@@ -14,13 +14,18 @@ import {
   LayoutList,
   Pencil,
   AlertTriangle,
+  Calculator,
 } from "lucide-react";
 import {
   produtos as produtosMock,
   insumos,
   formatBRL,
   Produto,
+  totalCustosIndiretos as totalCustosDefault,
+  DEFAULT_CONFIGURACOES,
+  type Configuracoes,
 } from "@/lib/data";
+import { loadCustos } from "@/app/financeiro/page";
 
 type ModalMode = "detalhe" | "novo" | "editar" | null;
 
@@ -29,7 +34,7 @@ interface ReceitaRow {
   quantidade: string;
 }
 
-const CATEGORIAS = [
+const CATEGORIAS_DEFAULT = [
   "Chaveiro",
   "Adesivo",
   "Tag",
@@ -38,9 +43,35 @@ const CATEGORIAS = [
   "Kit",
   "Outro",
 ];
+
 const INSUMOS_ROTATIVO = insumos.filter(
   (i) => i.categoria === "visivel" || i.categoria === "invisivel"
 );
+
+function loadConfig(): Configuracoes {
+  if (typeof window === "undefined") return DEFAULT_CONFIGURACOES;
+  try {
+    const saved = localStorage.getItem("almanac_config");
+    if (saved) return { ...DEFAULT_CONFIGURACOES, ...JSON.parse(saved) };
+  } catch {}
+  return DEFAULT_CONFIGURACOES;
+}
+
+function getTotalCustos(): number {
+  const items = loadCustos();
+  return items.reduce((s, c) => s + c.valorMensal, 0);
+}
+
+function calcPrecoSugerido(
+  materialCost: number,
+  tempoMin: number,
+  config: Configuracoes
+): number {
+  const total = getTotalCustos() || totalCustosDefault;
+  const hourlyRate = config.horasTrabalhoMes > 0 ? total / config.horasTrabalhoMes : 0;
+  const timeCost = (tempoMin / 60) * hourlyRate;
+  return (materialCost + timeCost) * config.multiplicadorPreco;
+}
 
 // ── Modal wrapper ────────────────────────────────────────────
 function Modal({
@@ -146,59 +177,20 @@ function FotoUpload() {
   );
 }
 
-// ── Margem bar ───────────────────────────────────────────────
-function MargemBar({ margem }: { margem: number }) {
-  const color =
-    margem >= 70
-      ? "var(--status-success)"
-      : margem >= 40
-      ? "var(--status-warning)"
-      : "var(--status-error)";
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <div
-        style={{
-          flex: 1,
-          height: 4,
-          borderRadius: 9999,
-          background: "var(--bg-input)",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            width: `${Math.min(Math.max(margem, 0), 100)}%`,
-            height: "100%",
-            background: color,
-            borderRadius: 9999,
-            transition: "width 400ms cubic-bezier(0.34,1.56,0.64,1)",
-          }}
-        />
-      </div>
-      <span
-        style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: 12,
-          fontWeight: 700,
-          color,
-          width: 44,
-          textAlign: "right",
-          flexShrink: 0,
-        }}
-      >
-        {margem.toFixed(1)}%
-      </span>
-    </div>
-  );
-}
-
 // ── Detalhe content ──────────────────────────────────────────
 function DetalheContent({ produto }: { produto: Produto }) {
   const receitaComInsumo = produto.receita.map((r) => ({
     ...r,
     insumo: insumos.find((i) => i.id === r.insumoId)!,
   }));
+
+  const config = loadConfig();
+  const hourlyRate =
+    config.horasTrabalhoMes > 0
+      ? getTotalCustos() / config.horasTrabalhoMes
+      : 0;
+  const timeCost = (produto.tempoProducao / 60) * hourlyRate;
+  const precoCalculado = (produto.custo + timeCost) * config.multiplicadorPreco;
 
   return (
     <>
@@ -246,16 +238,78 @@ function DetalheContent({ produto }: { produto: Produto }) {
           <div
             style={{ fontFamily: "var(--font-mono)", fontWeight: 700, fontSize: 20 }}
           >
-            {formatBRL(produto.precoSugerido)}
+            {formatBRL(precoCalculado)}
           </div>
         </div>
       </div>
 
-      <div>
-        <div className="alm-label" style={{ marginBottom: 6 }}>
-          Margem de contribuição
+      {/* Breakdown do preço */}
+      <div
+        style={{
+          background: "var(--bg-input)",
+          borderRadius: "var(--radius-md, 4px)",
+          padding: "10px 12px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            marginBottom: 2,
+          }}
+        >
+          <Calculator size={11} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.07em",
+              color: "var(--text-tertiary)",
+            }}
+          >
+            Como foi calculado
+          </span>
         </div>
-        <MargemBar margem={produto.margem} />
+        {[
+          { label: "Material (insumos)", value: produto.custo },
+          {
+            label: `Tempo (${produto.tempoProducao}min × R$${hourlyRate.toFixed(2)}/h)`,
+            value: timeCost,
+          },
+        ].map(({ label, value }) => (
+          <div
+            key={label}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: 12,
+            }}
+          >
+            <span style={{ color: "var(--text-secondary)" }}>{label}</span>
+            <span style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(value)}</span>
+          </div>
+        ))}
+        <div
+          style={{
+            borderTop: "1px solid var(--border-default)",
+            paddingTop: 6,
+            display: "flex",
+            justifyContent: "space-between",
+            fontSize: 12,
+          }}
+        >
+          <span style={{ color: "var(--text-secondary)" }}>
+            × {config.multiplicadorPreco}× (multiplicador)
+          </span>
+          <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>
+            {formatBRL(precoCalculado)}
+          </span>
+        </div>
       </div>
 
       <div>
@@ -323,31 +377,117 @@ function DetalheContent({ produto }: { produto: Produto }) {
   );
 }
 
+// ── Categoria select com opção de criar nova ──────────────────
+function CategoriaSelect({
+  value,
+  onChange,
+  categorias,
+  onAddCategoria,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  categorias: string[];
+  onAddCategoria: (c: string) => void;
+}) {
+  const [criando, setCriando] = useState(false);
+  const [nova, setNova] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (criando) inputRef.current?.focus();
+  }, [criando]);
+
+  function confirmar() {
+    const cat = nova.trim();
+    if (!cat) { setCriando(false); setNova(""); return; }
+    onAddCategoria(cat);
+    onChange(cat);
+    setCriando(false);
+    setNova("");
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <select
+        className="alm-select"
+        style={{ height: 32 }}
+        value={criando ? "__nova__" : value}
+        onChange={(e) => {
+          if (e.target.value === "__nova__") {
+            setCriando(true);
+          } else {
+            setCriando(false);
+            onChange(e.target.value);
+          }
+        }}
+      >
+        {categorias.map((c) => (
+          <option key={c} value={c}>{c}</option>
+        ))}
+        <option value="__nova__">+ Nova categoria…</option>
+      </select>
+      {criando && (
+        <div style={{ display: "flex", gap: 6 }}>
+          <input
+            ref={inputRef}
+            className="atlas-input"
+            placeholder="Nome da categoria"
+            value={nova}
+            onChange={(e) => setNova(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") confirmar();
+              if (e.key === "Escape") { setCriando(false); setNova(""); }
+            }}
+            style={{ flex: 1, fontSize: 12 }}
+          />
+          <button
+            type="button"
+            className="atlas-btn atlas-btn-primary atlas-btn-sm"
+            onClick={confirmar}
+          >
+            Criar
+          </button>
+          <button
+            type="button"
+            className="atlas-btn atlas-btn-ghost atlas-btn-sm"
+            onClick={() => { setCriando(false); setNova(""); }}
+          >
+            <X size={13} strokeWidth={1.5} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const MULT_PRESETS = [2, 3, 4, 5];
+
 // ── Produto form (novo e editar) ──────────────────────────────
 function ProdutoFormContent({
   initial,
+  categorias,
   onSave,
   onClose,
+  onAddCategoria,
 }: {
   initial?: Produto;
+  categorias: string[];
   onSave: (data: {
     nome: string;
     categoria: string;
     tempo: number;
-    preco: number;
     receita: ReceitaRow[];
+    multiplicador: number;
   }) => void;
   onClose: () => void;
+  onAddCategoria: (c: string) => void;
 }) {
   const [nome, setNome] = useState(initial?.nome ?? "");
   const [categoria, setCategoria] = useState(
-    initial?.categoria ?? "Chaveiro"
+    initial?.categoria ?? categorias[0] ?? "Outro"
   );
   const [tempo, setTempo] = useState(
     initial ? String(initial.tempoProducao) : ""
-  );
-  const [preco, setPreco] = useState(
-    initial ? String(initial.precoSugerido) : ""
   );
   const [receita, setReceita] = useState<ReceitaRow[]>(
     initial
@@ -355,26 +495,33 @@ function ProdutoFormContent({
           insumoId: r.insumoId,
           quantidade: String(r.quantidade),
         }))
-      : [{ insumoId: INSUMOS_ROTATIVO[0].id, quantidade: "" }]
+      : [{ insumoId: INSUMOS_ROTATIVO[0]?.id ?? "", quantidade: "" }]
   );
 
-  const custoCalculado = receita.reduce((sum, r) => {
+  const config = loadConfig();
+  const [multInput, setMultInput] = useState(String(config.multiplicadorPreco));
+
+  const multNum = Math.max(1, parseFloat(multInput) || 1);
+
+  const materialCost = receita.reduce((sum, r) => {
     const ins = insumos.find((i) => i.id === r.insumoId);
     const qtd = parseFloat(r.quantidade);
     if (ins && !isNaN(qtd) && qtd > 0) return sum + ins.precoAtual * qtd;
     return sum;
   }, 0);
 
-  const precoNum = parseFloat(preco.replace(",", ".")) || 0;
-  const margemCalc =
-    precoNum > custoCalculado
-      ? ((precoNum - custoCalculado) / precoNum) * 100
+  const tempoNum = parseInt(tempo) || 0;
+  const hourlyRate =
+    config.horasTrabalhoMes > 0
+      ? getTotalCustos() / config.horasTrabalhoMes
       : 0;
+  const timeCost = (tempoNum / 60) * hourlyRate;
+  const precoCalculado = (materialCost + timeCost) * multNum;
 
   const addItem = () =>
     setReceita((prev) => [
       ...prev,
-      { insumoId: INSUMOS_ROTATIVO[0].id, quantidade: "" },
+      { insumoId: INSUMOS_ROTATIVO[0]?.id ?? "", quantidade: "" },
     ]);
 
   const removeItem = (idx: number) =>
@@ -385,16 +532,16 @@ function ProdutoFormContent({
       prev.map((r, i) => (i === idx ? { ...r, [field]: value } : r))
     );
 
-  const canSave = nome.trim().length > 0 && precoNum > 0;
+  const canSave = nome.trim().length > 0;
 
   const handleSave = () => {
     if (!canSave) return;
     onSave({
       nome: nome.trim(),
       categoria,
-      tempo: parseInt(tempo) || 0,
-      preco: precoNum,
+      tempo: tempoNum,
       receita,
+      multiplicador: multNum,
     });
   };
 
@@ -415,18 +562,12 @@ function ProdutoFormContent({
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <div className="alm-field">
           <label className="alm-label">Categoria</label>
-          <select
-            className="alm-select"
-            style={{ height: 32 }}
+          <CategoriaSelect
             value={categoria}
-            onChange={(e) => setCategoria(e.target.value)}
-          >
-            {CATEGORIAS.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+            onChange={setCategoria}
+            categorias={categorias}
+            onAddCategoria={onAddCategoria}
+          />
         </div>
         <div className="alm-field">
           <label className="alm-label">Tempo de produção (min)</label>
@@ -564,37 +705,111 @@ function ProdutoFormContent({
           <span
             style={{ fontFamily: "var(--font-mono)", fontWeight: 700, fontSize: 13 }}
           >
-            {formatBRL(custoCalculado)}
+            {formatBRL(materialCost)}
           </span>
         </div>
       </div>
 
-      <div className="alm-field">
-        <label className="alm-label">Preço de venda sugerido (R$)</label>
-        <input
-          className="atlas-input"
-          type="number"
-          min="0"
-          step="0.01"
-          placeholder="0,00"
-          value={preco}
-          onChange={(e) => setPreco(e.target.value)}
-        />
-      </div>
-
-      {precoNum > 0 && (
-        <div>
-          <div className="alm-label" style={{ marginBottom: 6 }}>
-            Margem estimada
+      {/* Preço calculado */}
+      <div
+        style={{
+          background: "var(--bg-input)",
+          border: "1px solid var(--border-default)",
+          borderRadius: "var(--radius-md, 4px)",
+          padding: "12px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <Calculator size={12} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
+            <span className="alm-label">Preço de venda sugerido</span>
           </div>
-          <MargemBar margem={margemCalc} />
-          {margemCalc < 40 && (
-            <div className="atlas-alert atlas-alert-warning" style={{ marginTop: 8 }}>
-              Margem abaixo de 40% — verifique o preço ou reduza insumos.
-            </div>
-          )}
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontWeight: 700,
+              fontSize: 18,
+              color: "var(--accent-primary)",
+            }}
+          >
+            {formatBRL(precoCalculado)}
+          </span>
         </div>
-      )}
+
+        {/* Breakdown */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          {[
+            { label: "Material", value: materialCost },
+            { label: `Tempo (${tempoNum}min × R$${hourlyRate.toFixed(2)}/h)`, value: timeCost },
+          ].map(({ label, value }) => (
+            <div
+              key={label}
+              style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}
+            >
+              <span style={{ color: "var(--text-tertiary)" }}>{label}</span>
+              <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-secondary)" }}>
+                {formatBRL(value)}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Multiplicador */}
+        <div
+          style={{
+            borderTop: "1px solid var(--border-default)",
+            paddingTop: 10,
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+          }}
+        >
+          <span className="alm-label">Multiplicador</span>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {MULT_PRESETS.map((p) => {
+              const active = parseFloat(multInput) === p;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setMultInput(String(p))}
+                  style={{
+                    height: 28,
+                    padding: "0 10px",
+                    borderRadius: "var(--radius-md, 4px)",
+                    border: active
+                      ? "1px solid var(--accent-primary)"
+                      : "1px solid var(--border-default)",
+                    background: active ? "var(--accent-primary)" : "var(--bg-raised)",
+                    color: active ? "#fff" : "var(--text-secondary)",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 12,
+                    fontWeight: active ? 700 : 400,
+                    cursor: "pointer",
+                    transition: "all 120ms ease",
+                    flexShrink: 0,
+                  }}
+                >
+                  {p}×
+                </button>
+              );
+            })}
+            <input
+              className="atlas-input"
+              type="number"
+              min="1"
+              step="0.1"
+              value={multInput}
+              onChange={(e) => setMultInput(e.target.value)}
+              style={{ width: 64, fontFamily: "var(--font-mono)", fontSize: 12 }}
+              placeholder="3"
+            />
+          </div>
+        </div>
+      </div>
 
       <div
         style={{
@@ -635,6 +850,7 @@ export default function ProdutosPage() {
   const [selected, setSelected] = useState<Produto | null>(null);
   const [mode, setMode] = useState<ModalMode>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [categorias, setCategorias] = useState<string[]>(CATEGORIAS_DEFAULT);
 
   const filtrados = lista.filter(
     (p) =>
@@ -654,39 +870,38 @@ export default function ProdutosPage() {
     setTimeout(() => setSelected(null), 340);
   };
 
+  const handleAddCategoria = (cat: string) => {
+    setCategorias((prev) =>
+      prev.includes(cat) ? prev : [...prev, cat]
+    );
+  };
+
   const handleSave = (data: {
     nome: string;
     categoria: string;
     tempo: number;
-    preco: number;
     receita: ReceitaRow[];
+    multiplicador: number;
   }) => {
+    const config = loadConfig();
+    const custo = data.receita.reduce((sum, r) => {
+      const ins = insumos.find((i) => i.id === r.insumoId);
+      const qtd = parseFloat(r.quantidade);
+      if (ins && !isNaN(qtd) && qtd > 0) return sum + ins.precoAtual * qtd;
+      return sum;
+    }, 0);
+    const configComMult = { ...config, multiplicadorPreco: data.multiplicador };
+    const precoSugerido = calcPrecoSugerido(custo, data.tempo, configComMult);
+
     if (mode === "novo") {
       const novo: Produto = {
         id: `prd-${Date.now()}`,
         nome: data.nome,
         categoria: data.categoria,
         tempoProducao: data.tempo,
-        precoSugerido: data.preco,
-        custo: data.receita.reduce((sum, r) => {
-          const ins = insumos.find((i) => i.id === r.insumoId);
-          const qtd = parseFloat(r.quantidade);
-          if (ins && !isNaN(qtd) && qtd > 0) return sum + ins.precoAtual * qtd;
-          return sum;
-        }, 0),
-        margem:
-          data.preco > 0
-            ? ((data.preco -
-                data.receita.reduce((sum, r) => {
-                  const ins = insumos.find((i) => i.id === r.insumoId);
-                  const qtd = parseFloat(r.quantidade);
-                  if (ins && !isNaN(qtd) && qtd > 0)
-                    return sum + ins.precoAtual * qtd;
-                  return sum;
-                }, 0)) /
-                data.preco) *
-              100
-            : 0,
+        precoSugerido,
+        custo,
+        margem: 0,
         receita: data.receita.map((r) => ({
           insumoId: r.insumoId,
           quantidade: parseFloat(r.quantidade) || 0,
@@ -694,12 +909,6 @@ export default function ProdutosPage() {
       };
       setLista((prev) => [...prev, novo]);
     } else if (mode === "editar" && selected) {
-      const custo = data.receita.reduce((sum, r) => {
-        const ins = insumos.find((i) => i.id === r.insumoId);
-        const qtd = parseFloat(r.quantidade);
-        if (ins && !isNaN(qtd) && qtd > 0) return sum + ins.precoAtual * qtd;
-        return sum;
-      }, 0);
       setLista((prev) =>
         prev.map((p) =>
           p.id === selected.id
@@ -708,12 +917,9 @@ export default function ProdutosPage() {
                 nome: data.nome,
                 categoria: data.categoria,
                 tempoProducao: data.tempo,
-                precoSugerido: data.preco,
+                precoSugerido,
                 custo,
-                margem:
-                  data.preco > 0
-                    ? ((data.preco - custo) / data.preco) * 100
-                    : 0,
+                margem: 0,
                 receita: data.receita.map((r) => ({
                   insumoId: r.insumoId,
                   quantidade: parseFloat(r.quantidade) || 0,
@@ -833,18 +1039,12 @@ export default function ProdutosPage() {
                   <th className="num">Custo produção</th>
                   <th className="num">Preço sugerido</th>
                   <th className="num">Tempo</th>
-                  <th style={{ minWidth: 140 }}>Margem</th>
                 </tr>
               </thead>
               <tbody>
                 {filtrados.map((p) => {
-                  const margemColor =
-                    p.margem >= 70
-                      ? "var(--status-success)"
-                      : p.margem >= 40
-                      ? "var(--status-warning)"
-                      : "var(--status-error)";
-
+                  const config = loadConfig();
+                  const preco = calcPrecoSugerido(p.custo, p.tempoProducao, config);
                   return (
                     <tr key={p.id} onClick={() => openDetalhe(p)}>
                       <td>
@@ -886,7 +1086,7 @@ export default function ProdutosPage() {
                         className="num"
                         style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}
                       >
-                        {formatBRL(p.precoSugerido)}
+                        {formatBRL(preco)}
                       </td>
                       <td
                         className="num"
@@ -902,48 +1102,6 @@ export default function ProdutosPage() {
                           <Clock size={11} strokeWidth={1.5} />
                           {p.tempoProducao} min
                         </span>
-                      </td>
-                      <td>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            paddingRight: 8,
-                          }}
-                        >
-                          <div
-                            style={{
-                              flex: 1,
-                              height: 3,
-                              borderRadius: 9999,
-                              background: "var(--bg-input)",
-                              overflow: "hidden",
-                              minWidth: 60,
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: `${Math.min(p.margem, 100)}%`,
-                                height: "100%",
-                                background: margemColor,
-                                borderRadius: 9999,
-                              }}
-                            />
-                          </div>
-                          <span
-                            style={{
-                              fontFamily: "var(--font-mono)",
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: margemColor,
-                              width: 40,
-                              textAlign: "right",
-                            }}
-                          >
-                            {p.margem.toFixed(1)}%
-                          </span>
-                        </div>
                       </td>
                     </tr>
                   );
@@ -974,13 +1132,8 @@ export default function ProdutosPage() {
             }}
           >
             {filtrados.map((p) => {
-              const margemColor =
-                p.margem >= 70
-                  ? "var(--status-success)"
-                  : p.margem >= 40
-                  ? "var(--status-warning)"
-                  : "var(--status-error)";
-
+              const config = loadConfig();
+              const preco = calcPrecoSugerido(p.custo, p.tempoProducao, config);
               return (
                 <div
                   key={p.id}
@@ -1045,14 +1198,7 @@ export default function ProdutosPage() {
                     >
                       {p.categoria}
                     </span>
-                    <div
-                      style={{
-                        marginTop: "auto",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 5,
-                      }}
-                    >
+                    <div style={{ marginTop: "auto" }}>
                       <div
                         style={{
                           fontFamily: "var(--font-mono)",
@@ -1060,39 +1206,7 @@ export default function ProdutosPage() {
                           fontSize: 14,
                         }}
                       >
-                        {formatBRL(p.precoSugerido)}
-                      </div>
-                      <div
-                        style={{ display: "flex", alignItems: "center", gap: 6 }}
-                      >
-                        <div
-                          style={{
-                            flex: 1,
-                            height: 3,
-                            borderRadius: 9999,
-                            background: "var(--bg-hover)",
-                            overflow: "hidden",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: `${Math.min(p.margem, 100)}%`,
-                              height: "100%",
-                              background: margemColor,
-                              borderRadius: 9999,
-                            }}
-                          />
-                        </div>
-                        <span
-                          style={{
-                            fontFamily: "var(--font-mono)",
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: margemColor,
-                          }}
-                        >
-                          {p.margem.toFixed(0)}%
-                        </span>
+                        {formatBRL(preco)}
                       </div>
                     </div>
                   </div>
@@ -1191,7 +1305,12 @@ export default function ProdutosPage() {
 
       {/* Modal novo produto */}
       <Modal open={mode === "novo"} onClose={close} title="Novo produto" wide>
-        <ProdutoFormContent onSave={handleSave} onClose={close} />
+        <ProdutoFormContent
+          categorias={categorias}
+          onSave={handleSave}
+          onClose={close}
+          onAddCategoria={handleAddCategoria}
+        />
       </Modal>
 
       {/* Modal editar produto */}
@@ -1204,8 +1323,10 @@ export default function ProdutosPage() {
         {selected && (
           <ProdutoFormContent
             initial={selected}
+            categorias={categorias}
             onSave={handleSave}
             onClose={close}
+            onAddCategoria={handleAddCategoria}
           />
         )}
       </Modal>

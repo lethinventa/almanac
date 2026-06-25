@@ -155,7 +155,6 @@ function DetalheContent({ insumo }: { insumo: Insumo }) {
       {/* Dados */}
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
         {insumo.unidade !== "—" && <InfoRow label="Unidade" value={insumo.unidade} />}
-        {insumo.fornecedor && <InfoRow label="Fornecedor" value={insumo.fornecedor} />}
         <InfoRow label="Preço atual" value={`${formatBRL(insumo.precoAtual)} / ${insumo.unidade}`} mono />
         {insumo.estoque !== null && (
           <InfoRow label="Estoque atual" value={`${insumo.estoque} ${insumo.unidade}`} mono error={alerta} />
@@ -263,10 +262,6 @@ function EntradaContent({ insumo }: { insumo: Insumo }) {
       <div className="alm-field">
         <label className="alm-label">Valor pago por {insumo.unidade} (R$) — atualiza preço</label>
         <input className="atlas-input" type="number" placeholder={String(insumo.precoAtual)} step="0.01" />
-      </div>
-      <div className="alm-field">
-        <label className="alm-label">Fornecedor</label>
-        <input className="atlas-input" type="text" placeholder={insumo.fornecedor ?? "Opcional"} />
       </div>
     </>
   );
@@ -381,10 +376,6 @@ function NovoInsumoContent() {
         </div>
       )}
 
-      <div className="alm-field">
-        <label className="alm-label">Fornecedor (opcional)</label>
-        <input className="atlas-input" type="text" placeholder="Nome ou loja" />
-      </div>
     </>
   );
 }
@@ -482,7 +473,6 @@ export default function InsumosPage() {
                   <th className="num">Estoque</th>
                   <th className="num">Mínimo</th>
                   <th className="num">Preço atual</th>
-                  <th>Fornecedor</th>
                   <th></th>
                 </tr>
               </thead>
@@ -510,9 +500,6 @@ export default function InsumosPage() {
                       </td>
                       <td className="num" style={{ fontFamily: "var(--font-mono)" }}>
                         {formatBRL(insumo.precoAtual)}/{insumo.unidade === "—" ? "un." : insumo.unidade}
-                      </td>
-                      <td style={{ color: "var(--text-secondary)", fontSize: "12px" }}>
-                        {insumo.fornecedor ?? "—"}
                       </td>
                       <td>
                         <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end" }}>

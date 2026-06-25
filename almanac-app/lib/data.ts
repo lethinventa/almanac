@@ -70,9 +70,18 @@ export interface Encomenda {
 export interface CustoIndireto {
   id: string;
   nome: string;
-  tipo: "fixo" | "mao_de_obra";
   valorMensal: number;
 }
+
+export interface Configuracoes {
+  horasTrabalhoMes: number;
+  multiplicadorPreco: number;
+}
+
+export const DEFAULT_CONFIGURACOES: Configuracoes = {
+  horasTrabalhoMes: 160,
+  multiplicadorPreco: 3,
+};
 
 // ─────────────────────────────────────────────────────────────
 // Insumos
@@ -495,11 +504,10 @@ export const encomendas: Encomenda[] = [
 // Custos indiretos
 // ─────────────────────────────────────────────────────────────
 export const custosIndiretos: CustoIndireto[] = [
-  { id: "ci-1", nome: "Energia elétrica", tipo: "fixo", valorMensal: 110.0 },
-  { id: "ci-2", nome: "Internet", tipo: "fixo", valorMensal: 99.9 },
-  { id: "ci-3", nome: "Assinatura Canva Pro", tipo: "fixo", valorMensal: 54.99 },
-  { id: "ci-4", nome: "Aluguel da sala", tipo: "fixo", valorMensal: 450.0 },
-  { id: "ci-5", nome: "Mão de obra (proprietária)", tipo: "mao_de_obra", valorMensal: 60.0 },
+  { id: "ci-1", nome: "Energia elétrica", valorMensal: 110.0 },
+  { id: "ci-2", nome: "Internet", valorMensal: 99.9 },
+  { id: "ci-3", nome: "Assinatura Canva Pro", valorMensal: 54.99 },
+  { id: "ci-4", nome: "Aluguel da sala", valorMensal: 450.0 },
 ];
 
 // ─────────────────────────────────────────────────────────────

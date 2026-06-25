@@ -115,72 +115,192 @@ const EXT_COLORS: Record<string, { bg: string; color: string }> = {
   PSD: { bg: "#1a5276", color: "#fff" },
 };
 
-// ── KitPhoto (compact) ────────────────────────────────────────
-function KitPhoto({
-  src,
-  onChange,
+// ── VisualGaleria ─────────────────────────────────────────────
+function VisualGaleria({
+  foto,
+  onFotoChange,
+  itens,
+  onPreview,
 }: {
-  src: string | null;
-  onChange: (url: string) => void;
+  foto: string | null;
+  onFotoChange: (url: string) => void;
+  itens: EncomendaItem[];
+  onPreview: (src: string, alt: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) onChange(URL.createObjectURL(f));
+    if (f) onFotoChange(URL.createObjectURL(f));
   };
 
-  if (src) {
-    return (
-      <div style={{ position: "relative" }}>
-        <img
-          src={src}
-          alt="Foto do kit"
-          style={{
-            width: "100%",
-            height: 160,
-            objectFit: "cover",
-            borderRadius: "var(--radius-md)",
-            display: "block",
-          }}
-        />
-        <button
-          onClick={() => inputRef.current?.click()}
-          style={{
-            position: "absolute",
-            bottom: 8,
-            right: 8,
-            background: "rgba(0,0,0,0.65)",
-            border: "1px solid rgba(255,255,255,0.15)",
-            borderRadius: "var(--radius-md)",
-            color: "#fff",
-            fontSize: 11,
-            padding: "4px 10px",
-            cursor: "pointer",
-            backdropFilter: "blur(4px)",
-          }}
-        >
-          Trocar foto
-        </button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          style={{ display: "none" }}
-          onChange={handleFile}
-        />
-      </div>
-    );
-  }
+  const TILE = 88;
+
+  const tiles: {
+    key: string;
+    label: string;
+    src: string | null;
+    isKit?: boolean;
+    qty?: number;
+  }[] = [
+    { key: "kit", label: "preview geral", src: foto, isKit: true },
+    ...itens.map((item, i) => {
+      const prod = produtos.find((p) => p.id === item.produtoId);
+      return {
+        key: `item-${i}`,
+        label: prod?.nome ?? item.produtoId,
+        src: prod?.foto ?? null,
+        qty: item.quantidade,
+      };
+    }),
+  ];
 
   return (
-    <div className="alm-upload" onClick={() => inputRef.current?.click()}>
-      <ImagePlus size={20} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
-      <span className="alm-upload-label">Adicionar foto do kit</span>
-      <span className="alm-upload-hint">Foto gerada por IA com o conjunto do pedido</span>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+      {tiles.map((tile) => {
+        const hasPhoto = !!tile.src;
+        return (
+          <div
+            key={tile.key}
+            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}
+          >
+            <div
+              style={{
+                width: TILE,
+                height: TILE,
+                borderRadius: "var(--radius-md)",
+                border: `1px solid ${hasPhoto ? "var(--border-default)" : "var(--border-subtle)"}`,
+                background: "var(--bg-input)",
+                overflow: "hidden",
+                position: "relative",
+                flexShrink: 0,
+                cursor: hasPhoto ? "zoom-in" : tile.isKit ? "pointer" : "default",
+              }}
+              onClick={() => {
+                if (hasPhoto) onPreview(tile.src!, tile.label);
+                else if (tile.isKit) inputRef.current?.click();
+              }}
+            >
+              {hasPhoto ? (
+                <>
+                  <img
+                    src={tile.src!}
+                    alt={tile.label}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 4,
+                      right: 4,
+                      background: "rgba(0,0,0,0.45)",
+                      borderRadius: "var(--radius-sm)",
+                      width: 18,
+                      height: 18,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <ZoomIn size={10} strokeWidth={1.5} style={{ color: "#fff" }} />
+                  </div>
+                </>
+              ) : tile.isKit ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    height: "100%",
+                    gap: 4,
+                  }}
+                >
+                  <ImagePlus size={18} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
+                  <span style={{ fontSize: 9, color: "var(--text-tertiary)", textAlign: "center", lineHeight: 1.2 }}>
+                    adicionar
+                  </span>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    height: "100%",
+                  }}
+                >
+                  <Package size={20} strokeWidth={1} style={{ color: "var(--border-default)" }} />
+                </div>
+              )}
+
+              {tile.qty !== undefined && tile.qty > 1 && (
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 4,
+                    left: 4,
+                    background: "rgba(0,0,0,0.6)",
+                    color: "#fff",
+                    fontSize: 9,
+                    fontWeight: 700,
+                    padding: "1px 5px",
+                    borderRadius: "var(--radius-full)",
+                    lineHeight: 1.4,
+                    fontFamily: "var(--font-mono)",
+                  }}
+                >
+                  ×{tile.qty}
+                </div>
+              )}
+
+              {tile.isKit && hasPhoto && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    inputRef.current?.click();
+                  }}
+                  style={{
+                    position: "absolute",
+                    bottom: 4,
+                    right: 4,
+                    background: "rgba(0,0,0,0.55)",
+                    border: "none",
+                    borderRadius: "var(--radius-sm)",
+                    color: "#fff",
+                    fontSize: 9,
+                    padding: "2px 6px",
+                    cursor: "pointer",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  trocar
+                </button>
+              )}
+            </div>
+
+            <span
+              style={{
+                fontSize: 10,
+                color: "var(--text-tertiary)",
+                maxWidth: TILE,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                textAlign: "center",
+                lineHeight: 1,
+              }}
+            >
+              {tile.label}
+            </span>
+          </div>
+        );
+      })}
+
       <input
         ref={inputRef}
         type="file"
         accept="image/*"
+        style={{ display: "none" }}
         onChange={handleFile}
       />
     </div>
@@ -191,9 +311,11 @@ function KitPhoto({
 function TabelaProdutos({
   itens,
   onChange,
+  onPreview,
 }: {
   itens: EncomendaItem[];
   onChange: (itens: EncomendaItem[]) => void;
+  onPreview?: (src: string, alt: string) => void;
 }) {
   const [editCell, setEditCell] = useState<{
     row: number;
@@ -303,7 +425,9 @@ function TabelaProdutos({
                       justifyContent: "center",
                       flexShrink: 0,
                       overflow: "hidden",
+                      cursor: prod?.foto ? "zoom-in" : "default",
                     }}
+                    onClick={() => prod?.foto && onPreview?.(prod.foto, prod.nome)}
                   >
                     {prod?.foto ? (
                       <img
@@ -1227,7 +1351,7 @@ export default function EncomendaDetalhePage() {
         {/* Coluna principal */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Tabela de produtos */}
-          <TabelaProdutos itens={itens} onChange={setItens} />
+          <TabelaProdutos itens={itens} onChange={setItens} onPreview={(src, alt) => setLightbox({ src, alt })} />
 
           {/* Observações */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -1250,111 +1374,13 @@ export default function EncomendaDetalhePage() {
             <div className="atlas-card-header">
               <span className="atlas-panel-title">Visual do pedido</span>
             </div>
-            <div className="atlas-card-body" style={{ display: "flex", flexDirection: "column", gap: 16, padding: "12px" }}>
-              {/* Kit photo */}
-              <KitPhoto src={foto} onChange={setFoto} />
-
-              {/* Individual previews */}
-              {itens.length > 0 && (
-                <div>
-                  <p
-                    className="label-upper"
-                    style={{ marginBottom: 10 }}
-                  >
-                    Previews individuais
-                  </p>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
-                      gap: 10,
-                    }}
-                  >
-                    {itens.map((item, i) => {
-                      const prod = produtos.find((p) => p.id === item.produtoId);
-                      const prodFoto = prod?.foto;
-                      return (
-                        <div
-                          key={i}
-                          style={{
-                            border: "1px solid var(--border-default)",
-                            borderRadius: "var(--radius-md)",
-                            overflow: "hidden",
-                            background: "var(--bg-base)",
-                          }}
-                        >
-                          <div
-                            style={{
-                              height: 110,
-                              background: "var(--bg-input)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              overflow: "hidden",
-                            }}
-                          >
-                            {prodFoto ? (
-                              <img
-                                src={prodFoto}
-                                alt={prod?.nome}
-                                style={{
-                                  width: "100%",
-                                  height: "100%",
-                                  objectFit: "cover",
-                                }}
-                              />
-                            ) : (
-                              <Package
-                                size={28}
-                                strokeWidth={1}
-                                style={{ color: "var(--text-tertiary)" }}
-                              />
-                            )}
-                          </div>
-                          <div style={{ padding: "8px 10px" }}>
-                            <div
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 600,
-                                color: "var(--text-primary)",
-                                marginBottom: 2,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {prod?.nome ?? item.produtoId}
-                            </div>
-                            <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
-                              {item.quantidade} un.
-                            </div>
-                            {prodFoto && (
-                              <button
-                                className="atlas-btn atlas-btn-ghost atlas-btn-sm"
-                                style={{
-                                  marginTop: 6,
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 3,
-                                  fontSize: 10,
-                                  padding: "0 4px",
-                                  height: 20,
-                                }}
-                                onClick={() =>
-                                  setLightbox({ src: prodFoto, alt: prod?.nome ?? "" })
-                                }
-                              >
-                                <ZoomIn size={10} strokeWidth={1.5} />
-                                Ampliar
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+            <div className="atlas-card-body" style={{ padding: "12px" }}>
+              <VisualGaleria
+                foto={foto}
+                onFotoChange={setFoto}
+                itens={itens}
+                onPreview={(src, alt) => setLightbox({ src, alt })}
+              />
             </div>
           </div>
         </div>

@@ -190,7 +190,6 @@ export default function DashboardPage() {
                   <th className="num">Estoque atual</th>
                   <th className="num">Mínimo</th>
                   <th className="num">Preço atual</th>
-                  <th>Fornecedor</th>
                 </tr>
               </thead>
               <tbody>
@@ -215,9 +214,6 @@ export default function DashboardPage() {
                     </td>
                     <td className="num" style={{ fontFamily: "var(--font-mono)" }}>
                       {formatBRL(insumo.precoAtual)}/{insumo.unidade}
-                    </td>
-                    <td style={{ color: "var(--text-secondary)", fontSize: "12px" }}>
-                      {insumo.fornecedor ?? "—"}
                     </td>
                   </tr>
                 ))}
