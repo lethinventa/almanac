@@ -28,6 +28,7 @@ export interface Produto {
   custo: number;
   precoSugerido: number;
   margem: number;
+  foto?: string;
 }
 
 export type EncomendaStatus =
@@ -61,6 +62,7 @@ export interface Encomenda {
   custoProducao: number;
   margem: number;
   observacoes?: string;
+  observacoesInternas?: string;
   foto?: string;
   linksUteis?: LinkUtil[];
 }
@@ -322,6 +324,7 @@ export const encomendas: Encomenda[] = [
     custoProducao: 10.45,
     margem: 94.2,
     observacoes: "Cliente pediu embalagem especial para presente",
+    observacoesInternas: "Usar fita de cetim rosa na embalagem. Conferir estoque de vinil antes de iniciar.",
   },
   {
     id: "enc-2",
@@ -365,6 +368,7 @@ export const encomendas: Encomenda[] = [
     custoProducao: 28.6,
     margem: 95.9,
     observacoes: "Encomenda para loja física — entrega em mãos",
+    observacoesInternas: "Confirmar endereço de entrega com a cliente antes de embalar.",
   },
   {
     id: "enc-5",

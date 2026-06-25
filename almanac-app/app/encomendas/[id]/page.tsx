@@ -1,20 +1,23 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useRef, useEffect } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
   ImagePlus,
-  ExternalLink,
   Plus,
   Trash2,
   MessageCircle,
   Users,
   Calendar,
   ChevronRight,
-  Link2,
-  FileText,
+  Check,
+  Clock,
+  Package,
+  ZoomIn,
+  X,
+  Eye,
 } from "lucide-react";
 import {
   encomendas as encomendasMock,
@@ -25,30 +28,95 @@ import {
   statusBadge,
   EncomendaStatus,
   LinkUtil,
+  EncomendaItem,
 } from "@/lib/data";
 
+// ── Status flow ───────────────────────────────────────────────
 const NEXT_STATUS: Partial<Record<EncomendaStatus, EncomendaStatus>> = {
   aguardando: "em_producao",
   em_producao: "pronto",
   pronto: "entregue",
 };
-
 const NEXT_LABEL: Partial<Record<EncomendaStatus, string>> = {
   aguardando: "Iniciar produção",
   em_producao: "Marcar como pronto",
   pronto: "Confirmar entrega",
 };
 
-const STATUS_COLOR: Record<EncomendaStatus, string> = {
-  aguardando: "var(--text-tertiary)",
-  em_producao: "var(--status-warning)",
-  pronto: "var(--accent-highlight)",
-  entregue: "var(--status-success)",
-  cancelado: "var(--status-error)",
+// ── Helpers ───────────────────────────────────────────────────
+function formatOrderNumber(id: string): string {
+  const match = id.match(/\d+$/);
+  return match ? `#${match[0].padStart(3, "0")}` : `#${id}`;
+}
+
+function getDaysLabel(dateStr: string, status: EncomendaStatus): string | null {
+  if (status === "entregue" || status === "cancelado") return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const delivery = new Date(`${dateStr}T00:00:00`);
+  const diff = Math.round(
+    (delivery.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  if (diff < 0) return `${Math.abs(diff)} dias de atraso`;
+  if (diff === 0) return "entrega hoje";
+  return `faltam ${diff} dias`;
+}
+
+function deriveTimeline(
+  status: EncomendaStatus,
+  dataPedido: string
+): { evento: string; data: string; concluido: boolean; isCurrent: boolean }[] {
+  const base = new Date(`${dataPedido}T00:00:00`);
+  const addDays = (n: number) => {
+    const d = new Date(base);
+    d.setDate(d.getDate() + n);
+    return d.toLocaleDateString("pt-BR");
+  };
+
+  if (status === "cancelado") {
+    return [
+      { evento: "Pedido criado", data: addDays(0), concluido: true, isCurrent: false },
+      { evento: "Pedido cancelado", data: addDays(1), concluido: false, isCurrent: true },
+    ];
+  }
+
+  const ORDER: EncomendaStatus[] = ["aguardando", "em_producao", "pronto", "entregue"];
+  const currentIdx = ORDER.indexOf(status);
+
+  const steps = [
+    { evento: "Pedido criado", statusIdx: 0 },
+    { evento: "Produção iniciada", statusIdx: 1 },
+    { evento: "Marcado como pronto", statusIdx: 2 },
+    { evento: "Entregue ao cliente", statusIdx: 3 },
+  ];
+
+  return steps
+    .filter((s) => s.statusIdx <= currentIdx)
+    .map((s) => ({
+      evento: s.evento,
+      data: addDays(s.statusIdx),
+      concluido: s.statusIdx < currentIdx,
+      isCurrent: s.statusIdx === currentIdx,
+    }));
+}
+
+function getFileExt(url: string, label: string): string {
+  const src = url || label;
+  const match = src.match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
+  return match ? match[1].toUpperCase() : "ARQ";
+}
+
+const EXT_COLORS: Record<string, { bg: string; color: string }> = {
+  PDF: { bg: "#c0392b", color: "#fff" },
+  PNG: { bg: "#2980b9", color: "#fff" },
+  JPG: { bg: "#2980b9", color: "#fff" },
+  JPEG: { bg: "#2980b9", color: "#fff" },
+  AI:  { bg: "#7b2d8b", color: "#fff" },
+  PSD: { bg: "#1a5276", color: "#fff" },
 };
 
-// ── Foto hero ────────────────────────────────────────────────
-function FotoHero({
+// ── KitPhoto (compact) ────────────────────────────────────────
+function KitPhoto({
   src,
   onChange,
 }: {
@@ -56,7 +124,6 @@ function FotoHero({
   onChange: (url: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (f) onChange(URL.createObjectURL(f));
@@ -67,12 +134,12 @@ function FotoHero({
       <div style={{ position: "relative" }}>
         <img
           src={src}
-          alt="Visualização final"
+          alt="Foto do kit"
           style={{
             width: "100%",
-            aspectRatio: "16/7",
+            height: 160,
             objectFit: "cover",
-            borderRadius: "var(--radius-lg, 6px)",
+            borderRadius: "var(--radius-md)",
             display: "block",
           }}
         />
@@ -80,11 +147,11 @@ function FotoHero({
           onClick={() => inputRef.current?.click()}
           style={{
             position: "absolute",
-            bottom: 10,
-            right: 10,
+            bottom: 8,
+            right: 8,
             background: "rgba(0,0,0,0.65)",
             border: "1px solid rgba(255,255,255,0.15)",
-            borderRadius: "var(--radius-md, 4px)",
+            borderRadius: "var(--radius-md)",
             color: "#fff",
             fontSize: 11,
             padding: "4px 10px",
@@ -106,172 +173,794 @@ function FotoHero({
   }
 
   return (
-    <div
-      onClick={() => inputRef.current?.click()}
-      style={{
-        width: "100%",
-        aspectRatio: "16/7",
-        border: "1px dashed var(--border-strong)",
-        borderRadius: "var(--radius-lg, 6px)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-        cursor: "pointer",
-        background: "var(--bg-input)",
-        transition: "background-color 120ms ease, border-color 120ms ease",
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.background =
-          "var(--bg-hover)";
-        (e.currentTarget as HTMLDivElement).style.borderColor =
-          "var(--accent-primary)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLDivElement).style.background =
-          "var(--bg-input)";
-        (e.currentTarget as HTMLDivElement).style.borderColor =
-          "var(--border-strong)";
-      }}
-    >
-      <ImagePlus
-        size={24}
-        strokeWidth={1.5}
-        style={{ color: "var(--text-tertiary)" }}
-      />
-      <div style={{ textAlign: "center" }}>
-        <div style={{ fontSize: 13, color: "var(--text-secondary)", fontWeight: 500 }}>
-          Adicionar foto principal
-        </div>
-        <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>
-          Visualização final gerada por IA — PNG, JPG até 10 MB
-        </div>
-      </div>
+    <div className="alm-upload" onClick={() => inputRef.current?.click()}>
+      <ImagePlus size={20} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
+      <span className="alm-upload-label">Adicionar foto do kit</span>
+      <span className="alm-upload-hint">Foto gerada por IA com o conjunto do pedido</span>
       <input
         ref={inputRef}
         type="file"
         accept="image/*"
-        style={{ display: "none" }}
         onChange={handleFile}
       />
     </div>
   );
 }
 
-// ── Links úteis ──────────────────────────────────────────────
-function LinksUteis({
-  links,
+// ── TabelaProdutos ────────────────────────────────────────────
+function TabelaProdutos({
+  itens,
   onChange,
 }: {
-  links: LinkUtil[];
-  onChange: (links: LinkUtil[]) => void;
+  itens: EncomendaItem[];
+  onChange: (itens: EncomendaItem[]) => void;
 }) {
-  const [novoLabel, setNovoLabel] = useState("");
-  const [novoUrl, setNovoUrl] = useState("");
+  const [editCell, setEditCell] = useState<{
+    row: number;
+    field: "quantidade" | "precoUnitario";
+  } | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [addingRow, setAddingRow] = useState(false);
+  const [newItem, setNewItem] = useState({
+    produtoId: produtos[0]?.id ?? "",
+    quantidade: "1",
+    precoUnitario: String(produtos[0]?.precoSugerido ?? 0),
+  });
 
-  const add = () => {
-    if (!novoUrl.trim()) return;
-    onChange([
-      ...links,
-      { label: novoLabel.trim() || novoUrl.trim(), url: novoUrl.trim() },
-    ]);
-    setNovoLabel("");
-    setNovoUrl("");
+  const startEdit = (row: number, field: "quantidade" | "precoUnitario") => {
+    setEditCell({ row, field });
+    setEditValue(String(itens[row][field]));
   };
 
-  const remove = (idx: number) =>
-    onChange(links.filter((_, i) => i !== idx));
+  const commitEdit = () => {
+    if (!editCell) return;
+    const val = parseFloat(editValue);
+    if (!isNaN(val) && val > 0) {
+      onChange(
+        itens.map((item, i) =>
+          i === editCell.row ? { ...item, [editCell.field]: val } : item
+        )
+      );
+    }
+    setEditCell(null);
+  };
+
+  const removeItem = (idx: number) =>
+    onChange(itens.filter((_, i) => i !== idx));
+
+  const confirmAdd = () => {
+    const qty = parseFloat(newItem.quantidade);
+    const price = parseFloat(newItem.precoUnitario);
+    if (!newItem.produtoId || isNaN(qty) || qty <= 0) return;
+    onChange([
+      ...itens,
+      { produtoId: newItem.produtoId, quantidade: qty, precoUnitario: price || 0 },
+    ]);
+    setAddingRow(false);
+    const first = produtos[0];
+    setNewItem({
+      produtoId: first?.id ?? "",
+      quantidade: "1",
+      precoUnitario: String(first?.precoSugerido ?? 0),
+    });
+  };
+
+  const subtotal = itens.reduce((s, i) => s + i.quantidade * i.precoUnitario, 0);
+
+  const editableCellStyle: React.CSSProperties = {
+    fontFamily: "var(--font-mono)",
+    cursor: "pointer",
+    borderRadius: "var(--radius-sm)",
+    padding: "2px 4px",
+    display: "inline-block",
+    transition: "background-color 80ms",
+  };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {links.length === 0 && (
-        <div
-          style={{ fontSize: 12, color: "var(--text-tertiary)", fontStyle: "italic" }}
-        >
-          Nenhum link adicionado ainda.
+    <div className="atlas-card" style={{ padding: 0 }}>
+      {/* Header */}
+      <div
+        className="atlas-card-header"
+        style={{ justifyContent: "space-between", padding: "0 12px" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span className="atlas-panel-title">Produtos do pedido</span>
+          <span className="atlas-badge">
+            {itens.length} {itens.length === 1 ? "item" : "itens"}
+          </span>
         </div>
-      )}
-      {links.map((l, i) => (
-        <div
-          key={i}
-          style={{ display: "flex", alignItems: "center", gap: 8 }}
-        >
-          <FileText
-            size={13}
-            strokeWidth={1.5}
-            style={{ color: "var(--text-tertiary)", flexShrink: 0 }}
-          />
-          <a
-            href={l.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              fontSize: 12,
-              color: "var(--accent-highlight)",
-              textDecoration: "none",
-              flex: 1,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              minWidth: 0,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {l.label}
-            <ExternalLink size={10} strokeWidth={1.5} style={{ flexShrink: 0 }} />
-          </a>
-          <button
-            onClick={() => remove(i)}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "var(--text-tertiary)",
-              padding: 0,
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            <Trash2 size={12} strokeWidth={1.5} />
-          </button>
-        </div>
-      ))}
+      </div>
 
-      {/* Add form */}
-      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-        <input
-          className="atlas-input"
-          placeholder="Rótulo (ex: Drive identidade visual)"
-          style={{ flex: 1, fontSize: 12 }}
-          value={novoLabel}
-          onChange={(e) => setNovoLabel(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && add()}
-        />
-        <input
-          className="atlas-input"
-          placeholder="https://..."
-          style={{ flex: 1, fontSize: 12 }}
-          value={novoUrl}
-          onChange={(e) => setNovoUrl(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && add()}
-        />
+      {/* Table */}
+      <table className="atlas-table" style={{ width: "100%" }}>
+        <thead>
+          <tr>
+            <th style={{ width: 44 }} />
+            <th>Produto</th>
+            <th className="num">Qtd</th>
+            <th className="num">Valor unit.</th>
+            <th className="num">Subtotal</th>
+            <th style={{ width: 36 }} />
+          </tr>
+        </thead>
+        <tbody>
+          {itens.map((item, i) => {
+            const prod = produtos.find((p) => p.id === item.produtoId);
+            const sub = item.quantidade * item.precoUnitario;
+            return (
+              <tr key={i} style={{ cursor: "default" }}>
+                {/* Thumbnail */}
+                <td style={{ padding: "0 8px 0 12px" }}>
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: "var(--radius-sm)",
+                      background: "var(--bg-input)",
+                      border: "1px solid var(--border-default)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                      overflow: "hidden",
+                    }}
+                  >
+                    {prod?.foto ? (
+                      <img
+                        src={prod.foto}
+                        alt={prod.nome}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    ) : (
+                      <Package
+                        size={14}
+                        strokeWidth={1.5}
+                        style={{ color: "var(--text-tertiary)" }}
+                      />
+                    )}
+                  </div>
+                </td>
+
+                {/* Name */}
+                <td style={{ fontWeight: 500 }}>{prod?.nome ?? item.produtoId}</td>
+
+                {/* Qty — inline editable */}
+                <td className="num">
+                  {editCell?.row === i && editCell.field === "quantidade" ? (
+                    <input
+                      autoFocus
+                      type="number"
+                      min="1"
+                      className="atlas-input"
+                      style={{ width: 64, fontSize: 12, textAlign: "right", height: 24 }}
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={commitEdit}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitEdit();
+                        if (e.key === "Escape") setEditCell(null);
+                      }}
+                    />
+                  ) : (
+                    <span
+                      title="Clique para editar"
+                      style={{ ...editableCellStyle, color: "var(--text-secondary)" }}
+                      onClick={() => startEdit(i, "quantidade")}
+                      onMouseEnter={(e) =>
+                        ((e.currentTarget as HTMLElement).style.background = "var(--bg-hover)")
+                      }
+                      onMouseLeave={(e) =>
+                        ((e.currentTarget as HTMLElement).style.background = "transparent")
+                      }
+                    >
+                      {item.quantidade}
+                    </span>
+                  )}
+                </td>
+
+                {/* Unit price — inline editable */}
+                <td className="num">
+                  {editCell?.row === i && editCell.field === "precoUnitario" ? (
+                    <input
+                      autoFocus
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="atlas-input"
+                      style={{ width: 88, fontSize: 12, textAlign: "right", height: 24 }}
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={commitEdit}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitEdit();
+                        if (e.key === "Escape") setEditCell(null);
+                      }}
+                    />
+                  ) : (
+                    <span
+                      title="Clique para editar"
+                      style={{
+                        ...editableCellStyle,
+                        fontSize: 11,
+                        color: "var(--text-tertiary)",
+                      }}
+                      onClick={() => startEdit(i, "precoUnitario")}
+                      onMouseEnter={(e) =>
+                        ((e.currentTarget as HTMLElement).style.background = "var(--bg-hover)")
+                      }
+                      onMouseLeave={(e) =>
+                        ((e.currentTarget as HTMLElement).style.background = "transparent")
+                      }
+                    >
+                      {formatBRL(item.precoUnitario)}
+                    </span>
+                  )}
+                </td>
+
+                {/* Subtotal */}
+                <td className="num" style={{ fontFamily: "var(--font-mono)" }}>
+                  {formatBRL(sub)}
+                </td>
+
+                {/* Remove */}
+                <td style={{ padding: "0 8px 0 0" }}>
+                  <button
+                    className="atlas-btn-icon"
+                    title="Remover produto"
+                    onClick={() => removeItem(i)}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      color: "var(--text-tertiary)",
+                      borderRadius: "var(--radius-sm)",
+                    }}
+                    onMouseEnter={(e) =>
+                      ((e.currentTarget as HTMLElement).style.color = "var(--status-error)")
+                    }
+                    onMouseLeave={(e) =>
+                      ((e.currentTarget as HTMLElement).style.color = "var(--text-tertiary)")
+                    }
+                  >
+                    <Trash2 size={13} strokeWidth={1.5} />
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+
+          {/* Add row */}
+          {addingRow && (
+            <tr style={{ cursor: "default" }}>
+              <td />
+              <td>
+                <select
+                  className="alm-select"
+                  style={{ width: "100%", height: 28 }}
+                  value={newItem.produtoId}
+                  onChange={(e) => {
+                    const prod = produtos.find((p) => p.id === e.target.value);
+                    setNewItem((n) => ({
+                      ...n,
+                      produtoId: e.target.value,
+                      precoUnitario: String(prod?.precoSugerido ?? n.precoUnitario),
+                    }));
+                  }}
+                >
+                  {produtos.map((p) => (
+                    <option key={p.id} value={p.id}>{p.nome}</option>
+                  ))}
+                </select>
+              </td>
+              <td className="num">
+                <input
+                  className="atlas-input"
+                  type="number"
+                  min="1"
+                  placeholder="Qtd"
+                  style={{ width: 64, fontSize: 12, height: 28 }}
+                  value={newItem.quantidade}
+                  onChange={(e) =>
+                    setNewItem((n) => ({ ...n, quantidade: e.target.value }))
+                  }
+                />
+              </td>
+              <td className="num">
+                <input
+                  className="atlas-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Preço"
+                  style={{ width: 88, fontSize: 12, height: 28 }}
+                  value={newItem.precoUnitario}
+                  onChange={(e) =>
+                    setNewItem((n) => ({ ...n, precoUnitario: e.target.value }))
+                  }
+                />
+              </td>
+              <td />
+              <td style={{ padding: "0 8px 0 0" }}>
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button
+                    onClick={confirmAdd}
+                    style={{
+                      background: "var(--accent-highlight)",
+                      border: "none",
+                      borderRadius: "var(--radius-sm)",
+                      color: "#fff",
+                      width: 26,
+                      height: 26,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Check size={12} strokeWidth={2} />
+                  </button>
+                  <button
+                    onClick={() => setAddingRow(false)}
+                    className="atlas-btn-icon"
+                    style={{ width: 26, height: 26 }}
+                  >
+                    <X size={12} strokeWidth={1.5} />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
+      {/* Footer */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "8px 12px",
+          borderTop: "1px solid var(--border-default)",
+        }}
+      >
         <button
-          className="atlas-btn atlas-btn-secondary atlas-btn-sm"
-          style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}
-          onClick={add}
-          disabled={!novoUrl.trim()}
+          className="atlas-btn atlas-btn-ghost atlas-btn-sm"
+          style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+          onClick={() => setAddingRow(true)}
+          disabled={addingRow}
         >
           <Plus size={12} strokeWidth={1.5} />
+          Adicionar produto
         </button>
+        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+          Subtotal dos itens{" "}
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontWeight: 700,
+              color: "var(--text-primary)",
+              marginLeft: 6,
+            }}
+          >
+            {formatBRL(subtotal)}
+          </span>
+        </span>
       </div>
     </div>
   );
 }
 
-// ── Info row ─────────────────────────────────────────────────
+// ── ObservacoesCard ───────────────────────────────────────────
+function ObservacoesCard({
+  title,
+  value,
+  onChange,
+  placeholder,
+}: {
+  title: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  const save = () => {
+    onChange(draft);
+    setEditing(false);
+  };
+
+  const cancel = () => {
+    setDraft(value);
+    setEditing(false);
+  };
+
+  return (
+    <div className="atlas-card" style={{ display: "flex", flexDirection: "column" }}>
+      <div className="atlas-card-header">
+        <span className="atlas-panel-title">{title}</span>
+      </div>
+      <div
+        className="atlas-card-body"
+        style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8, padding: "10px 12px" }}
+      >
+        {editing ? (
+          <>
+            <textarea
+              autoFocus
+              className="atlas-input"
+              rows={4}
+              style={{
+                resize: "vertical",
+                padding: "6px 8px",
+                lineHeight: 1.5,
+                fontSize: 13,
+                height: "auto",
+              }}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+            />
+            <div style={{ display: "flex", gap: 6 }}>
+              <button className="atlas-btn atlas-btn-primary atlas-btn-sm" onClick={save}>
+                Salvar
+              </button>
+              <button className="atlas-btn atlas-btn-secondary atlas-btn-sm" onClick={cancel}>
+                Cancelar
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            {value ? (
+              <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6, margin: 0 }}>
+                {value}
+              </p>
+            ) : (
+              <p style={{ fontSize: 12, color: "var(--text-tertiary)", fontStyle: "italic", margin: 0 }}>
+                {placeholder}
+              </p>
+            )}
+            <button
+              className="atlas-btn atlas-btn-ghost atlas-btn-sm"
+              style={{ alignSelf: "flex-start", fontSize: 11 }}
+              onClick={() => {
+                setDraft(value);
+                setEditing(true);
+              }}
+            >
+              Editar
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Lightbox ──────────────────────────────────────────────────
+function Lightbox({
+  src,
+  alt,
+  onClose,
+}: {
+  src: string;
+  alt: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.88)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: "var(--z-modal)" as unknown as number,
+        cursor: "zoom-out",
+      }}
+    >
+      <img
+        src={src}
+        alt={alt}
+        style={{
+          maxWidth: "90vw",
+          maxHeight: "90vh",
+          objectFit: "contain",
+          borderRadius: "var(--radius-md)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      />
+      <button
+        onClick={onClose}
+        style={{
+          position: "absolute",
+          top: 16,
+          right: 16,
+          background: "rgba(255,255,255,0.1)",
+          border: "1px solid rgba(255,255,255,0.2)",
+          borderRadius: "50%",
+          width: 36,
+          height: 36,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          color: "#fff",
+        }}
+      >
+        <X size={18} strokeWidth={1.5} />
+      </button>
+    </div>
+  );
+}
+
+// ── ArquivosPedido ────────────────────────────────────────────
+function ArquivosPedido({
+  arquivos,
+  onChange,
+}: {
+  arquivos: LinkUtil[];
+  onChange: (a: LinkUtil[]) => void;
+}) {
+  const [label, setLabel] = useState("");
+  const [url, setUrl] = useState("");
+
+  const add = () => {
+    if (!url.trim()) return;
+    onChange([...arquivos, { label: label.trim() || url.trim(), url: url.trim() }]);
+    setLabel("");
+    setUrl("");
+  };
+
+  const remove = (idx: number) => onChange(arquivos.filter((_, i) => i !== idx));
+
+  return (
+    <div className="atlas-card">
+      <div className="atlas-card-header">
+        <span className="atlas-panel-title">Arquivos do pedido</span>
+      </div>
+      <div className="atlas-card-body" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {arquivos.length === 0 && (
+          <p style={{ fontSize: 12, color: "var(--text-tertiary)", fontStyle: "italic", margin: 0 }}>
+            Nenhum arquivo adicionado.
+          </p>
+        )}
+
+        {arquivos.map((arq, i) => {
+          const ext = getFileExt(arq.url, arq.label);
+          const colors = EXT_COLORS[ext] ?? { bg: "var(--bg-raised)", color: "var(--text-secondary)" };
+          return (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {/* Type icon */}
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "var(--radius-sm)",
+                  background: colors.bg,
+                  color: colors.color,
+                  fontSize: 8,
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  letterSpacing: -0.3,
+                  fontFamily: "var(--font-mono)",
+                }}
+              >
+                {ext.slice(0, 3)}
+              </div>
+
+              {/* Label */}
+              <span
+                style={{
+                  flex: 1,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                {arq.label}
+              </span>
+
+              {/* Actions */}
+              <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+                <a
+                  href={arq.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Visualizar"
+                  className="atlas-btn-icon"
+                  style={{ width: 26, height: 26, color: "var(--text-tertiary)", display: "flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <Eye size={13} strokeWidth={1.5} />
+                </a>
+                <button
+                  onClick={() => remove(i)}
+                  className="atlas-btn-icon"
+                  title="Remover"
+                  style={{ width: 26, height: 26, color: "var(--text-tertiary)" }}
+                  onMouseEnter={(e) =>
+                    ((e.currentTarget as HTMLElement).style.color = "var(--status-error)")
+                  }
+                  onMouseLeave={(e) =>
+                    ((e.currentTarget as HTMLElement).style.color = "var(--text-tertiary)")
+                  }
+                >
+                  <Trash2 size={13} strokeWidth={1.5} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Add form */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, borderTop: arquivos.length > 0 ? "1px solid var(--border-subtle)" : undefined, paddingTop: arquivos.length > 0 ? 8 : 0 }}>
+          <input
+            className="atlas-input"
+            placeholder="Nome do arquivo"
+            style={{ fontSize: 12 }}
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && add()}
+          />
+          <div style={{ display: "flex", gap: 6 }}>
+            <input
+              className="atlas-input"
+              placeholder="https://..."
+              style={{ flex: 1, fontSize: 12 }}
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && add()}
+            />
+            <button
+              className="atlas-btn atlas-btn-ghost atlas-btn-sm"
+              style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}
+              onClick={add}
+              disabled={!url.trim()}
+            >
+              <Plus size={12} strokeWidth={1.5} />
+              Adicionar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── TimelinePedido ────────────────────────────────────────────
+function TimelinePedido({
+  status,
+  dataPedido,
+}: {
+  status: EncomendaStatus;
+  dataPedido: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const eventos = deriveTimeline(status, dataPedido);
+  const shown = expanded ? eventos : eventos.slice(0, 4);
+
+  return (
+    <div className="atlas-card">
+      <div className="atlas-card-header">
+        <span className="atlas-panel-title">Timeline do pedido</span>
+      </div>
+      <div
+        className="atlas-card-body"
+        style={{ display: "flex", flexDirection: "column", gap: 0, padding: "10px 12px" }}
+      >
+        {shown.map((e, i) => (
+          <div
+            key={i}
+            style={{
+              display: "flex",
+              gap: 10,
+              paddingBottom: i < shown.length - 1 ? 14 : 0,
+              position: "relative",
+            }}
+          >
+            {/* Connector line */}
+            {i < shown.length - 1 && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: 9,
+                  top: 20,
+                  width: 1,
+                  bottom: 0,
+                  background: "var(--border-default)",
+                }}
+              />
+            )}
+
+            {/* Icon */}
+            <div
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: "50%",
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 1,
+                background: e.concluido
+                  ? "var(--status-success)"
+                  : e.isCurrent
+                  ? "var(--status-warning)"
+                  : "var(--bg-input)",
+                border: `1px solid ${
+                  e.concluido
+                    ? "var(--status-success)"
+                    : e.isCurrent
+                    ? "var(--status-warning)"
+                    : "var(--border-default)"
+                }`,
+              }}
+            >
+              {e.concluido ? (
+                <Check size={10} strokeWidth={2.5} style={{ color: "#fff" }} />
+              ) : (
+                <Clock
+                  size={10}
+                  strokeWidth={1.5}
+                  style={{
+                    color: e.isCurrent ? "var(--status-warning)" : "var(--text-tertiary)",
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Text */}
+            <div style={{ paddingTop: 1 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: e.isCurrent ? 600 : 500,
+                  color: "var(--text-primary)",
+                }}
+              >
+                {e.evento}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>
+                {e.data}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {eventos.length > 4 && (
+          <button
+            className="atlas-btn atlas-btn-ghost atlas-btn-sm"
+            style={{ marginTop: 10, fontSize: 11, alignSelf: "flex-start" }}
+            onClick={() => setExpanded((v) => !v)}
+          >
+            {expanded
+              ? "Ver menos"
+              : `Ver todas as atualizações (${eventos.length})`}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── InfoRow ───────────────────────────────────────────────────
 function InfoRow({
   label,
   children,
@@ -286,7 +975,7 @@ function InfoRow({
         justifyContent: "space-between",
         alignItems: "center",
         padding: "5px 0",
-        borderBottom: "1px solid var(--border-default)",
+        borderBottom: "1px solid var(--border-subtle)",
         fontSize: 12,
       }}
     >
@@ -296,158 +985,237 @@ function InfoRow({
   );
 }
 
-// ── Page ─────────────────────────────────────────────────────
+// ── Page ──────────────────────────────────────────────────────
 export default function EncomendaDetalhePage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
-
   const encBase = encomendasMock.find((e) => e.id === id);
 
   const [status, setStatus] = useState<EncomendaStatus>(
     encBase?.status ?? "aguardando"
   );
   const [foto, setFoto] = useState<string | null>(encBase?.foto ?? null);
-  const [links, setLinks] = useState<LinkUtil[]>(encBase?.linksUteis ?? []);
+  const [arquivos, setArquivos] = useState<LinkUtil[]>(
+    encBase?.linksUteis ?? []
+  );
+  const [itens, setItens] = useState<EncomendaItem[]>(encBase?.itens ?? []);
+  const [observacoes, setObservacoes] = useState(encBase?.observacoes ?? "");
+  const [observacoesInternas, setObservacoesInternas] = useState(
+    encBase?.observacoesInternas ?? ""
+  );
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
 
   if (!encBase) {
     return (
       <div className="alm-page">
         <div className="alm-page-header">
           <div>
-            <p style={{ color: "var(--text-tertiary)" }}>
-              Encomenda não encontrada.
-            </p>
-            <Link href="/encomendas" className="atlas-link">
-              ← Voltar
-            </Link>
+            <p style={{ color: "var(--text-tertiary)" }}>Encomenda não encontrada.</p>
+            <Link href="/encomendas" className="atlas-link">← Voltar</Link>
           </div>
         </div>
       </div>
     );
   }
 
-  const enc = { ...encBase, status };
+  const orderNumber = formatOrderNumber(encBase.id);
 
+  // Recalculate financials from current items
+  const subtotal = itens.reduce((s, i) => s + i.quantidade * i.precoUnitario, 0);
+  const desconto = encBase.desconto ?? 0;
+  const totalCobrado = Math.max(subtotal - desconto, 0);
+  const custoProducao = itens.reduce((s, i) => {
+    const prod = produtos.find((p) => p.id === i.produtoId);
+    return s + (prod?.custo ?? 0) * i.quantidade;
+  }, 0);
+  const margem =
+    totalCobrado > 0 ? ((totalCobrado - custoProducao) / totalCobrado) * 100 : 0;
   const margemColor =
-    enc.margem >= 60
+    margem >= 60
       ? "var(--status-success)"
-      : enc.margem >= 30
+      : margem >= 30
       ? "var(--status-warning)"
       : "var(--status-error)";
 
   const isLate =
-    enc.status !== "entregue" &&
-    enc.status !== "cancelado" &&
-    new Date(enc.dataEntrega) < new Date();
+    status !== "entregue" &&
+    status !== "cancelado" &&
+    new Date(`${encBase.dataEntrega}T00:00:00`) < new Date();
 
-  const nextStatus = NEXT_STATUS[enc.status];
-  const nextLabel = NEXT_LABEL[enc.status];
+  const daysLabel = getDaysLabel(encBase.dataEntrega, status);
+  const nextStatus = NEXT_STATUS[status];
+  const nextLabel = NEXT_LABEL[status];
+
+  const canalIcon =
+    encBase.canal === "whatsapp" ? (
+      <MessageCircle size={12} strokeWidth={1.5} />
+    ) : (
+      <Users size={12} strokeWidth={1.5} />
+    );
+  const canalLabel = encBase.canal === "whatsapp" ? "WhatsApp" : "Presencial";
 
   return (
     <div className="alm-page">
-      {/* Header */}
-      <div className="alm-page-header">
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      {/* ── Header ─────────────────────────────────────────── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {/* Row 1: back + actions */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <Link
             href="/encomendas"
             className="atlas-btn atlas-btn-ghost atlas-btn-sm"
-            style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              color: "var(--text-secondary)",
+            }}
           >
             <ArrowLeft size={13} strokeWidth={1.5} />
+            Voltar para encomendas
           </Link>
-          <div>
-            <h1 className="alm-page-title" style={{ marginBottom: 2 }}>
-              {enc.cliente}
-            </h1>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span className={statusBadge[enc.status]}>
-                {statusLabels[enc.status]}
-              </span>
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                  fontSize: 11,
-                  color: "var(--text-tertiary)",
-                }}
-              >
-                {enc.canal === "whatsapp" ? (
-                  <MessageCircle size={11} strokeWidth={1.5} />
-                ) : (
-                  <Users size={11} strokeWidth={1.5} />
-                )}
-                {enc.canal === "whatsapp" ? "WhatsApp" : "Presencial"}
-              </span>
-              {isLate && (
-                <span
+
+          {/* Actions */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {confirmCancel ? (
+              <>
+                <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                  Cancelar pedido?
+                </span>
+                <button
+                  className="atlas-btn atlas-btn-secondary atlas-btn-sm"
+                  onClick={() => setConfirmCancel(false)}
+                >
+                  Não
+                </button>
+                <button
+                  className="atlas-btn atlas-btn-sm"
                   style={{
-                    fontSize: 11,
-                    color: "var(--status-error)",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 3,
+                    background: "var(--status-error)",
+                    color: "#fff",
+                    border: "none",
+                  }}
+                  onClick={() => {
+                    setStatus("cancelado");
+                    setConfirmCancel(false);
                   }}
                 >
-                  · Entrega atrasada
-                </span>
-              )}
-            </div>
+                  Sim, cancelar
+                </button>
+              </>
+            ) : (
+              <>
+                {status !== "entregue" && status !== "cancelado" && (
+                  <button
+                    className="atlas-btn atlas-btn-ghost atlas-btn-sm"
+                    style={{ color: "var(--status-error)" }}
+                    onClick={() => setConfirmCancel(true)}
+                  >
+                    Cancelar pedido
+                  </button>
+                )}
+                {nextStatus && (
+                  <button
+                    className="atlas-btn atlas-btn-primary atlas-btn-sm"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
+                    onClick={() => setStatus(nextStatus)}
+                  >
+                    {nextLabel}
+                    <ChevronRight size={13} strokeWidth={1.5} />
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </div>
 
-        {/* Actions */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {confirmCancel ? (
-            <>
-              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                Cancelar pedido?
-              </span>
-              <button
-                className="atlas-btn atlas-btn-secondary atlas-btn-sm"
-                onClick={() => setConfirmCancel(false)}
-              >
-                Não
-              </button>
-              <button
-                className="atlas-btn atlas-btn-sm"
-                style={{ background: "var(--status-error)", color: "#fff", border: "none" }}
-                onClick={() => {
-                  setStatus("cancelado");
-                  setConfirmCancel(false);
+        {/* Row 2: order number + client */}
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>
+            Pedido {orderNumber}
+          </h1>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              marginTop: 3,
+              fontSize: 14,
+              color: "var(--text-secondary)",
+              fontWeight: 500,
+            }}
+          >
+            {canalIcon}
+            {encBase.cliente}
+            <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>
+              · {canalLabel}
+            </span>
+          </div>
+        </div>
+
+        {/* Row 3: info bar */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+          }}
+        >
+          <span className={statusBadge[status]}>{statusLabels[status]}</span>
+
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 12,
+              color: "var(--text-tertiary)",
+            }}
+          >
+            <Calendar size={11} strokeWidth={1.5} />
+            Pedido em {formatDate(encBase.dataPedido)}
+          </span>
+
+          <span style={{ color: "var(--border-strong)", fontSize: 12 }}>·</span>
+
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 12,
+              color: isLate ? "var(--status-error)" : "var(--text-tertiary)",
+            }}
+          >
+            <Calendar size={11} strokeWidth={1.5} />
+            Entrega {formatDate(encBase.dataEntrega)}
+            {daysLabel && (
+              <span
+                style={{
+                  background: isLate ? "var(--status-error-muted)" : "var(--bg-raised)",
+                  border: `1px solid ${isLate ? "rgba(244,71,71,0.25)" : "var(--border-default)"}`,
+                  color: isLate ? "var(--status-error)" : "var(--text-tertiary)",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: "1px 6px",
+                  borderRadius: "var(--radius-full)",
+                  letterSpacing: "0.02em",
                 }}
               >
-                Sim, cancelar
-              </button>
-            </>
-          ) : (
-            <>
-              {enc.status !== "entregue" && enc.status !== "cancelado" && (
-                <button
-                  className="atlas-btn atlas-btn-ghost atlas-btn-sm"
-                  style={{ color: "var(--status-error)" }}
-                  onClick={() => setConfirmCancel(true)}
-                >
-                  Cancelar pedido
-                </button>
-              )}
-              {nextStatus && (
-                <button
-                  className="atlas-btn atlas-btn-primary atlas-btn-sm"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
-                  onClick={() => setStatus(nextStatus)}
-                >
-                  {nextLabel}
-                  <ChevronRight size={13} strokeWidth={1.5} />
-                </button>
-              )}
-            </>
-          )}
+                {daysLabel}
+              </span>
+            )}
+          </span>
         </div>
       </div>
 
-      {/* Body */}
+      {/* ── Body ───────────────────────────────────────────── */}
       <div
         style={{
           display: "grid",
@@ -458,157 +1226,154 @@ export default function EncomendaDetalhePage() {
       >
         {/* Coluna principal */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Foto principal */}
-          <div className="atlas-card">
-            <div className="atlas-card-header">
-              <span className="atlas-panel-title">Visualização final</span>
-            </div>
-            <div className="atlas-card-body">
-              <FotoHero src={foto} onChange={setFoto} />
-            </div>
-          </div>
-
-          {/* Itens do pedido */}
-          <div className="atlas-card" style={{ padding: 0 }}>
-            <div
-              className="atlas-card-header"
-              style={{ padding: "0 16px", height: 40, display: "flex", alignItems: "center" }}
-            >
-              <span className="atlas-panel-title">Itens do pedido</span>
-            </div>
-            <table className="atlas-table" style={{ width: "100%" }}>
-              <thead>
-                <tr>
-                  <th style={{ width: 40 }} />
-                  <th>Produto</th>
-                  <th className="num">Qtd</th>
-                  <th className="num">Unitário</th>
-                  <th className="num">Subtotal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {enc.itens.map((item, i) => {
-                  const prod = produtos.find((p) => p.id === item.produtoId);
-                  return (
-                    <tr key={i} style={{ cursor: "default" }}>
-                      <td style={{ padding: "0 8px 0 12px" }}>
-                        <div
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 4,
-                            background: "var(--bg-input)",
-                            border: "1px solid var(--border-default)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexShrink: 0,
-                          }}
-                        >
-                          {prod?.foto ? (
-                            <img
-                              src={prod.foto}
-                              alt={prod.nome}
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                                borderRadius: 4,
-                              }}
-                            />
-                          ) : (
-                            <svg
-                              width="14"
-                              height="14"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="var(--text-tertiary)"
-                              strokeWidth="1.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                            </svg>
-                          )}
-                        </div>
-                      </td>
-                      <td style={{ fontWeight: 500 }}>
-                        {prod?.nome ?? item.produtoId}
-                      </td>
-                      <td
-                        className="num"
-                        style={{ fontFamily: "var(--font-mono)", color: "var(--text-secondary)" }}
-                      >
-                        {item.quantidade}
-                      </td>
-                      <td
-                        className="num"
-                        style={{ fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", fontSize: 11 }}
-                      >
-                        {formatBRL(item.precoUnitario)}
-                      </td>
-                      <td
-                        className="num"
-                        style={{ fontFamily: "var(--font-mono)" }}
-                      >
-                        {formatBRL(item.quantidade * item.precoUnitario)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          {/* Tabela de produtos */}
+          <TabelaProdutos itens={itens} onChange={setItens} />
 
           {/* Observações */}
-          {enc.observacoes && (
-            <div className="atlas-card">
-              <div className="atlas-card-header">
-                <span className="atlas-panel-title">Observações</span>
-              </div>
-              <div className="atlas-card-body">
-                <p
-                  style={{
-                    fontSize: 13,
-                    color: "var(--text-secondary)",
-                    lineHeight: 1.6,
-                    margin: 0,
-                  }}
-                >
-                  {enc.observacoes}
-                </p>
-              </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <ObservacoesCard
+              title="Observações do cliente"
+              value={observacoes}
+              onChange={setObservacoes}
+              placeholder="Nenhuma observação do cliente."
+            />
+            <ObservacoesCard
+              title="Observações internas"
+              value={observacoesInternas}
+              onChange={setObservacoesInternas}
+              placeholder="Nenhuma anotação interna."
+            />
+          </div>
+
+          {/* Visual do pedido */}
+          <div className="atlas-card">
+            <div className="atlas-card-header">
+              <span className="atlas-panel-title">Visual do pedido</span>
             </div>
-          )}
+            <div className="atlas-card-body" style={{ display: "flex", flexDirection: "column", gap: 16, padding: "12px" }}>
+              {/* Kit photo */}
+              <KitPhoto src={foto} onChange={setFoto} />
+
+              {/* Individual previews */}
+              {itens.length > 0 && (
+                <div>
+                  <p
+                    className="label-upper"
+                    style={{ marginBottom: 10 }}
+                  >
+                    Previews individuais
+                  </p>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+                      gap: 10,
+                    }}
+                  >
+                    {itens.map((item, i) => {
+                      const prod = produtos.find((p) => p.id === item.produtoId);
+                      const prodFoto = prod?.foto;
+                      return (
+                        <div
+                          key={i}
+                          style={{
+                            border: "1px solid var(--border-default)",
+                            borderRadius: "var(--radius-md)",
+                            overflow: "hidden",
+                            background: "var(--bg-base)",
+                          }}
+                        >
+                          <div
+                            style={{
+                              height: 110,
+                              background: "var(--bg-input)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              overflow: "hidden",
+                            }}
+                          >
+                            {prodFoto ? (
+                              <img
+                                src={prodFoto}
+                                alt={prod?.nome}
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                }}
+                              />
+                            ) : (
+                              <Package
+                                size={28}
+                                strokeWidth={1}
+                                style={{ color: "var(--text-tertiary)" }}
+                              />
+                            )}
+                          </div>
+                          <div style={{ padding: "8px 10px" }}>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: "var(--text-primary)",
+                                marginBottom: 2,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {prod?.nome ?? item.produtoId}
+                            </div>
+                            <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
+                              {item.quantidade} un.
+                            </div>
+                            {prodFoto && (
+                              <button
+                                className="atlas-btn atlas-btn-ghost atlas-btn-sm"
+                                style={{
+                                  marginTop: 6,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 3,
+                                  fontSize: 10,
+                                  padding: "0 4px",
+                                  height: 20,
+                                }}
+                                onClick={() =>
+                                  setLightbox({ src: prodFoto, alt: prod?.nome ?? "" })
+                                }
+                              >
+                                <ZoomIn size={10} strokeWidth={1.5} />
+                                Ampliar
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Coluna lateral */}
+        {/* Sidebar */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {/* Informações */}
           <div className="atlas-card">
             <div className="atlas-card-header">
               <span className="atlas-panel-title">Informações</span>
             </div>
-            <div className="atlas-card-body" style={{ padding: "8px 16px 12px" }}>
+            <div className="atlas-card-body" style={{ padding: "8px 12px 12px" }}>
               <InfoRow label="Canal">
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                >
-                  {enc.canal === "whatsapp" ? (
-                    <MessageCircle size={11} strokeWidth={1.5} />
-                  ) : (
-                    <Users size={11} strokeWidth={1.5} />
-                  )}
-                  {enc.canal === "whatsapp" ? "WhatsApp" : "Presencial"}
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  {canalIcon}
+                  {canalLabel}
                 </span>
               </InfoRow>
-              <InfoRow label="Pedido em">
-                {formatDate(enc.dataPedido)}
-              </InfoRow>
+              <InfoRow label="Pedido em">{formatDate(encBase.dataPedido)}</InfoRow>
               <InfoRow label="Entrega prevista">
                 <span
                   style={{
@@ -619,8 +1384,11 @@ export default function EncomendaDetalhePage() {
                   }}
                 >
                   <Calendar size={11} strokeWidth={1.5} />
-                  {formatDate(enc.dataEntrega)}
+                  {formatDate(encBase.dataEntrega)}
                 </span>
+              </InfoRow>
+              <InfoRow label="Código do pedido">
+                <span style={{ fontFamily: "var(--font-mono)" }}>{orderNumber}</span>
               </InfoRow>
             </div>
           </div>
@@ -630,18 +1398,13 @@ export default function EncomendaDetalhePage() {
             <div className="atlas-card-header">
               <span className="atlas-panel-title">Financeiro</span>
             </div>
-            <div className="atlas-card-body" style={{ padding: "8px 16px 12px" }}>
+            <div className="atlas-card-body" style={{ padding: "8px 12px 12px" }}>
               <InfoRow label="Subtotal bruto">
                 <span style={{ fontFamily: "var(--font-mono)" }}>
-                  {formatBRL(
-                    enc.itens.reduce(
-                      (s, i) => s + i.quantidade * i.precoUnitario,
-                      0
-                    )
-                  )}
+                  {formatBRL(subtotal)}
                 </span>
               </InfoRow>
-              {enc.desconto > 0 && (
+              {desconto > 0 && (
                 <InfoRow label="Desconto">
                   <span
                     style={{
@@ -649,23 +1412,18 @@ export default function EncomendaDetalhePage() {
                       color: "var(--status-error)",
                     }}
                   >
-                    − {formatBRL(enc.desconto)}
+                    − {formatBRL(desconto)}
                   </span>
                 </InfoRow>
               )}
               <InfoRow label="Total cobrado">
-                <span
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontWeight: 700,
-                  }}
-                >
-                  {formatBRL(enc.totalCobrado)}
+                <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>
+                  {formatBRL(totalCobrado)}
                 </span>
               </InfoRow>
               <InfoRow label="Custo produção">
                 <span style={{ fontFamily: "var(--font-mono)" }}>
-                  {formatBRL(enc.custoProducao)}
+                  {formatBRL(custoProducao)}
                 </span>
               </InfoRow>
               <div
@@ -678,7 +1436,11 @@ export default function EncomendaDetalhePage() {
                 }}
               >
                 <span
-                  style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-secondary)",
+                    fontWeight: 600,
+                  }}
                 >
                   Margem
                 </span>
@@ -690,27 +1452,28 @@ export default function EncomendaDetalhePage() {
                     color: margemColor,
                   }}
                 >
-                  {enc.margem.toFixed(1)}%
+                  {margem.toFixed(1)}%
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Links úteis */}
-          <div className="atlas-card">
-            <div
-              className="atlas-card-header"
-              style={{ display: "flex", alignItems: "center", gap: 6 }}
-            >
-              <Link2 size={12} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
-              <span className="atlas-panel-title">Links úteis</span>
-            </div>
-            <div className="atlas-card-body">
-              <LinksUteis links={links} onChange={setLinks} />
-            </div>
-          </div>
+          {/* Arquivos */}
+          <ArquivosPedido arquivos={arquivos} onChange={setArquivos} />
+
+          {/* Timeline */}
+          <TimelinePedido status={status} dataPedido={encBase.dataPedido} />
         </div>
       </div>
+
+      {/* Lightbox */}
+      {lightbox && (
+        <Lightbox
+          src={lightbox.src}
+          alt={lightbox.alt}
+          onClose={() => setLightbox(null)}
+        />
+      )}
     </div>
   );
 }
