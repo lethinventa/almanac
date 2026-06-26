@@ -396,6 +396,11 @@ body {
   color: var(--text-tertiary);
 }
 
+/* ── Light mode overrides ───────────────────────────────── */
+[data-theme="light"] .atlas-stat-delta.is-up {
+  color: #059669;
+}
+
 /* ── Mobile ─────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .alm-shell {

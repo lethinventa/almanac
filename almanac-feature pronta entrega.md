@@ -68,16 +68,20 @@ Usuário acessa produto
 
 ## 3. Venda de pronta entrega
 
-Fluxo idêntico ao de encomenda, com duas diferenças:
+Módulo independente de Encomendas — tela e fluxo próprios na navegação.
 
-1. O tipo da encomenda é marcado como "Pronta entrega" (vs "Sob encomenda")
-2. A baixa de estoque ocorre no estoque de prontos, não nos insumos
+> Encomenda = produzido após o pedido, com prazo e acompanhamento.
+> Pronta entrega = varejo imediato, produto já disponível em estoque.
+
+### Tela própria na sidebar
+"Pronta Entrega" aparece como item fixo na navegação, separado de "Encomendas". Os dois módulos podem compartilhar componentes (formulário de cliente, painel de pagamento) mas não estão acoplados.
 
 ### Fluxo
 
 ```
-Usuário acessa "Encomendas" (ou novo módulo "Vendas")
-  → Clica em "Nova venda — pronta entrega"
+Usuário acessa "Pronta Entrega" na sidebar
+  → Vê listagem de vendas realizadas
+  → Clica em "Nova venda"
   → Preenche: cliente, canal, data
   → Adiciona itens:
       → Seleciona produto
@@ -85,13 +89,21 @@ Usuário acessa "Encomendas" (ou novo módulo "Vendas")
       → Se estoque suficiente → permite adicionar
       → Se estoque insuficiente → avisa, mas permite prosseguir
       → Informa quantidade + preço (editável)
-  → Desconto + total (igual encomenda)
-  → Pagamento (igual encomenda)
+  → Desconto + total
+  → Registra pagamento
   → Salva com status "Aguardando"
   → Ao marcar como "Entregue":
       → Sistema deduz do estoque de prontos
       → Registra receita no financeiro
 ```
+
+### Status da venda de pronta entrega
+
+```
+Aguardando → Entregue → Cancelado
+```
+
+> Fluxo mais curto que encomenda — sem "Em produção" ou "Pronto", pois o item já existe.
 
 ---
 
@@ -109,8 +121,9 @@ Usuário acessa "Encomendas" (ou novo módulo "Vendas")
 
 | Tela | O que muda |
 |---|---|
+| Sidebar / navegação | Adiciona "Pronta Entrega" como item fixo, separado de "Encomendas" |
 | Produtos | Adiciona coluna "Prontos em estoque" + botão "Registrar lote" + histórico de lotes |
-| Encomendas | Adiciona tipo de venda (sob encomenda / pronta entrega) como campo obrigatório |
+| Encomendas | Nenhuma alteração — fluxos permanecem independentes |
 | Estoque | Log de insumos passa a registrar saídas por lote de produção além de saídas por entrega |
 | Financeiro | Receitas de pronta entrega entram no mesmo fluxo de caixa |
 | Dashboard | Adiciona indicador de produtos com estoque de prontos baixo |

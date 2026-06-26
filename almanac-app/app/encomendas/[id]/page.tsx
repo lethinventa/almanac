@@ -15,7 +15,6 @@ import {
   Check,
   Clock,
   Package,
-  PackageCheck,
   ZoomIn,
   X,
   Eye,
@@ -30,11 +29,11 @@ import {
   statusLabels,
   statusBadge,
   EncomendaStatus,
-  EncomendaTipo,
   LinkUtil,
   EncomendaItem,
   Produto,
 } from "@/lib/data";
+import { PainelPagamento } from "@/components/shared/painel-pagamento";
 
 // ── Status flow ───────────────────────────────────────────────
 const NEXT_STATUS: Partial<Record<EncomendaStatus, EncomendaStatus>> = {
@@ -387,7 +386,6 @@ function TabelaProdutos({
 
   return (
     <div className="atlas-card" style={{ padding: 0 }}>
-      {/* Header */}
       <div
         className="atlas-card-header"
         style={{ justifyContent: "space-between", padding: "0 12px" }}
@@ -400,7 +398,6 @@ function TabelaProdutos({
         </div>
       </div>
 
-      {/* Table */}
       <table className="atlas-table" style={{ width: "100%" }}>
         <thead>
           <tr>
@@ -418,7 +415,6 @@ function TabelaProdutos({
             const sub = item.quantidade * item.precoUnitario;
             return (
               <tr key={i} style={{ cursor: "default" }}>
-                {/* Thumbnail */}
                 <td style={{ padding: "0 8px 0 12px" }}>
                   <div
                     style={{
@@ -443,16 +439,11 @@ function TabelaProdutos({
                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
                       />
                     ) : (
-                      <Package
-                        size={14}
-                        strokeWidth={1.5}
-                        style={{ color: "var(--text-tertiary)" }}
-                      />
+                      <Package size={14} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
                     )}
                   </div>
                 </td>
 
-                {/* Name */}
                 <td>
                   <span
                     style={{
@@ -478,7 +469,6 @@ function TabelaProdutos({
                   </span>
                 </td>
 
-                {/* Qty — inline editable */}
                 <td className="num">
                   {editCell?.row === i && editCell.field === "quantidade" ? (
                     <input
@@ -512,7 +502,6 @@ function TabelaProdutos({
                   )}
                 </td>
 
-                {/* Unit price — inline editable */}
                 <td className="num">
                   {editCell?.row === i && editCell.field === "precoUnitario" ? (
                     <input
@@ -533,11 +522,7 @@ function TabelaProdutos({
                   ) : (
                     <span
                       title="Clique para editar"
-                      style={{
-                        ...editableCellStyle,
-                        fontSize: 11,
-                        color: "var(--text-tertiary)",
-                      }}
+                      style={{ ...editableCellStyle, fontSize: 11, color: "var(--text-tertiary)" }}
                       onClick={() => startEdit(i, "precoUnitario")}
                       onMouseEnter={(e) =>
                         ((e.currentTarget as HTMLElement).style.background = "var(--bg-hover)")
@@ -551,23 +536,16 @@ function TabelaProdutos({
                   )}
                 </td>
 
-                {/* Subtotal */}
                 <td className="num" style={{ fontFamily: "var(--font-mono)" }}>
                   {formatBRL(sub)}
                 </td>
 
-                {/* Remove */}
                 <td style={{ padding: "0 8px 0 0" }}>
                   <button
                     className="atlas-btn-icon"
                     title="Remover produto"
                     onClick={() => removeItem(i)}
-                    style={{
-                      width: 28,
-                      height: 28,
-                      color: "var(--text-tertiary)",
-                      borderRadius: "var(--radius-sm)",
-                    }}
+                    style={{ width: 28, height: 28, color: "var(--text-tertiary)", borderRadius: "var(--radius-sm)" }}
                     onMouseEnter={(e) =>
                       ((e.currentTarget as HTMLElement).style.color = "var(--status-error)")
                     }
@@ -582,7 +560,6 @@ function TabelaProdutos({
             );
           })}
 
-          {/* Add row */}
           {addingRow && (
             <tr style={{ cursor: "default" }}>
               <td />
@@ -613,9 +590,7 @@ function TabelaProdutos({
                   placeholder="Qtd"
                   style={{ width: 64, fontSize: 12, height: 28 }}
                   value={newItem.quantidade}
-                  onChange={(e) =>
-                    setNewItem((n) => ({ ...n, quantidade: e.target.value }))
-                  }
+                  onChange={(e) => setNewItem((n) => ({ ...n, quantidade: e.target.value }))}
                 />
               </td>
               <td className="num">
@@ -627,9 +602,7 @@ function TabelaProdutos({
                   placeholder="Preço"
                   style={{ width: 88, fontSize: 12, height: 28 }}
                   value={newItem.precoUnitario}
-                  onChange={(e) =>
-                    setNewItem((n) => ({ ...n, precoUnitario: e.target.value }))
-                  }
+                  onChange={(e) => setNewItem((n) => ({ ...n, precoUnitario: e.target.value }))}
                 />
               </td>
               <td />
@@ -667,7 +640,6 @@ function TabelaProdutos({
         </tbody>
       </table>
 
-      {/* Footer */}
       <div
         style={{
           display: "flex",
@@ -688,14 +660,7 @@ function TabelaProdutos({
         </button>
         <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
           Subtotal dos itens{" "}
-          <span
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontWeight: 700,
-              color: "var(--text-primary)",
-              marginLeft: 6,
-            }}
-          >
+          <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--text-primary)", marginLeft: 6 }}>
             {formatBRL(subtotal)}
           </span>
         </span>
@@ -719,15 +684,8 @@ function ObservacoesCard({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
 
-  const save = () => {
-    onChange(draft);
-    setEditing(false);
-  };
-
-  const cancel = () => {
-    setDraft(value);
-    setEditing(false);
-  };
+  const save = () => { onChange(draft); setEditing(false); };
+  const cancel = () => { setDraft(value); setEditing(false); };
 
   return (
     <div className="atlas-card" style={{ display: "flex", flexDirection: "column" }}>
@@ -744,43 +702,26 @@ function ObservacoesCard({
               autoFocus
               className="atlas-input"
               rows={4}
-              style={{
-                resize: "vertical",
-                padding: "6px 8px",
-                lineHeight: 1.5,
-                fontSize: 13,
-                height: "auto",
-              }}
+              style={{ resize: "vertical", padding: "6px 8px", lineHeight: 1.5, fontSize: 13, height: "auto" }}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
             />
             <div style={{ display: "flex", gap: 6 }}>
-              <button className="atlas-btn atlas-btn-primary atlas-btn-sm" onClick={save}>
-                Salvar
-              </button>
-              <button className="atlas-btn atlas-btn-secondary atlas-btn-sm" onClick={cancel}>
-                Cancelar
-              </button>
+              <button className="atlas-btn atlas-btn-primary atlas-btn-sm" onClick={save}>Salvar</button>
+              <button className="atlas-btn atlas-btn-secondary atlas-btn-sm" onClick={cancel}>Cancelar</button>
             </div>
           </>
         ) : (
           <>
             {value ? (
-              <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6, margin: 0 }}>
-                {value}
-              </p>
+              <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6, margin: 0 }}>{value}</p>
             ) : (
-              <p style={{ fontSize: 12, color: "var(--text-tertiary)", fontStyle: "italic", margin: 0 }}>
-                {placeholder}
-              </p>
+              <p style={{ fontSize: 12, color: "var(--text-tertiary)", fontStyle: "italic", margin: 0 }}>{placeholder}</p>
             )}
             <button
               className="atlas-btn atlas-btn-ghost atlas-btn-sm"
               style={{ alignSelf: "flex-start", fontSize: 11 }}
-              onClick={() => {
-                setDraft(value);
-                setEditing(true);
-              }}
+              onClick={() => { setDraft(value); setEditing(true); }}
             >
               Editar
             </button>
@@ -792,19 +733,9 @@ function ObservacoesCard({
 }
 
 // ── Lightbox ──────────────────────────────────────────────────
-function Lightbox({
-  src,
-  alt,
-  onClose,
-}: {
-  src: string;
-  alt: string;
-  onClose: () => void;
-}) {
+function Lightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
@@ -826,12 +757,7 @@ function Lightbox({
       <img
         src={src}
         alt={alt}
-        style={{
-          maxWidth: "90vw",
-          maxHeight: "90vh",
-          objectFit: "contain",
-          borderRadius: "var(--radius-md)",
-        }}
+        style={{ maxWidth: "90vw", maxHeight: "90vh", objectFit: "contain", borderRadius: "var(--radius-md)" }}
         onClick={(e) => e.stopPropagation()}
       />
       <button
@@ -859,27 +785,15 @@ function Lightbox({
 }
 
 // ── ProdutoDetalheModal ───────────────────────────────────────
-function ProdutoDetalheModal({
-  produto,
-  onClose,
-}: {
-  produto: Produto;
-  onClose: () => void;
-}) {
+function ProdutoDetalheModal({ produto, onClose }: { produto: Produto; onClose: () => void }) {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
   const margemColor =
-    produto.margem >= 60
-      ? "var(--status-success)"
-      : produto.margem >= 30
-      ? "var(--status-warning)"
-      : "var(--status-error)";
+    produto.margem >= 60 ? "var(--status-success)" : produto.margem >= 30 ? "var(--status-warning)" : "var(--status-error)";
 
   return (
     <div
@@ -897,7 +811,7 @@ function ProdutoDetalheModal({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "var(--bg-surface)",
+          background: "var(--bg-raised)",
           border: "1px solid var(--border-default)",
           borderRadius: "var(--radius-md)",
           width: 420,
@@ -909,7 +823,6 @@ function ProdutoDetalheModal({
           boxShadow: "0 8px 32px rgba(0,0,0,0.28)",
         }}
       >
-        {/* Header */}
         <div
           style={{
             display: "flex",
@@ -922,47 +835,24 @@ function ProdutoDetalheModal({
         >
           <div>
             <div style={{ fontSize: 14, fontWeight: 600 }}>{produto.nome}</div>
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>
-              {produto.categoria}
-            </div>
+            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>{produto.categoria}</div>
           </div>
-          <button
-            className="atlas-btn atlas-btn-ghost atlas-btn-icon atlas-btn-sm"
-            onClick={onClose}
-          >
+          <button className="atlas-btn atlas-btn-ghost atlas-btn-icon atlas-btn-sm" onClick={onClose}>
             <X size={14} strokeWidth={1.5} />
           </button>
         </div>
 
-        {/* Body */}
         <div style={{ overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 14 }}>
-          {/* Foto */}
           {produto.foto && (
             <img
               src={produto.foto}
               alt={produto.nome}
-              style={{
-                width: "100%",
-                maxHeight: 180,
-                objectFit: "cover",
-                borderRadius: "var(--radius-sm)",
-                border: "1px solid var(--border-default)",
-              }}
+              style={{ width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-default)" }}
             />
           )}
 
-          {/* Resumo financeiro */}
           <div>
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 600,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                color: "var(--text-tertiary)",
-                marginBottom: 6,
-              }}
-            >
+            <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-tertiary)", marginBottom: 6 }}>
               Financeiro
             </div>
             <InfoRow label="Custo unitário">
@@ -972,28 +862,14 @@ function ProdutoDetalheModal({
               <span style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(produto.precoSugerido)}</span>
             </InfoRow>
             <InfoRow label="Margem">
-              <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: margemColor }}>
-                {produto.margem.toFixed(1)}%
-              </span>
+              <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: margemColor }}>{produto.margem.toFixed(1)}%</span>
             </InfoRow>
-            <InfoRow label="Tempo de produção">
-              {produto.tempoProducao} min
-            </InfoRow>
+            <InfoRow label="Tempo de produção">{produto.tempoProducao} min</InfoRow>
           </div>
 
-          {/* Receita */}
           {produto.receita.length > 0 && (
             <div>
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  color: "var(--text-tertiary)",
-                  marginBottom: 6,
-                }}
-              >
+              <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-tertiary)", marginBottom: 6 }}>
                 Receita ({produto.receita.length} insumo{produto.receita.length !== 1 ? "s" : ""})
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
@@ -1002,14 +878,7 @@ function ProdutoDetalheModal({
                   return (
                     <div
                       key={r.insumoId}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        fontSize: 12,
-                        padding: "5px 0",
-                        borderBottom: "1px solid var(--border-subtle)",
-                      }}
+                      style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, padding: "5px 0", borderBottom: "1px solid var(--border-subtle)" }}
                     >
                       <span>{ins?.nome ?? r.insumoId}</span>
                       <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-secondary)", fontSize: 11 }}>
@@ -1064,7 +933,6 @@ function ArquivosPedido({
           const colors = EXT_COLORS[ext] ?? { bg: "var(--bg-raised)", color: "var(--text-secondary)" };
           return (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {/* Type icon */}
               <div
                 style={{
                   width: 28,
@@ -1084,8 +952,6 @@ function ArquivosPedido({
               >
                 {ext.slice(0, 3)}
               </div>
-
-              {/* Label */}
               <span
                 style={{
                   flex: 1,
@@ -1099,8 +965,6 @@ function ArquivosPedido({
               >
                 {arq.label}
               </span>
-
-              {/* Actions */}
               <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
                 <a
                   href={arq.url}
@@ -1117,12 +981,8 @@ function ArquivosPedido({
                   className="atlas-btn-icon"
                   title="Remover"
                   style={{ width: 26, height: 26, color: "var(--text-tertiary)" }}
-                  onMouseEnter={(e) =>
-                    ((e.currentTarget as HTMLElement).style.color = "var(--status-error)")
-                  }
-                  onMouseLeave={(e) =>
-                    ((e.currentTarget as HTMLElement).style.color = "var(--text-tertiary)")
-                  }
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--status-error)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--text-tertiary)")}
                 >
                   <Trash2 size={13} strokeWidth={1.5} />
                 </button>
@@ -1131,7 +991,6 @@ function ArquivosPedido({
           );
         })}
 
-        {/* Add form */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6, borderTop: arquivos.length > 0 ? "1px solid var(--border-subtle)" : undefined, paddingTop: arquivos.length > 0 ? 8 : 0 }}>
           <input
             className="atlas-input"
@@ -1166,386 +1025,8 @@ function ArquivosPedido({
   );
 }
 
-// ── PainelPagamento ───────────────────────────────────────────
-interface Pagamento {
-  id: string;
-  valor: number;
-  data: string;
-  forma: "pix" | "dinheiro" | "cartao" | "outro";
-  observacao?: string;
-}
-
-const FORMA_PAG_LABEL: Record<string, string> = {
-  pix: "Pix",
-  dinheiro: "Dinheiro",
-  cartao: "Cartão",
-  outro: "Outro",
-};
-
-function loadPagamentosEnc(encId: string): Pagamento[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const all = localStorage.getItem("almanac_pagamentos");
-    if (!all) return [];
-    return JSON.parse(all)[encId] ?? [];
-  } catch { return []; }
-}
-
-function savePagamentosEnc(encId: string, pags: Pagamento[]) {
-  if (typeof window === "undefined") return;
-  try {
-    const all = localStorage.getItem("almanac_pagamentos");
-    const parsed = all ? JSON.parse(all) : {};
-    parsed[encId] = pags;
-    localStorage.setItem("almanac_pagamentos", JSON.stringify(parsed));
-  } catch {}
-}
-
-function PainelPagamento({
-  encId,
-  totalCobrado,
-}: {
-  encId: string;
-  totalCobrado: number;
-}) {
-  const hoje = new Date().toISOString().slice(0, 10);
-  const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [estornoId, setEstornoId] = useState<string | null>(null);
-  const [estornoMotivo, setEstornoMotivo] = useState("");
-
-  const [fValor, setFValor] = useState("");
-  const [fData, setFData] = useState(hoje);
-  const [fForma, setFForma] = useState<"pix" | "dinheiro" | "cartao" | "outro">("pix");
-  const [fObs, setFObs] = useState("");
-
-  useEffect(() => {
-    setPagamentos(loadPagamentosEnc(encId));
-  }, [encId]);
-
-  function persist(pags: Pagamento[]) {
-    setPagamentos(pags);
-    savePagamentosEnc(encId, pags);
-  }
-
-  function handleAdd() {
-    const valor = parseFloat(fValor);
-    if (!valor || valor <= 0) return;
-    persist([
-      ...pagamentos,
-      {
-        id: `pag-${Date.now()}`,
-        valor,
-        data: fData,
-        forma: fForma,
-        observacao: fObs.trim() || undefined,
-      },
-    ]);
-    setShowForm(false);
-    setFValor("");
-    setFObs("");
-    setFData(hoje);
-    setFForma("pix");
-  }
-
-  function handleEstorno(id: string) {
-    const orig = pagamentos.find((p) => p.id === id);
-    if (!orig) return;
-    persist([
-      ...pagamentos,
-      {
-        id: `est-${Date.now()}`,
-        valor: -Math.abs(orig.valor),
-        data: hoje,
-        forma: orig.forma,
-        observacao: `Estorno: ${estornoMotivo.trim() || "sem motivo"}`,
-      },
-    ]);
-    setEstornoId(null);
-    setEstornoMotivo("");
-  }
-
-  const totalRecebido = pagamentos.reduce((s, p) => s + p.valor, 0);
-  const saldo = totalCobrado - totalRecebido;
-
-  const statusPag =
-    totalRecebido <= 0
-      ? "sem_pagamento"
-      : saldo < 0
-      ? "paga_maior"
-      : saldo === 0
-      ? "paga"
-      : "sinal";
-
-  const statusConfig: Record<string, { label: string; bg: string; color: string }> = {
-    sem_pagamento: { label: "Sem pagamento", bg: "var(--bg-raised)", color: "var(--text-tertiary)" },
-    sinal:         { label: "Sinal recebido", bg: "rgba(255,193,7,0.1)", color: "var(--status-warning)" },
-    paga:          { label: "Paga", bg: "rgba(72,199,142,0.1)", color: "var(--status-success)" },
-    paga_maior:    { label: "Paga a maior", bg: "rgba(124,111,239,0.12)", color: "var(--accent-primary, #7c6fef)" },
-  };
-  const sc = statusConfig[statusPag];
-
-  return (
-    <div className="atlas-card">
-      <div className="atlas-card-header">
-        <span className="atlas-panel-title">Pagamento</span>
-      </div>
-      <div className="atlas-card-body" style={{ padding: "8px 12px 12px" }}>
-        {/* Status badge */}
-        <div style={{ marginBottom: 10 }}>
-          <span
-            style={{
-              display: "inline-block",
-              fontSize: 11,
-              fontWeight: 600,
-              padding: "2px 8px",
-              borderRadius: "var(--radius-full)",
-              background: sc.bg,
-              color: sc.color,
-              border: `1px solid ${sc.color}44`,
-            }}
-          >
-            {sc.label}
-          </span>
-        </div>
-
-        {/* Totals */}
-        <InfoRow label="Total cobrado">
-          <span style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(totalCobrado)}</span>
-        </InfoRow>
-        <InfoRow label="Recebido">
-          <span
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontWeight: 600,
-              color: totalRecebido > 0 ? "var(--status-success)" : "var(--text-tertiary)",
-            }}
-          >
-            {formatBRL(Math.max(totalRecebido, 0))}
-          </span>
-        </InfoRow>
-        {Math.abs(saldo) > 0.001 && (
-          <InfoRow label={saldo > 0 ? "Saldo em aberto" : "Pago a maior"}>
-            <span
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontWeight: 600,
-                color: saldo > 0 ? "var(--status-warning)" : "var(--accent-primary, #7c6fef)",
-              }}
-            >
-              {formatBRL(Math.abs(saldo))}
-            </span>
-          </InfoRow>
-        )}
-
-        {/* List of payments */}
-        {pagamentos.length > 0 && (
-          <div style={{ marginTop: 10 }}>
-            {pagamentos.map((p) => {
-              const isNeg = p.valor < 0;
-              const isEstornando = estornoId === p.id;
-
-              if (isEstornando) {
-                return (
-                  <div key={p.id} style={{ padding: "6px 0", borderTop: "1px solid var(--border-subtle)" }}>
-                    <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 4 }}>
-                      Motivo do estorno:
-                    </div>
-                    <div style={{ display: "flex", gap: 4 }}>
-                      <input
-                        autoFocus
-                        className="atlas-input"
-                        style={{ flex: 1, fontSize: 11, height: 26 }}
-                        placeholder="Ex: cliente desistiu"
-                        value={estornoMotivo}
-                        onChange={(e) => setEstornoMotivo(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleEstorno(p.id);
-                          if (e.key === "Escape") setEstornoId(null);
-                        }}
-                      />
-                      <button
-                        className="atlas-btn atlas-btn-sm"
-                        style={{ background: "var(--status-error)", color: "#fff", border: "none", fontSize: 11 }}
-                        onClick={() => handleEstorno(p.id)}
-                      >
-                        Confirmar
-                      </button>
-                      <button
-                        className="atlas-btn atlas-btn-ghost atlas-btn-sm"
-                        onClick={() => { setEstornoId(null); setEstornoMotivo(""); }}
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                );
-              }
-
-              return (
-                <div
-                  key={p.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    padding: "6px 0",
-                    borderTop: "1px solid var(--border-subtle)",
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                      {formatDate(p.data)} · {FORMA_PAG_LABEL[p.forma]}
-                    </div>
-                    {p.observacao && (
-                      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>
-                        {p.observacao}
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: isNeg ? "var(--status-error)" : "var(--status-success)",
-                      }}
-                    >
-                      {isNeg ? "−" : "+"} {formatBRL(Math.abs(p.valor))}
-                    </span>
-                    {!isNeg && (
-                      <button
-                        style={{
-                          background: "none",
-                          border: "none",
-                          fontSize: 10,
-                          color: "var(--text-tertiary)",
-                          cursor: "pointer",
-                          padding: 0,
-                          textDecoration: "underline",
-                        }}
-                        onClick={() => setEstornoId(p.id)}
-                      >
-                        estornar
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Add form or register button */}
-        {showForm ? (
-          <div
-            style={{
-              marginTop: 10,
-              padding: 10,
-              background: "var(--bg-input)",
-              borderRadius: "var(--radius-md, 4px)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-            }}
-          >
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-              <div className="alm-field" style={{ margin: 0 }}>
-                <label className="alm-label">Valor (R$)</label>
-                <input
-                  autoFocus
-                  className="atlas-input"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0,00"
-                  value={fValor}
-                  onChange={(e) => setFValor(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                />
-              </div>
-              <div className="alm-field" style={{ margin: 0 }}>
-                <label className="alm-label">Data</label>
-                <input
-                  className="atlas-input"
-                  type="date"
-                  value={fData}
-                  onChange={(e) => setFData(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="alm-field" style={{ margin: 0 }}>
-              <label className="alm-label">Forma de pagamento</label>
-              <select
-                className="alm-select"
-                style={{ height: 32 }}
-                value={fForma}
-                onChange={(e) => setFForma(e.target.value as typeof fForma)}
-              >
-                <option value="pix">Pix</option>
-                <option value="dinheiro">Dinheiro</option>
-                <option value="cartao">Cartão</option>
-                <option value="outro">Outro</option>
-              </select>
-            </div>
-            <div className="alm-field" style={{ margin: 0 }}>
-              <label className="alm-label">Observação (opcional)</label>
-              <input
-                className="atlas-input"
-                placeholder="Ex: sinal, 50% antecipado..."
-                value={fObs}
-                onChange={(e) => setFObs(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-              />
-            </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button
-                className="atlas-btn atlas-btn-primary atlas-btn-sm"
-                onClick={handleAdd}
-                disabled={!fValor}
-                style={{ opacity: !fValor ? 0.4 : 1, flex: 1 }}
-              >
-                Salvar
-              </button>
-              <button
-                className="atlas-btn atlas-btn-ghost atlas-btn-sm"
-                onClick={() => setShowForm(false)}
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            className="atlas-btn atlas-btn-secondary atlas-btn-sm"
-            style={{
-              marginTop: 12,
-              width: "100%",
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              gap: 5,
-            }}
-            onClick={() => setShowForm(true)}
-          >
-            <Plus size={12} strokeWidth={1.5} />
-            Registrar pagamento
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ── TimelinePedido ────────────────────────────────────────────
-function TimelinePedido({
-  status,
-  dataPedido,
-}: {
-  status: EncomendaStatus;
-  dataPedido: string;
-}) {
+function TimelinePedido({ status, dataPedido }: { status: EncomendaStatus; dataPedido: string }) {
   const [expanded, setExpanded] = useState(false);
   const eventos = deriveTimeline(status, dataPedido);
   const shown = expanded ? eventos : eventos.slice(0, 4);
@@ -1555,35 +1036,15 @@ function TimelinePedido({
       <div className="atlas-card-header">
         <span className="atlas-panel-title">Timeline do pedido</span>
       </div>
-      <div
-        className="atlas-card-body"
-        style={{ display: "flex", flexDirection: "column", gap: 0, padding: "10px 12px" }}
-      >
+      <div className="atlas-card-body" style={{ display: "flex", flexDirection: "column", gap: 0, padding: "10px 12px" }}>
         {shown.map((e, i) => (
           <div
             key={i}
-            style={{
-              display: "flex",
-              gap: 10,
-              paddingBottom: i < shown.length - 1 ? 14 : 0,
-              position: "relative",
-            }}
+            style={{ display: "flex", gap: 10, paddingBottom: i < shown.length - 1 ? 14 : 0, position: "relative" }}
           >
-            {/* Connector line */}
             {i < shown.length - 1 && (
-              <div
-                style={{
-                  position: "absolute",
-                  left: 9,
-                  top: 20,
-                  width: 1,
-                  bottom: 0,
-                  background: "var(--border-default)",
-                }}
-              />
+              <div style={{ position: "absolute", left: 9, top: 20, width: 1, bottom: 0, background: "var(--border-default)" }} />
             )}
-
-            {/* Icon */}
             <div
               style={{
                 width: 20,
@@ -1594,47 +1055,19 @@ function TimelinePedido({
                 alignItems: "center",
                 justifyContent: "center",
                 zIndex: 1,
-                background: e.concluido
-                  ? "var(--status-success)"
-                  : e.isCurrent
-                  ? "var(--status-warning)"
-                  : "var(--bg-input)",
-                border: `1px solid ${
-                  e.concluido
-                    ? "var(--status-success)"
-                    : e.isCurrent
-                    ? "var(--status-warning)"
-                    : "var(--border-default)"
-                }`,
+                background: e.concluido ? "var(--status-success)" : e.isCurrent ? "var(--status-warning)" : "var(--bg-input)",
+                border: `1px solid ${e.concluido ? "var(--status-success)" : e.isCurrent ? "var(--status-warning)" : "var(--border-default)"}`,
               }}
             >
               {e.concluido ? (
                 <Check size={10} strokeWidth={2.5} style={{ color: "#fff" }} />
               ) : (
-                <Clock
-                  size={10}
-                  strokeWidth={1.5}
-                  style={{
-                    color: e.isCurrent ? "var(--status-warning)" : "var(--text-tertiary)",
-                  }}
-                />
+                <Clock size={10} strokeWidth={1.5} style={{ color: e.isCurrent ? "var(--status-warning)" : "var(--text-tertiary)" }} />
               )}
             </div>
-
-            {/* Text */}
             <div style={{ paddingTop: 1 }}>
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: e.isCurrent ? 600 : 500,
-                  color: "var(--text-primary)",
-                }}
-              >
-                {e.evento}
-              </div>
-              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>
-                {e.data}
-              </div>
+              <div style={{ fontSize: 12, fontWeight: e.isCurrent ? 600 : 500, color: "var(--text-primary)" }}>{e.evento}</div>
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>{e.data}</div>
             </div>
           </div>
         ))}
@@ -1645,9 +1078,7 @@ function TimelinePedido({
             style={{ marginTop: 10, fontSize: 11, alignSelf: "flex-start" }}
             onClick={() => setExpanded((v) => !v)}
           >
-            {expanded
-              ? "Ver menos"
-              : `Ver todas as atualizações (${eventos.length})`}
+            {expanded ? "Ver menos" : `Ver todas as atualizações (${eventos.length})`}
           </button>
         )}
       </div>
@@ -1656,13 +1087,7 @@ function TimelinePedido({
 }
 
 // ── InfoRow ───────────────────────────────────────────────────
-function InfoRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div
       style={{
@@ -1685,41 +1110,29 @@ export default function EncomendaDetalhePage() {
   const { id } = useParams<{ id: string }>();
   const encBase = encomendasMock.find((e) => e.id === id);
 
-  const [status, setStatus] = useState<EncomendaStatus>(
-    encBase?.status ?? "aguardando"
-  );
-  const tipo: EncomendaTipo = encBase?.tipo ?? "sob_encomenda";
+  const [status, setStatus] = useState<EncomendaStatus>(encBase?.status ?? "aguardando");
   const storedFotos: Record<string, string> =
     typeof window !== "undefined"
       ? JSON.parse(localStorage.getItem("almanac_enc_fotos") ?? "{}")
       : {};
   const encId = encBase?.id ?? "";
-  const [foto, setFoto] = useState<string | null>(
-    storedFotos[encId] ?? encBase?.foto ?? null
-  );
+  const [foto, setFoto] = useState<string | null>(storedFotos[encId] ?? encBase?.foto ?? null);
 
   const handleFotoChange = (src: string | null) => {
     setFoto(src);
     if (!encId) return;
-    const fotos: Record<string, string> = JSON.parse(
-      localStorage.getItem("almanac_enc_fotos") ?? "{}"
-    );
+    const fotos: Record<string, string> = JSON.parse(localStorage.getItem("almanac_enc_fotos") ?? "{}");
     if (src) fotos[encId] = src;
     else delete fotos[encId];
     localStorage.setItem("almanac_enc_fotos", JSON.stringify(fotos));
   };
-  const [arquivos, setArquivos] = useState<LinkUtil[]>(
-    encBase?.linksUteis ?? []
-  );
+  const [arquivos, setArquivos] = useState<LinkUtil[]>(encBase?.linksUteis ?? []);
   const [itens, setItens] = useState<EncomendaItem[]>(encBase?.itens ?? []);
   const [observacoes, setObservacoes] = useState(encBase?.observacoes ?? "");
-  const [observacoesInternas, setObservacoesInternas] = useState(
-    encBase?.observacoesInternas ?? ""
-  );
+  const [observacoesInternas, setObservacoesInternas] = useState(encBase?.observacoesInternas ?? "");
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
   const [produtoModal, setProdutoModal] = useState<Produto | null>(null);
-  const [avisoEntrega, setAvisoEntrega] = useState<string | null>(null);
 
   if (!encBase) {
     return (
@@ -1736,7 +1149,6 @@ export default function EncomendaDetalhePage() {
 
   const orderNumber = formatOrderNumber(encBase.id);
 
-  // Recalculate financials from current items
   const subtotal = itens.reduce((s, i) => s + i.quantidade * i.precoUnitario, 0);
   const desconto = encBase.desconto ?? 0;
   const totalCobrado = Math.max(subtotal - desconto, 0);
@@ -1744,14 +1156,9 @@ export default function EncomendaDetalhePage() {
     const prod = produtos.find((p) => p.id === i.produtoId);
     return s + (prod?.custo ?? 0) * i.quantidade;
   }, 0);
-  const margem =
-    totalCobrado > 0 ? ((totalCobrado - custoProducao) / totalCobrado) * 100 : 0;
+  const margem = totalCobrado > 0 ? ((totalCobrado - custoProducao) / totalCobrado) * 100 : 0;
   const margemColor =
-    margem >= 60
-      ? "var(--status-success)"
-      : margem >= 30
-      ? "var(--status-warning)"
-      : "var(--status-error)";
+    margem >= 60 ? "var(--status-success)" : margem >= 30 ? "var(--status-warning)" : "var(--status-error)";
 
   const isLate =
     status !== "entregue" &&
@@ -1775,51 +1182,27 @@ export default function EncomendaDetalhePage() {
       {/* ── Header ─────────────────────────────────────────── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {/* Row 1: back + actions */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Link
             href="/encomendas"
             className="atlas-btn atlas-btn-ghost atlas-btn-sm"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              color: "var(--text-secondary)",
-            }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--text-secondary)" }}
           >
             <ArrowLeft size={13} strokeWidth={1.5} />
             Voltar para encomendas
           </Link>
 
-          {/* Actions */}
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {confirmCancel ? (
               <>
-                <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                  Cancelar pedido?
-                </span>
-                <button
-                  className="atlas-btn atlas-btn-secondary atlas-btn-sm"
-                  onClick={() => setConfirmCancel(false)}
-                >
+                <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Cancelar pedido?</span>
+                <button className="atlas-btn atlas-btn-secondary atlas-btn-sm" onClick={() => setConfirmCancel(false)}>
                   Não
                 </button>
                 <button
                   className="atlas-btn atlas-btn-sm"
-                  style={{
-                    background: "var(--status-error)",
-                    color: "#fff",
-                    border: "none",
-                  }}
-                  onClick={() => {
-                    setStatus("cancelado");
-                    setConfirmCancel(false);
-                  }}
+                  style={{ background: "var(--status-error)", color: "#fff", border: "none" }}
+                  onClick={() => { setStatus("cancelado"); setConfirmCancel(false); }}
                 >
                   Sim, cancelar
                 </button>
@@ -1839,22 +1222,7 @@ export default function EncomendaDetalhePage() {
                   <button
                     className="atlas-btn atlas-btn-primary atlas-btn-sm"
                     style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
-                    onClick={() => {
-                      if (nextStatus === "entregue" && tipo === "pronta_entrega") {
-                        const insuficientes = itens.filter((item) => {
-                          const prod = produtos.find((p) => p.id === item.produtoId);
-                          return prod?.prontoEstoque !== undefined && item.quantidade > (prod.prontoEstoque ?? 0);
-                        });
-                        if (insuficientes.length > 0) {
-                          const nomes = insuficientes
-                            .map((i) => produtos.find((p) => p.id === i.produtoId)?.nome ?? i.produtoId)
-                            .join(", ");
-                          setAvisoEntrega(`Estoque insuficiente: ${nomes}. Prosseguir mesmo assim?`);
-                          return;
-                        }
-                      }
-                      setStatus(nextStatus);
-                    }}
+                    onClick={() => setStatus(nextStatus)}
                   >
                     {nextLabel}
                     <ChevronRight size={13} strokeWidth={1.5} />
@@ -1883,75 +1251,19 @@ export default function EncomendaDetalhePage() {
           >
             {canalIcon}
             {encBase.cliente}
-            <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>
-              · {canalLabel}
-            </span>
+            <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>· {canalLabel}</span>
           </div>
         </div>
 
-        {/* Row 3: info bar */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            flexWrap: "wrap",
-          }}
-        >
+        {/* Row 3: status + dates */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span className={statusBadge[status]}>{statusLabels[status]}</span>
-
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              fontSize: 11,
-              fontWeight: 600,
-              padding: "2px 8px",
-              borderRadius: "var(--radius-full)",
-              background:
-                tipo === "pronta_entrega"
-                  ? "rgba(72,199,142,0.1)"
-                  : "var(--bg-raised)",
-              color:
-                tipo === "pronta_entrega"
-                  ? "var(--status-success)"
-                  : "var(--text-tertiary)",
-              border: `1px solid ${tipo === "pronta_entrega" ? "rgba(72,199,142,0.25)" : "var(--border-default)"}`,
-            }}
-          >
-            {tipo === "pronta_entrega" ? (
-              <PackageCheck size={11} strokeWidth={1.5} />
-            ) : (
-              <Package size={11} strokeWidth={1.5} />
-            )}
-            {tipo === "pronta_entrega" ? "Pronta entrega" : "Sob encomenda"}
-          </span>
-
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              fontSize: 12,
-              color: "var(--text-tertiary)",
-            }}
-          >
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text-tertiary)" }}>
             <Calendar size={11} strokeWidth={1.5} />
             Pedido em {formatDate(encBase.dataPedido)}
           </span>
-
           <span style={{ color: "var(--border-strong)", fontSize: 12 }}>·</span>
-
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              fontSize: 12,
-              color: isLate ? "var(--status-error)" : "var(--text-tertiary)",
-            }}
-          >
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: isLate ? "var(--status-error)" : "var(--text-tertiary)" }}>
             <Calendar size={11} strokeWidth={1.5} />
             Entrega {formatDate(encBase.dataEntrega)}
             {daysLabel && (
@@ -1975,17 +1287,9 @@ export default function EncomendaDetalhePage() {
       </div>
 
       {/* ── Body ───────────────────────────────────────────── */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 280px",
-          gap: 20,
-          alignItems: "start",
-        }}
-      >
-        {/* Coluna principal — operacional */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 20, alignItems: "start" }}>
+        {/* Coluna principal */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Tabela de produtos */}
           <TabelaProdutos
             itens={itens}
             onChange={setItens}
@@ -1993,10 +1297,8 @@ export default function EncomendaDetalhePage() {
             onProdutoClick={(prod) => setProdutoModal(prod)}
           />
 
-          {/* Pagamento */}
-          <PainelPagamento encId={encBase.id} totalCobrado={totalCobrado} />
+          <PainelPagamento recordId={encBase.id} totalCobrado={totalCobrado} />
 
-          {/* Observações */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <ObservacoesCard
               title="Observações do cliente"
@@ -2012,11 +1314,10 @@ export default function EncomendaDetalhePage() {
             />
           </div>
 
-          {/* Timeline */}
           <TimelinePedido status={status} dataPedido={encBase.dataPedido} />
         </div>
 
-        {/* Sidebar — referência e visual */}
+        {/* Sidebar */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {/* Informações */}
           <div className="atlas-card">
@@ -2030,26 +1331,9 @@ export default function EncomendaDetalhePage() {
                   {canalLabel}
                 </span>
               </InfoRow>
-              <InfoRow label="Tipo">
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  {tipo === "pronta_entrega" ? (
-                    <PackageCheck size={11} strokeWidth={1.5} style={{ color: "var(--status-success)" }} />
-                  ) : (
-                    <Package size={11} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
-                  )}
-                  {tipo === "pronta_entrega" ? "Pronta entrega" : "Sob encomenda"}
-                </span>
-              </InfoRow>
               <InfoRow label="Pedido em">{formatDate(encBase.dataPedido)}</InfoRow>
               <InfoRow label="Entrega prevista">
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    color: isLate ? "var(--status-error)" : undefined,
-                  }}
-                >
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: isLate ? "var(--status-error)" : undefined }}>
                   <Calendar size={11} strokeWidth={1.5} />
                   {formatDate(encBase.dataEntrega)}
                 </span>
@@ -2067,58 +1351,24 @@ export default function EncomendaDetalhePage() {
             </div>
             <div className="atlas-card-body" style={{ padding: "8px 12px 12px" }}>
               <InfoRow label="Subtotal bruto">
-                <span style={{ fontFamily: "var(--font-mono)" }}>
-                  {formatBRL(subtotal)}
-                </span>
+                <span style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(subtotal)}</span>
               </InfoRow>
               {desconto > 0 && (
                 <InfoRow label="Desconto">
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      color: "var(--status-error)",
-                    }}
-                  >
+                  <span style={{ fontFamily: "var(--font-mono)", color: "var(--status-error)" }}>
                     − {formatBRL(desconto)}
                   </span>
                 </InfoRow>
               )}
               <InfoRow label="Total cobrado">
-                <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>
-                  {formatBRL(totalCobrado)}
-                </span>
+                <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>{formatBRL(totalCobrado)}</span>
               </InfoRow>
               <InfoRow label="Custo produção">
-                <span style={{ fontFamily: "var(--font-mono)" }}>
-                  {formatBRL(custoProducao)}
-                </span>
+                <span style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(custoProducao)}</span>
               </InfoRow>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  paddingTop: 10,
-                  marginTop: 4,
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 12,
-                    color: "var(--text-secondary)",
-                    fontWeight: 600,
-                  }}
-                >
-                  Margem
-                </span>
-                <span
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontWeight: 700,
-                    fontSize: 16,
-                    color: margemColor,
-                  }}
-                >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 10, marginTop: 4 }}>
+                <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}>Margem</span>
+                <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, fontSize: 16, color: margemColor }}>
                   {margem.toFixed(1)}%
                 </span>
               </div>
@@ -2140,87 +1390,16 @@ export default function EncomendaDetalhePage() {
             </div>
           </div>
 
-          {/* Arquivos */}
           <ArquivosPedido arquivos={arquivos} onChange={setArquivos} />
         </div>
       </div>
 
-      {/* Lightbox */}
       {lightbox && (
-        <Lightbox
-          src={lightbox.src}
-          alt={lightbox.alt}
-          onClose={() => setLightbox(null)}
-        />
+        <Lightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />
       )}
 
-      {/* Modal detalhe produto */}
       {produtoModal && (
-        <ProdutoDetalheModal
-          produto={produtoModal}
-          onClose={() => setProdutoModal(null)}
-        />
-      )}
-
-      {/* Aviso estoque insuficiente (pronta entrega) */}
-      {avisoEntrega && (
-        <div
-          onClick={() => setAvisoEntrega(null)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.55)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: "var(--z-modal)" as unknown as number,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "var(--bg-surface)",
-              border: "1px solid var(--border-default)",
-              borderRadius: "var(--radius-md)",
-              width: 380,
-              maxWidth: "calc(100vw - 32px)",
-              padding: 20,
-              display: "flex",
-              flexDirection: "column",
-              gap: 14,
-              boxShadow: "0 8px 32px rgba(0,0,0,0.28)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <PackageCheck size={18} strokeWidth={1.5} style={{ color: "var(--status-warning)", flexShrink: 0, marginTop: 1 }} />
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
-                  Estoque de prontos insuficiente
-                </div>
-                <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                  {avisoEntrega}
-                </div>
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button
-                className="atlas-btn atlas-btn-secondary atlas-btn-sm"
-                onClick={() => setAvisoEntrega(null)}
-              >
-                Cancelar
-              </button>
-              <button
-                className="atlas-btn atlas-btn-primary atlas-btn-sm"
-                onClick={() => {
-                  setStatus("entregue");
-                  setAvisoEntrega(null);
-                }}
-              >
-                Confirmar mesmo assim
-              </button>
-            </div>
-          </div>
-        </div>
+        <ProdutoDetalheModal produto={produtoModal} onClose={() => setProdutoModal(null)} />
       )}
     </div>
   );

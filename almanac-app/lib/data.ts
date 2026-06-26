@@ -60,13 +60,10 @@ export interface LinkUtil {
   url: string;
 }
 
-export type EncomendaTipo = "sob_encomenda" | "pronta_entrega";
-
 export interface Encomenda {
   id: string;
   cliente: string;
   canal: "whatsapp" | "presencial";
-  tipo?: EncomendaTipo;
   status: EncomendaStatus;
   dataPedido: string;
   dataEntrega: string;
@@ -531,6 +528,30 @@ export const encomendas: Encomenda[] = [
     observacoes: "Cartões de visita para escritório de advocacia",
   },
 ];
+
+// ─────────────────────────────────────────────────────────────
+// Pronta Entrega
+// ─────────────────────────────────────────────────────────────
+export interface ProdutoPE {
+  id: string;
+  nome: string;
+  descricao?: string;
+  foto?: string;
+  precoVenda: number;
+  estoqueAtual: number;
+  estoqueMin: number;
+}
+
+export const produtosPE: ProdutoPE[] = [
+  { id: "pe-1", nome: "Caderneta pautada A6", descricao: "Capa dura, 80 folhas", precoVenda: 28.0, estoqueAtual: 12, estoqueMin: 5 },
+  { id: "pe-2", nome: "Adesivos florais (cartela)", descricao: "Cartela 10×15cm, 24 adesivos", precoVenda: 9.5, estoqueAtual: 3, estoqueMin: 10 },
+  { id: "pe-3", nome: "Marcador de página acrílico", descricao: "Kit com 4 unidades", precoVenda: 15.0, estoqueAtual: 0, estoqueMin: 5 },
+  { id: "pe-4", nome: "Planner mensal impresso", descricao: "A4, 12 meses, sem data", precoVenda: 22.0, estoqueAtual: 8, estoqueMin: 5 },
+];
+
+export const vendasProntaEntregaPendentes = produtosPE.filter(
+  (p) => p.estoqueAtual > 0
+);
 
 // ─────────────────────────────────────────────────────────────
 // Custos indiretos

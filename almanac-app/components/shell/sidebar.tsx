@@ -7,10 +7,11 @@ import {
   Package,
   Box,
   ClipboardList,
+  PackageCheck,
   BarChart2,
   Settings,
 } from "lucide-react";
-import { insumosEmAlerta, encomendasAbertas } from "@/lib/data";
+import { insumosEmAlerta, encomendasAbertas, vendasProntaEntregaPendentes } from "@/lib/data";
 
 const mainNav = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -27,6 +28,13 @@ const mainNav = [
     label: "Encomendas",
     icon: ClipboardList,
     badge: encomendasAbertas.length > 0 ? encomendasAbertas.length : null,
+    badgeType: "neutral" as const,
+  },
+  {
+    href: "/pronta-entrega",
+    label: "Pronta Entrega",
+    icon: PackageCheck,
+    badge: vendasProntaEntregaPendentes.length > 0 ? vendasProntaEntregaPendentes.length : null,
     badgeType: "neutral" as const,
   },
   { href: "/financeiro", label: "Financeiro", icon: BarChart2 },

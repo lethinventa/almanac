@@ -18,7 +18,6 @@ import {
   Link2,
   FileText,
   ExternalLink,
-  PackageCheck,
 } from "lucide-react";
 import {
   encomendas as encomendasMock,
@@ -29,7 +28,6 @@ import {
   statusBadge,
   Encomenda,
   EncomendaStatus,
-  EncomendaTipo,
   LinkUtil,
 } from "@/lib/data";
 import { KanbanBoard } from "@/components/kanban-board";
@@ -153,7 +151,6 @@ function NovaEncomendaContent({
   const hoje = new Date().toISOString().slice(0, 10);
 
   const [foto, setFoto] = useState<string | null>(null);
-  const [tipo, setTipo] = useState<EncomendaTipo>("sob_encomenda");
   const [cliente, setCliente] = useState("");
   const [canal, setCanal] = useState<"whatsapp" | "presencial">("whatsapp");
   const [dataEntrega, setDataEntrega] = useState("");
@@ -221,7 +218,6 @@ function NovaEncomendaContent({
     onSave({
       cliente: cliente.trim(),
       canal,
-      tipo,
       status: "aguardando",
       dataPedido: hoje,
       dataEntrega,
@@ -244,52 +240,6 @@ function NovaEncomendaContent({
     <>
       {/* Foto */}
       <FotoUploadSmall value={foto} onChange={setFoto} />
-
-      {/* Tipo de venda */}
-      <div className="alm-field">
-        <label className="alm-label">Tipo de venda</label>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-          {(["sob_encomenda", "pronta_entrega"] as const).map((t) => {
-            const active = tipo === t;
-            return (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTipo(t)}
-                style={{
-                  height: 36,
-                  borderRadius: "var(--radius-md, 4px)",
-                  border: active
-                    ? "1px solid var(--accent-primary)"
-                    : "1px solid var(--border-default)",
-                  background: active ? "var(--accent-primary)" : "var(--bg-raised)",
-                  color: active ? "#fff" : "var(--text-secondary)",
-                  fontSize: 12,
-                  fontWeight: active ? 600 : 400,
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                  transition: "all 120ms ease",
-                }}
-              >
-                {t === "pronta_entrega" ? (
-                  <PackageCheck size={13} strokeWidth={1.5} />
-                ) : (
-                  <Package size={13} strokeWidth={1.5} />
-                )}
-                {t === "sob_encomenda" ? "Sob encomenda" : "Pronta entrega"}
-              </button>
-            );
-          })}
-        </div>
-        {tipo === "pronta_entrega" && (
-          <p style={{ fontSize: 11, color: "var(--text-tertiary)", margin: "4px 0 0", lineHeight: 1.5 }}>
-            A baixa de estoque ocorrerá no estoque de prontos ao confirmar entrega.
-          </p>
-        )}
-      </div>
 
       {/* Cliente + canal */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}>
@@ -352,88 +302,58 @@ function NovaEncomendaContent({
             const q = parseFloat(row.quantidade) || 0;
             const p = parseFloat(row.precoUnitario) || 0;
             const sub = q * p;
-            const prod = produtos.find((pr) => pr.id === row.produtoId);
-            const prontos = prod?.prontoEstoque ?? null;
-            const insuficiente =
-              tipo === "pronta_entrega" &&
-              prontos !== null &&
-              q > prontos;
             return (
-              <div key={idx} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                <div
-                  style={{ display: "grid", gridTemplateColumns: "1fr 64px 88px 72px 24px", gap: 6, alignItems: "center" }}
+              <div
+                key={idx}
+                style={{ display: "grid", gridTemplateColumns: "1fr 64px 88px 72px 24px", gap: 6, alignItems: "center" }}
+              >
+                <select
+                  className="alm-select"
+                  style={{ height: 32, fontSize: 12 }}
+                  value={row.produtoId}
+                  onChange={(e) => updateItem(idx, "produtoId", e.target.value)}
                 >
-                  <select
-                    className="alm-select"
-                    style={{ height: 32, fontSize: 12 }}
-                    value={row.produtoId}
-                    onChange={(e) => updateItem(idx, "produtoId", e.target.value)}
-                  >
-                    {produtos.map((p) => (
-                      <option key={p.id} value={p.id}>{p.nome}</option>
-                    ))}
-                  </select>
-                  <input
-                    className="atlas-input"
-                    type="number"
-                    min="1"
-                    placeholder="Qtd"
-                    style={{ fontSize: 12, borderColor: insuficiente ? "var(--status-error)" : undefined }}
-                    value={row.quantidade}
-                    onChange={(e) => updateItem(idx, "quantidade", e.target.value)}
-                  />
-                  <input
-                    className="atlas-input"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="R$ unit."
-                    style={{ fontSize: 12 }}
-                    value={row.precoUnitario}
-                    onChange={(e) => updateItem(idx, "precoUnitario", e.target.value)}
-                  />
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 11,
-                      color: sub > 0 ? "var(--text-primary)" : "var(--text-tertiary)",
-                      textAlign: "right",
-                      paddingRight: 4,
-                    }}
-                  >
-                    {sub > 0 ? formatBRL(sub) : "—"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeItem(idx)}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-tertiary)", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
-                  >
-                    <Trash2 size={13} strokeWidth={1.5} />
-                  </button>
-                </div>
-                {tipo === "pronta_entrega" && prontos !== null && (
-                  <div
-                    style={{
-                      fontSize: 10,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                      color: insuficiente ? "var(--status-error)" : "var(--text-tertiary)",
-                      paddingLeft: 2,
-                    }}
-                  >
-                    {insuficiente && <AlertTriangle size={10} strokeWidth={1.5} />}
-                    <PackageCheck size={10} strokeWidth={1.5} />
-                    {prontos} em estoque de prontos
-                    {insuficiente && " — insuficiente, mas pode prosseguir"}
-                  </div>
-                )}
-                {tipo === "pronta_entrega" && prontos === null && (
-                  <div style={{ fontSize: 10, color: "var(--status-warning)", paddingLeft: 2, display: "flex", alignItems: "center", gap: 4 }}>
-                    <AlertTriangle size={10} strokeWidth={1.5} />
-                    Produto sem estoque de prontos configurado
-                  </div>
-                )}
+                  {produtos.map((p) => (
+                    <option key={p.id} value={p.id}>{p.nome}</option>
+                  ))}
+                </select>
+                <input
+                  className="atlas-input"
+                  type="number"
+                  min="1"
+                  placeholder="Qtd"
+                  style={{ fontSize: 12 }}
+                  value={row.quantidade}
+                  onChange={(e) => updateItem(idx, "quantidade", e.target.value)}
+                />
+                <input
+                  className="atlas-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="R$ unit."
+                  style={{ fontSize: 12 }}
+                  value={row.precoUnitario}
+                  onChange={(e) => updateItem(idx, "precoUnitario", e.target.value)}
+                />
+                <span
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 11,
+                    color: sub > 0 ? "var(--text-primary)" : "var(--text-tertiary)",
+                    textAlign: "right",
+                    paddingRight: 4,
+                  }}
+                >
+                  {sub > 0 ? formatBRL(sub) : "—"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeItem(idx)}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-tertiary)", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <Trash2 size={13} strokeWidth={1.5} />
+                </button>
               </div>
             );
           })}
