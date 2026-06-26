@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Titlebar } from "@/components/shell/titlebar";
-import { Sidebar } from "@/components/shell/sidebar";
-import { MobileNav } from "@/components/shell/mobile-nav";
+import { AuthProvider } from "@/contexts/auth-context";
+import { AppShell } from "@/components/shell/app-shell";
 
 export const metadata: Metadata = {
   title: "Almanac — Papelaria criativa",
@@ -21,23 +20,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <div className="alm-shell">
-          <div className="alm-titlebar">
-            <Titlebar />
-          </div>
-
-          <aside className="alm-sidebar">
-            <Sidebar />
-          </aside>
-
-          <main className="alm-main">
-            {children}
-          </main>
-
-          <div className="alm-mobile-nav">
-            <MobileNav />
-          </div>
-        </div>
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -60,9 +60,7 @@ export function Sidebar() {
             <item.icon size={15} strokeWidth={1.5} />
             {item.label}
             {item.badge != null && (
-              <span
-                className={`alm-nav-badge${item.badgeType === "neutral" ? " is-neutral" : ""}`}
-              >
+              <span className={`alm-nav-badge${item.badgeType === "neutral" ? " is-neutral" : ""}`}>
                 {item.badge}
               </span>
             )}
