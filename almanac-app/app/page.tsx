@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { AlertTriangle, TrendingUp, ShoppingBag, Package, Plus, ClipboardList, Box } from "lucide-react";
+import { AlertTriangle, TrendingUp, ShoppingBag, Package, Plus, ClipboardList, Box, PackageCheck } from "lucide-react";
 import { KanbanWidget } from "@/components/kanban-widget";
 import {
   insumosEmAlerta,
+  produtosComProntoAlerta,
   encomendasAbertas,
   formatBRL,
   receitaMes,
@@ -222,6 +223,62 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Pronta entrega em alerta */}
+      {produtosComProntoAlerta.length > 0 && (
+        <div className="atlas-card">
+          <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span className="atlas-dot atlas-dot-warning is-pulse" />
+              <span className="atlas-panel-title">Pronta entrega em alerta</span>
+            </span>
+            <Link href="/produtos" className="atlas-link" style={{ fontSize: "11px" }}>
+              Ver produtos
+            </Link>
+          </div>
+          <div className="atlas-card-body" style={{ padding: 0 }}>
+            <table className="atlas-table" style={{ width: "100%", border: 0 }}>
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th>Categoria</th>
+                  <th className="num">Em estoque</th>
+                  <th className="num">Mínimo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {produtosComProntoAlerta.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <PackageCheck size={13} strokeWidth={1.5} style={{ color: "var(--status-warning)", flexShrink: 0 }} />
+                        <span style={{ fontWeight: 500 }}>{p.nome}</span>
+                      </div>
+                    </td>
+                    <td style={{ color: "var(--text-tertiary)", fontSize: "11px" }}>
+                      {p.categoria}
+                    </td>
+                    <td className="num">
+                      <span
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          fontWeight: 600,
+                          color: (p.prontoEstoque ?? 0) === 0 ? "var(--status-error)" : "var(--status-warning)",
+                        }}
+                      >
+                        {p.prontoEstoque ?? 0}
+                      </span>
+                    </td>
+                    <td className="num" style={{ fontFamily: "var(--font-mono)", color: "var(--text-tertiary)" }}>
+                      {p.prontoEstoqueMin}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Lucro líquido callout */}
       <div

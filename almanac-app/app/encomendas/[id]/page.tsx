@@ -15,20 +15,25 @@ import {
   Check,
   Clock,
   Package,
+  PackageCheck,
   ZoomIn,
   X,
   Eye,
+  Info,
 } from "lucide-react";
 import {
   encomendas as encomendasMock,
   produtos,
+  insumos,
   formatBRL,
   formatDate,
   statusLabels,
   statusBadge,
   EncomendaStatus,
+  EncomendaTipo,
   LinkUtil,
   EncomendaItem,
+  Produto,
 } from "@/lib/data";
 
 // ── Status flow ───────────────────────────────────────────────
@@ -312,10 +317,12 @@ function TabelaProdutos({
   itens,
   onChange,
   onPreview,
+  onProdutoClick,
 }: {
   itens: EncomendaItem[];
   onChange: (itens: EncomendaItem[]) => void;
   onPreview?: (src: string, alt: string) => void;
+  onProdutoClick?: (prod: Produto) => void;
 }) {
   const [editCell, setEditCell] = useState<{
     row: number;
@@ -446,7 +453,30 @@ function TabelaProdutos({
                 </td>
 
                 {/* Name */}
-                <td style={{ fontWeight: 500 }}>{prod?.nome ?? item.produtoId}</td>
+                <td>
+                  <span
+                    style={{
+                      fontWeight: 500,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      cursor: prod && onProdutoClick ? "pointer" : "default",
+                    }}
+                    onClick={() => prod && onProdutoClick?.(prod)}
+                    onMouseEnter={(e) => {
+                      if (prod && onProdutoClick)
+                        (e.currentTarget as HTMLElement).style.color = "var(--text-link, var(--primary))";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.color = "";
+                    }}
+                  >
+                    {prod?.nome ?? item.produtoId}
+                    {prod && onProdutoClick && (
+                      <Info size={11} strokeWidth={1.5} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
+                    )}
+                  </span>
+                </td>
 
                 {/* Qty — inline editable */}
                 <td className="num">
@@ -828,6 +858,175 @@ function Lightbox({
   );
 }
 
+// ── ProdutoDetalheModal ───────────────────────────────────────
+function ProdutoDetalheModal({
+  produto,
+  onClose,
+}: {
+  produto: Produto;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const margemColor =
+    produto.margem >= 60
+      ? "var(--status-success)"
+      : produto.margem >= 30
+      ? "var(--status-warning)"
+      : "var(--status-error)";
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: "var(--z-modal)" as unknown as number,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--bg-surface)",
+          border: "1px solid var(--border-default)",
+          borderRadius: "var(--radius-md)",
+          width: 420,
+          maxWidth: "calc(100vw - 32px)",
+          maxHeight: "85vh",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.28)",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "10px 14px",
+            borderBottom: "1px solid var(--border-default)",
+            flexShrink: 0,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{produto.nome}</div>
+            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>
+              {produto.categoria}
+            </div>
+          </div>
+          <button
+            className="atlas-btn atlas-btn-ghost atlas-btn-icon atlas-btn-sm"
+            onClick={onClose}
+          >
+            <X size={14} strokeWidth={1.5} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* Foto */}
+          {produto.foto && (
+            <img
+              src={produto.foto}
+              alt={produto.nome}
+              style={{
+                width: "100%",
+                maxHeight: 180,
+                objectFit: "cover",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border-default)",
+              }}
+            />
+          )}
+
+          {/* Resumo financeiro */}
+          <div>
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                color: "var(--text-tertiary)",
+                marginBottom: 6,
+              }}
+            >
+              Financeiro
+            </div>
+            <InfoRow label="Custo unitário">
+              <span style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(produto.custo)}</span>
+            </InfoRow>
+            <InfoRow label="Preço sugerido">
+              <span style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(produto.precoSugerido)}</span>
+            </InfoRow>
+            <InfoRow label="Margem">
+              <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: margemColor }}>
+                {produto.margem.toFixed(1)}%
+              </span>
+            </InfoRow>
+            <InfoRow label="Tempo de produção">
+              {produto.tempoProducao} min
+            </InfoRow>
+          </div>
+
+          {/* Receita */}
+          {produto.receita.length > 0 && (
+            <div>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  color: "var(--text-tertiary)",
+                  marginBottom: 6,
+                }}
+              >
+                Receita ({produto.receita.length} insumo{produto.receita.length !== 1 ? "s" : ""})
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                {produto.receita.map((r) => {
+                  const ins = insumos.find((i) => i.id === r.insumoId);
+                  return (
+                    <div
+                      key={r.insumoId}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        fontSize: 12,
+                        padding: "5px 0",
+                        borderBottom: "1px solid var(--border-subtle)",
+                      }}
+                    >
+                      <span>{ins?.nome ?? r.insumoId}</span>
+                      <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-secondary)", fontSize: 11 }}>
+                        {r.quantidade} {ins?.unidade ?? ""}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── ArquivosPedido ────────────────────────────────────────────
 function ArquivosPedido({
   arquivos,
@@ -962,6 +1161,378 @@ function ArquivosPedido({
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PainelPagamento ───────────────────────────────────────────
+interface Pagamento {
+  id: string;
+  valor: number;
+  data: string;
+  forma: "pix" | "dinheiro" | "cartao" | "outro";
+  observacao?: string;
+}
+
+const FORMA_PAG_LABEL: Record<string, string> = {
+  pix: "Pix",
+  dinheiro: "Dinheiro",
+  cartao: "Cartão",
+  outro: "Outro",
+};
+
+function loadPagamentosEnc(encId: string): Pagamento[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const all = localStorage.getItem("almanac_pagamentos");
+    if (!all) return [];
+    return JSON.parse(all)[encId] ?? [];
+  } catch { return []; }
+}
+
+function savePagamentosEnc(encId: string, pags: Pagamento[]) {
+  if (typeof window === "undefined") return;
+  try {
+    const all = localStorage.getItem("almanac_pagamentos");
+    const parsed = all ? JSON.parse(all) : {};
+    parsed[encId] = pags;
+    localStorage.setItem("almanac_pagamentos", JSON.stringify(parsed));
+  } catch {}
+}
+
+function PainelPagamento({
+  encId,
+  totalCobrado,
+}: {
+  encId: string;
+  totalCobrado: number;
+}) {
+  const hoje = new Date().toISOString().slice(0, 10);
+  const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [estornoId, setEstornoId] = useState<string | null>(null);
+  const [estornoMotivo, setEstornoMotivo] = useState("");
+
+  const [fValor, setFValor] = useState("");
+  const [fData, setFData] = useState(hoje);
+  const [fForma, setFForma] = useState<"pix" | "dinheiro" | "cartao" | "outro">("pix");
+  const [fObs, setFObs] = useState("");
+
+  useEffect(() => {
+    setPagamentos(loadPagamentosEnc(encId));
+  }, [encId]);
+
+  function persist(pags: Pagamento[]) {
+    setPagamentos(pags);
+    savePagamentosEnc(encId, pags);
+  }
+
+  function handleAdd() {
+    const valor = parseFloat(fValor);
+    if (!valor || valor <= 0) return;
+    persist([
+      ...pagamentos,
+      {
+        id: `pag-${Date.now()}`,
+        valor,
+        data: fData,
+        forma: fForma,
+        observacao: fObs.trim() || undefined,
+      },
+    ]);
+    setShowForm(false);
+    setFValor("");
+    setFObs("");
+    setFData(hoje);
+    setFForma("pix");
+  }
+
+  function handleEstorno(id: string) {
+    const orig = pagamentos.find((p) => p.id === id);
+    if (!orig) return;
+    persist([
+      ...pagamentos,
+      {
+        id: `est-${Date.now()}`,
+        valor: -Math.abs(orig.valor),
+        data: hoje,
+        forma: orig.forma,
+        observacao: `Estorno: ${estornoMotivo.trim() || "sem motivo"}`,
+      },
+    ]);
+    setEstornoId(null);
+    setEstornoMotivo("");
+  }
+
+  const totalRecebido = pagamentos.reduce((s, p) => s + p.valor, 0);
+  const saldo = totalCobrado - totalRecebido;
+
+  const statusPag =
+    totalRecebido <= 0
+      ? "sem_pagamento"
+      : saldo < 0
+      ? "paga_maior"
+      : saldo === 0
+      ? "paga"
+      : "sinal";
+
+  const statusConfig: Record<string, { label: string; bg: string; color: string }> = {
+    sem_pagamento: { label: "Sem pagamento", bg: "var(--bg-raised)", color: "var(--text-tertiary)" },
+    sinal:         { label: "Sinal recebido", bg: "rgba(255,193,7,0.1)", color: "var(--status-warning)" },
+    paga:          { label: "Paga", bg: "rgba(72,199,142,0.1)", color: "var(--status-success)" },
+    paga_maior:    { label: "Paga a maior", bg: "rgba(124,111,239,0.12)", color: "var(--accent-primary, #7c6fef)" },
+  };
+  const sc = statusConfig[statusPag];
+
+  return (
+    <div className="atlas-card">
+      <div className="atlas-card-header">
+        <span className="atlas-panel-title">Pagamento</span>
+      </div>
+      <div className="atlas-card-body" style={{ padding: "8px 12px 12px" }}>
+        {/* Status badge */}
+        <div style={{ marginBottom: 10 }}>
+          <span
+            style={{
+              display: "inline-block",
+              fontSize: 11,
+              fontWeight: 600,
+              padding: "2px 8px",
+              borderRadius: "var(--radius-full)",
+              background: sc.bg,
+              color: sc.color,
+              border: `1px solid ${sc.color}44`,
+            }}
+          >
+            {sc.label}
+          </span>
+        </div>
+
+        {/* Totals */}
+        <InfoRow label="Total cobrado">
+          <span style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(totalCobrado)}</span>
+        </InfoRow>
+        <InfoRow label="Recebido">
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontWeight: 600,
+              color: totalRecebido > 0 ? "var(--status-success)" : "var(--text-tertiary)",
+            }}
+          >
+            {formatBRL(Math.max(totalRecebido, 0))}
+          </span>
+        </InfoRow>
+        {Math.abs(saldo) > 0.001 && (
+          <InfoRow label={saldo > 0 ? "Saldo em aberto" : "Pago a maior"}>
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontWeight: 600,
+                color: saldo > 0 ? "var(--status-warning)" : "var(--accent-primary, #7c6fef)",
+              }}
+            >
+              {formatBRL(Math.abs(saldo))}
+            </span>
+          </InfoRow>
+        )}
+
+        {/* List of payments */}
+        {pagamentos.length > 0 && (
+          <div style={{ marginTop: 10 }}>
+            {pagamentos.map((p) => {
+              const isNeg = p.valor < 0;
+              const isEstornando = estornoId === p.id;
+
+              if (isEstornando) {
+                return (
+                  <div key={p.id} style={{ padding: "6px 0", borderTop: "1px solid var(--border-subtle)" }}>
+                    <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 4 }}>
+                      Motivo do estorno:
+                    </div>
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <input
+                        autoFocus
+                        className="atlas-input"
+                        style={{ flex: 1, fontSize: 11, height: 26 }}
+                        placeholder="Ex: cliente desistiu"
+                        value={estornoMotivo}
+                        onChange={(e) => setEstornoMotivo(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleEstorno(p.id);
+                          if (e.key === "Escape") setEstornoId(null);
+                        }}
+                      />
+                      <button
+                        className="atlas-btn atlas-btn-sm"
+                        style={{ background: "var(--status-error)", color: "#fff", border: "none", fontSize: 11 }}
+                        onClick={() => handleEstorno(p.id)}
+                      >
+                        Confirmar
+                      </button>
+                      <button
+                        className="atlas-btn atlas-btn-ghost atlas-btn-sm"
+                        onClick={() => { setEstornoId(null); setEstornoMotivo(""); }}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={p.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    padding: "6px 0",
+                    borderTop: "1px solid var(--border-subtle)",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                      {formatDate(p.data)} · {FORMA_PAG_LABEL[p.forma]}
+                    </div>
+                    {p.observacao && (
+                      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>
+                        {p.observacao}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span
+                      style={{
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: isNeg ? "var(--status-error)" : "var(--status-success)",
+                      }}
+                    >
+                      {isNeg ? "−" : "+"} {formatBRL(Math.abs(p.valor))}
+                    </span>
+                    {!isNeg && (
+                      <button
+                        style={{
+                          background: "none",
+                          border: "none",
+                          fontSize: 10,
+                          color: "var(--text-tertiary)",
+                          cursor: "pointer",
+                          padding: 0,
+                          textDecoration: "underline",
+                        }}
+                        onClick={() => setEstornoId(p.id)}
+                      >
+                        estornar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Add form or register button */}
+        {showForm ? (
+          <div
+            style={{
+              marginTop: 10,
+              padding: 10,
+              background: "var(--bg-input)",
+              borderRadius: "var(--radius-md, 4px)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              <div className="alm-field" style={{ margin: 0 }}>
+                <label className="alm-label">Valor (R$)</label>
+                <input
+                  autoFocus
+                  className="atlas-input"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0,00"
+                  value={fValor}
+                  onChange={(e) => setFValor(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                />
+              </div>
+              <div className="alm-field" style={{ margin: 0 }}>
+                <label className="alm-label">Data</label>
+                <input
+                  className="atlas-input"
+                  type="date"
+                  value={fData}
+                  onChange={(e) => setFData(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="alm-field" style={{ margin: 0 }}>
+              <label className="alm-label">Forma de pagamento</label>
+              <select
+                className="alm-select"
+                style={{ height: 32 }}
+                value={fForma}
+                onChange={(e) => setFForma(e.target.value as typeof fForma)}
+              >
+                <option value="pix">Pix</option>
+                <option value="dinheiro">Dinheiro</option>
+                <option value="cartao">Cartão</option>
+                <option value="outro">Outro</option>
+              </select>
+            </div>
+            <div className="alm-field" style={{ margin: 0 }}>
+              <label className="alm-label">Observação (opcional)</label>
+              <input
+                className="atlas-input"
+                placeholder="Ex: sinal, 50% antecipado..."
+                value={fObs}
+                onChange={(e) => setFObs(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+              />
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                className="atlas-btn atlas-btn-primary atlas-btn-sm"
+                onClick={handleAdd}
+                disabled={!fValor}
+                style={{ opacity: !fValor ? 0.4 : 1, flex: 1 }}
+              >
+                Salvar
+              </button>
+              <button
+                className="atlas-btn atlas-btn-ghost atlas-btn-sm"
+                onClick={() => setShowForm(false)}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            className="atlas-btn atlas-btn-secondary atlas-btn-sm"
+            style={{
+              marginTop: 12,
+              width: "100%",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: 5,
+            }}
+            onClick={() => setShowForm(true)}
+          >
+            <Plus size={12} strokeWidth={1.5} />
+            Registrar pagamento
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1117,7 +1688,26 @@ export default function EncomendaDetalhePage() {
   const [status, setStatus] = useState<EncomendaStatus>(
     encBase?.status ?? "aguardando"
   );
-  const [foto, setFoto] = useState<string | null>(encBase?.foto ?? null);
+  const tipo: EncomendaTipo = encBase?.tipo ?? "sob_encomenda";
+  const storedFotos: Record<string, string> =
+    typeof window !== "undefined"
+      ? JSON.parse(localStorage.getItem("almanac_enc_fotos") ?? "{}")
+      : {};
+  const encId = encBase?.id ?? "";
+  const [foto, setFoto] = useState<string | null>(
+    storedFotos[encId] ?? encBase?.foto ?? null
+  );
+
+  const handleFotoChange = (src: string | null) => {
+    setFoto(src);
+    if (!encId) return;
+    const fotos: Record<string, string> = JSON.parse(
+      localStorage.getItem("almanac_enc_fotos") ?? "{}"
+    );
+    if (src) fotos[encId] = src;
+    else delete fotos[encId];
+    localStorage.setItem("almanac_enc_fotos", JSON.stringify(fotos));
+  };
   const [arquivos, setArquivos] = useState<LinkUtil[]>(
     encBase?.linksUteis ?? []
   );
@@ -1128,6 +1718,8 @@ export default function EncomendaDetalhePage() {
   );
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
+  const [produtoModal, setProdutoModal] = useState<Produto | null>(null);
+  const [avisoEntrega, setAvisoEntrega] = useState<string | null>(null);
 
   if (!encBase) {
     return (
@@ -1247,7 +1839,22 @@ export default function EncomendaDetalhePage() {
                   <button
                     className="atlas-btn atlas-btn-primary atlas-btn-sm"
                     style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
-                    onClick={() => setStatus(nextStatus)}
+                    onClick={() => {
+                      if (nextStatus === "entregue" && tipo === "pronta_entrega") {
+                        const insuficientes = itens.filter((item) => {
+                          const prod = produtos.find((p) => p.id === item.produtoId);
+                          return prod?.prontoEstoque !== undefined && item.quantidade > (prod.prontoEstoque ?? 0);
+                        });
+                        if (insuficientes.length > 0) {
+                          const nomes = insuficientes
+                            .map((i) => produtos.find((p) => p.id === i.produtoId)?.nome ?? i.produtoId)
+                            .join(", ");
+                          setAvisoEntrega(`Estoque insuficiente: ${nomes}. Prosseguir mesmo assim?`);
+                          return;
+                        }
+                      }
+                      setStatus(nextStatus);
+                    }}
                   >
                     {nextLabel}
                     <ChevronRight size={13} strokeWidth={1.5} />
@@ -1292,6 +1899,34 @@ export default function EncomendaDetalhePage() {
           }}
         >
           <span className={statusBadge[status]}>{statusLabels[status]}</span>
+
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 11,
+              fontWeight: 600,
+              padding: "2px 8px",
+              borderRadius: "var(--radius-full)",
+              background:
+                tipo === "pronta_entrega"
+                  ? "rgba(72,199,142,0.1)"
+                  : "var(--bg-raised)",
+              color:
+                tipo === "pronta_entrega"
+                  ? "var(--status-success)"
+                  : "var(--text-tertiary)",
+              border: `1px solid ${tipo === "pronta_entrega" ? "rgba(72,199,142,0.25)" : "var(--border-default)"}`,
+            }}
+          >
+            {tipo === "pronta_entrega" ? (
+              <PackageCheck size={11} strokeWidth={1.5} />
+            ) : (
+              <Package size={11} strokeWidth={1.5} />
+            )}
+            {tipo === "pronta_entrega" ? "Pronta entrega" : "Sob encomenda"}
+          </span>
 
           <span
             style={{
@@ -1343,15 +1978,23 @@ export default function EncomendaDetalhePage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 300px",
+          gridTemplateColumns: "1fr 280px",
           gap: 20,
           alignItems: "start",
         }}
       >
-        {/* Coluna principal */}
+        {/* Coluna principal — operacional */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Tabela de produtos */}
-          <TabelaProdutos itens={itens} onChange={setItens} onPreview={(src, alt) => setLightbox({ src, alt })} />
+          <TabelaProdutos
+            itens={itens}
+            onChange={setItens}
+            onPreview={(src, alt) => setLightbox({ src, alt })}
+            onProdutoClick={(prod) => setProdutoModal(prod)}
+          />
+
+          {/* Pagamento */}
+          <PainelPagamento encId={encBase.id} totalCobrado={totalCobrado} />
 
           {/* Observações */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -1369,23 +2012,11 @@ export default function EncomendaDetalhePage() {
             />
           </div>
 
-          {/* Visual do pedido */}
-          <div className="atlas-card">
-            <div className="atlas-card-header">
-              <span className="atlas-panel-title">Visual do pedido</span>
-            </div>
-            <div className="atlas-card-body" style={{ padding: "12px" }}>
-              <VisualGaleria
-                foto={foto}
-                onFotoChange={setFoto}
-                itens={itens}
-                onPreview={(src, alt) => setLightbox({ src, alt })}
-              />
-            </div>
-          </div>
+          {/* Timeline */}
+          <TimelinePedido status={status} dataPedido={encBase.dataPedido} />
         </div>
 
-        {/* Sidebar */}
+        {/* Sidebar — referência e visual */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {/* Informações */}
           <div className="atlas-card">
@@ -1397,6 +2028,16 @@ export default function EncomendaDetalhePage() {
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                   {canalIcon}
                   {canalLabel}
+                </span>
+              </InfoRow>
+              <InfoRow label="Tipo">
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  {tipo === "pronta_entrega" ? (
+                    <PackageCheck size={11} strokeWidth={1.5} style={{ color: "var(--status-success)" }} />
+                  ) : (
+                    <Package size={11} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
+                  )}
+                  {tipo === "pronta_entrega" ? "Pronta entrega" : "Sob encomenda"}
                 </span>
               </InfoRow>
               <InfoRow label="Pedido em">{formatDate(encBase.dataPedido)}</InfoRow>
@@ -1484,11 +2125,23 @@ export default function EncomendaDetalhePage() {
             </div>
           </div>
 
+          {/* Visual do pedido */}
+          <div className="atlas-card">
+            <div className="atlas-card-header">
+              <span className="atlas-panel-title">Visual do pedido</span>
+            </div>
+            <div className="atlas-card-body" style={{ padding: "12px" }}>
+              <VisualGaleria
+                foto={foto}
+                onFotoChange={handleFotoChange}
+                itens={itens}
+                onPreview={(src, alt) => setLightbox({ src, alt })}
+              />
+            </div>
+          </div>
+
           {/* Arquivos */}
           <ArquivosPedido arquivos={arquivos} onChange={setArquivos} />
-
-          {/* Timeline */}
-          <TimelinePedido status={status} dataPedido={encBase.dataPedido} />
         </div>
       </div>
 
@@ -1499,6 +2152,75 @@ export default function EncomendaDetalhePage() {
           alt={lightbox.alt}
           onClose={() => setLightbox(null)}
         />
+      )}
+
+      {/* Modal detalhe produto */}
+      {produtoModal && (
+        <ProdutoDetalheModal
+          produto={produtoModal}
+          onClose={() => setProdutoModal(null)}
+        />
+      )}
+
+      {/* Aviso estoque insuficiente (pronta entrega) */}
+      {avisoEntrega && (
+        <div
+          onClick={() => setAvisoEntrega(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: "var(--z-modal)" as unknown as number,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border-default)",
+              borderRadius: "var(--radius-md)",
+              width: 380,
+              maxWidth: "calc(100vw - 32px)",
+              padding: 20,
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.28)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+              <PackageCheck size={18} strokeWidth={1.5} style={{ color: "var(--status-warning)", flexShrink: 0, marginTop: 1 }} />
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
+                  Estoque de prontos insuficiente
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                  {avisoEntrega}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                className="atlas-btn atlas-btn-secondary atlas-btn-sm"
+                onClick={() => setAvisoEntrega(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="atlas-btn atlas-btn-primary atlas-btn-sm"
+                onClick={() => {
+                  setStatus("entregue");
+                  setAvisoEntrega(null);
+                }}
+              >
+                Confirmar mesmo assim
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

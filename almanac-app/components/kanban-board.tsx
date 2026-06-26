@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calendar, AlertTriangle } from "lucide-react";
 import {
   Encomenda,
@@ -41,9 +41,23 @@ export function KanbanBoard({
   columns = STATUS_ORDER,
 }: KanbanBoardProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dragOverStatus, setDragOverStatus] = useState<EncomendaStatus | null>(
-    null
-  );
+  const [dragOverStatus, setDragOverStatus] = useState<EncomendaStatus | null>(null);
+  const [encFotos, setEncFotos] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const stored = JSON.parse(localStorage.getItem("almanac_enc_fotos") ?? "{}");
+    setEncFotos(stored);
+  }, []);
+
+  const getCardFoto = (enc: Encomenda): string | undefined => {
+    if (encFotos[enc.id]) return encFotos[enc.id];
+    if (enc.foto) return enc.foto;
+    for (const item of enc.itens) {
+      const prod = produtos.find((p) => p.id === item.produtoId);
+      if (prod?.foto) return prod.foto;
+    }
+    return undefined;
+  };
 
   return (
     <div className="alm-kanban">
@@ -128,6 +142,7 @@ export function KanbanBoard({
 
               {cards.map((enc) => {
                 const isDragging = draggedId === enc.id;
+                const cardFoto = getCardFoto(enc);
                 const resumo = enc.itens
                   .map((item) => {
                     const prod = produtos.find((p) => p.id === item.produtoId);
@@ -164,6 +179,23 @@ export function KanbanBoard({
                       userSelect: "none",
                     }}
                   >
+                    {cardFoto && (
+                      <div
+                        style={{
+                          margin: "-12px -12px 0",
+                          borderRadius: "var(--radius-lg, 6px) var(--radius-lg, 6px) 0 0",
+                          overflow: "hidden",
+                          height: 100,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <img
+                          src={cardFoto}
+                          alt={enc.cliente}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      </div>
+                    )}
                     <div className="alm-kanban-card-client">{enc.cliente}</div>
                     <div
                       className="alm-kanban-card-items"

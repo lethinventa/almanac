@@ -15,12 +15,15 @@ import {
   Pencil,
   AlertTriangle,
   Calculator,
+  PackageCheck,
+  History,
 } from "lucide-react";
 import {
   produtos as produtosMock,
   insumos,
   formatBRL,
   Produto,
+  LoteProducao,
   totalCustosIndiretos as totalCustosDefault,
   DEFAULT_CONFIGURACOES,
   type Configuracoes,
@@ -177,8 +180,250 @@ function FotoUpload() {
   );
 }
 
+// ── Registrar lote form ───────────────────────────────────────
+function RegistrarLoteForm({
+  produto,
+  onSave,
+  onClose,
+}: {
+  produto: Produto;
+  onSave: (qtd: number, data: string, obs: string) => void;
+  onClose: () => void;
+}) {
+  const hoje = new Date().toISOString().slice(0, 10);
+  const [qtd, setQtd] = useState("");
+  const [data, setData] = useState(hoje);
+  const [obs, setObs] = useState("");
+
+  const qtdNum = parseInt(qtd) || 0;
+  const custoTotal = qtdNum * produto.custo;
+  const canSave = qtdNum > 0;
+
+  return (
+    <div
+      style={{
+        background: "var(--bg-input)",
+        border: "1px solid var(--border-default)",
+        borderRadius: "var(--radius-md, 4px)",
+        padding: "12px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
+    >
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <div className="alm-field" style={{ margin: 0 }}>
+          <label className="alm-label">Quantidade produzida</label>
+          <input
+            autoFocus
+            className="atlas-input"
+            type="number"
+            min="1"
+            placeholder="Ex: 20"
+            value={qtd}
+            onChange={(e) => setQtd(e.target.value)}
+          />
+        </div>
+        <div className="alm-field" style={{ margin: 0 }}>
+          <label className="alm-label">Data de produção</label>
+          <input
+            className="atlas-input"
+            type="date"
+            value={data}
+            onChange={(e) => setData(e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="alm-field" style={{ margin: 0 }}>
+        <label className="alm-label">Observação (opcional)</label>
+        <input
+          className="atlas-input"
+          placeholder='Ex: "lote feira de junho"'
+          value={obs}
+          onChange={(e) => setObs(e.target.value)}
+        />
+      </div>
+      {qtdNum > 0 && (
+        <div
+          style={{
+            fontSize: 11,
+            color: "var(--text-tertiary)",
+            display: "flex",
+            gap: 12,
+          }}
+        >
+          <span>
+            Custo total estimado:{" "}
+            <strong style={{ color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>
+              {formatBRL(custoTotal)}
+            </strong>
+          </span>
+          <span style={{ color: "var(--status-warning)" }}>
+            Deduz insumos conforme receita
+          </span>
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 6 }}>
+        <button
+          className="atlas-btn atlas-btn-primary atlas-btn-sm"
+          disabled={!canSave}
+          style={{ opacity: canSave ? 1 : 0.4, flex: 1 }}
+          onClick={() => onSave(qtdNum, data, obs.trim())}
+        >
+          Registrar lote
+        </button>
+        <button
+          className="atlas-btn atlas-btn-ghost atlas-btn-sm"
+          onClick={onClose}
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Pronto estoque section ────────────────────────────────────
+function ProntoEstoqueSection({
+  produto,
+  onRegistrarLote,
+}: {
+  produto: Produto;
+  onRegistrarLote: () => void;
+}) {
+  const [showHistorico, setShowHistorico] = useState(false);
+  const prontos = produto.prontoEstoque ?? 0;
+  const min = produto.prontoEstoqueMin;
+  const emAlerta = min !== undefined && prontos <= min;
+  const lotes = produto.historicoLotes ?? [];
+
+  return (
+    <div
+      style={{
+        border: `1px solid ${emAlerta ? "rgba(244,71,71,0.3)" : "var(--border-default)"}`,
+        borderRadius: "var(--radius-md, 4px)",
+        background: emAlerta ? "rgba(244,71,71,0.04)" : "var(--bg-input)",
+        padding: "10px 12px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <PackageCheck
+            size={13}
+            strokeWidth={1.5}
+            style={{ color: emAlerta ? "var(--status-error)" : "var(--text-tertiary)" }}
+          />
+          <span className="alm-label">Pronta entrega</span>
+          {emAlerta && (
+            <AlertTriangle size={11} strokeWidth={1.5} style={{ color: "var(--status-error)" }} />
+          )}
+        </div>
+        <button
+          className="atlas-btn atlas-btn-secondary atlas-btn-sm"
+          style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+          onClick={onRegistrarLote}
+        >
+          <Plus size={11} strokeWidth={1.5} />
+          Registrar lote
+        </button>
+      </div>
+
+      <div style={{ display: "flex", gap: 20 }}>
+        <div>
+          <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>
+            Em estoque
+          </div>
+          <div
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontWeight: 700,
+              fontSize: 20,
+              color: emAlerta ? "var(--status-error)" : "var(--text-primary)",
+            }}
+          >
+            {prontos}
+          </div>
+        </div>
+        {min !== undefined && (
+          <div>
+            <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>
+              Mínimo
+            </div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 14, color: "var(--text-secondary)" }}>
+              {min}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {lotes.length > 0 && (
+        <button
+          className="atlas-btn atlas-btn-ghost atlas-btn-sm"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: 11,
+            alignSelf: "flex-start",
+            color: "var(--text-tertiary)",
+          }}
+          onClick={() => setShowHistorico((v) => !v)}
+        >
+          <History size={11} strokeWidth={1.5} />
+          {showHistorico ? "Ocultar" : `Ver histórico (${lotes.length} lote${lotes.length !== 1 ? "s" : ""})`}
+        </button>
+      )}
+
+      {showHistorico && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+          {[...lotes].reverse().map((l) => (
+            <div
+              key={l.id}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                padding: "5px 0",
+                borderTop: "1px solid var(--border-subtle)",
+                fontSize: 12,
+              }}
+            >
+              <div>
+                <div style={{ color: "var(--text-secondary)", fontWeight: 500 }}>
+                  {l.data.split("-").reverse().join("/")}
+                </div>
+                {l.observacao && (
+                  <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{l.observacao}</div>
+                )}
+              </div>
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontWeight: 600,
+                  color: "var(--status-success)",
+                }}
+              >
+                +{l.quantidade}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Detalhe content ──────────────────────────────────────────
-function DetalheContent({ produto }: { produto: Produto }) {
+function DetalheContent({
+  produto,
+  onRegistrarLote,
+}: {
+  produto: Produto;
+  onRegistrarLote: () => void;
+}) {
   const receitaComInsumo = produto.receita.map((r) => ({
     ...r,
     insumo: insumos.find((i) => i.id === r.insumoId)!,
@@ -373,6 +618,10 @@ function DetalheContent({ produto }: { produto: Produto }) {
           {formatBRL(produto.custo)}
         </span>
       </div>
+
+      {produto.prontoEstoque !== undefined && (
+        <ProntoEstoqueSection produto={produto} onRegistrarLote={onRegistrarLote} />
+      )}
     </>
   );
 }
@@ -851,6 +1100,7 @@ export default function ProdutosPage() {
   const [mode, setMode] = useState<ModalMode>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [categorias, setCategorias] = useState<string[]>(CATEGORIAS_DEFAULT);
+  const [showLoteForm, setShowLoteForm] = useState(false);
 
   const filtrados = lista.filter(
     (p) =>
@@ -936,6 +1186,38 @@ export default function ProdutosPage() {
     if (!selected) return;
     setLista((prev) => prev.filter((p) => p.id !== selected.id));
     close();
+  };
+
+  const handleRegistrarLote = (qtd: number, data: string, obs: string) => {
+    if (!selected) return;
+    const novoLote: LoteProducao = {
+      id: `lot-${Date.now()}`,
+      produtoId: selected.id,
+      quantidade: qtd,
+      data,
+      observacao: obs || undefined,
+    };
+    setLista((prev) =>
+      prev.map((p) =>
+        p.id === selected.id
+          ? {
+              ...p,
+              prontoEstoque: (p.prontoEstoque ?? 0) + qtd,
+              historicoLotes: [...(p.historicoLotes ?? []), novoLote],
+            }
+          : p
+      )
+    );
+    setSelected((prev) =>
+      prev
+        ? {
+            ...prev,
+            prontoEstoque: (prev.prontoEstoque ?? 0) + qtd,
+            historicoLotes: [...(prev.historicoLotes ?? []), novoLote],
+          }
+        : prev
+    );
+    setShowLoteForm(false);
   };
 
   return (
@@ -1039,12 +1321,18 @@ export default function ProdutosPage() {
                   <th className="num">Custo produção</th>
                   <th className="num">Preço sugerido</th>
                   <th className="num">Tempo</th>
+                  <th className="num">Prontos</th>
                 </tr>
               </thead>
               <tbody>
                 {filtrados.map((p) => {
                   const config = loadConfig();
                   const preco = calcPrecoSugerido(p.custo, p.tempoProducao, config);
+                  const temProntos = p.prontoEstoque !== undefined;
+                  const prontoAlerta =
+                    temProntos &&
+                    p.prontoEstoqueMin !== undefined &&
+                    (p.prontoEstoque ?? 0) <= p.prontoEstoqueMin;
                   return (
                     <tr key={p.id} onClick={() => openDetalhe(p)}>
                       <td>
@@ -1103,6 +1391,29 @@ export default function ProdutosPage() {
                           {p.tempoProducao} min
                         </span>
                       </td>
+                      <td className="num">
+                        {temProntos ? (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              fontFamily: "var(--font-mono)",
+                              fontWeight: 600,
+                              color: prontoAlerta
+                                ? "var(--status-error)"
+                                : "var(--text-primary)",
+                            }}
+                          >
+                            {prontoAlerta && (
+                              <AlertTriangle size={10} strokeWidth={1.5} />
+                            )}
+                            {p.prontoEstoque}
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--text-tertiary)", fontSize: 11 }}>—</span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -1134,13 +1445,18 @@ export default function ProdutosPage() {
             {filtrados.map((p) => {
               const config = loadConfig();
               const preco = calcPrecoSugerido(p.custo, p.tempoProducao, config);
+              const temProntos = p.prontoEstoque !== undefined;
+              const prontoAlerta =
+                temProntos &&
+                p.prontoEstoqueMin !== undefined &&
+                (p.prontoEstoque ?? 0) <= p.prontoEstoqueMin;
               return (
                 <div
                   key={p.id}
                   onClick={() => openDetalhe(p)}
                   style={{
                     background: "var(--bg-raised)",
-                    border: "1px solid var(--border-default)",
+                    border: `1px solid ${prontoAlerta ? "rgba(244,71,71,0.35)" : "var(--border-default)"}`,
                     borderRadius: "var(--radius-lg, 6px)",
                     overflow: "hidden",
                     cursor: "pointer",
@@ -1192,12 +1508,38 @@ export default function ProdutosPage() {
                     >
                       {p.nome}
                     </div>
-                    <span
-                      className="atlas-badge"
-                      style={{ alignSelf: "flex-start", fontSize: 10 }}
-                    >
-                      {p.categoria}
-                    </span>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      <span
+                        className="atlas-badge"
+                        style={{ alignSelf: "flex-start", fontSize: 10 }}
+                      >
+                        {p.categoria}
+                      </span>
+                      {temProntos && (
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 3,
+                            fontSize: 10,
+                            fontWeight: 600,
+                            padding: "1px 6px",
+                            borderRadius: "var(--radius-full)",
+                            background: prontoAlerta
+                              ? "rgba(244,71,71,0.12)"
+                              : "rgba(72,199,142,0.1)",
+                            color: prontoAlerta
+                              ? "var(--status-error)"
+                              : "var(--status-success)",
+                            border: `1px solid ${prontoAlerta ? "rgba(244,71,71,0.25)" : "rgba(72,199,142,0.25)"}`,
+                          }}
+                        >
+                          {prontoAlerta && <AlertTriangle size={9} strokeWidth={1.5} />}
+                          <PackageCheck size={9} strokeWidth={1.5} />
+                          {p.prontoEstoque}
+                        </span>
+                      )}
+                    </div>
                     <div style={{ marginTop: "auto" }}>
                       <div
                         style={{
@@ -1219,7 +1561,7 @@ export default function ProdutosPage() {
       {/* Modal detalhe */}
       <Modal
         open={mode === "detalhe"}
-        onClose={close}
+        onClose={() => { setShowLoteForm(false); close(); }}
         title={selected?.nome ?? "Produto"}
         wide
         footer={
@@ -1300,7 +1642,21 @@ export default function ProdutosPage() {
           )
         }
       >
-        {selected && <DetalheContent produto={selected} />}
+        {selected && (
+          <>
+            <DetalheContent
+              produto={selected}
+              onRegistrarLote={() => setShowLoteForm(true)}
+            />
+            {showLoteForm && (
+              <RegistrarLoteForm
+                produto={selected}
+                onSave={handleRegistrarLote}
+                onClose={() => setShowLoteForm(false)}
+              />
+            )}
+          </>
+        )}
       </Modal>
 
       {/* Modal novo produto */}

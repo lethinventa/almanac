@@ -19,6 +19,14 @@ export interface InsumoReceita {
   quantidade: number;
 }
 
+export interface LoteProducao {
+  id: string;
+  produtoId: string;
+  quantidade: number;
+  data: string;
+  observacao?: string;
+}
+
 export interface Produto {
   id: string;
   nome: string;
@@ -29,6 +37,9 @@ export interface Produto {
   precoSugerido: number;
   margem: number;
   foto?: string;
+  prontoEstoque?: number;
+  prontoEstoqueMin?: number;
+  historicoLotes?: LoteProducao[];
 }
 
 export type EncomendaStatus =
@@ -49,10 +60,13 @@ export interface LinkUtil {
   url: string;
 }
 
+export type EncomendaTipo = "sob_encomenda" | "pronta_entrega";
+
 export interface Encomenda {
   id: string;
   cliente: string;
   canal: "whatsapp" | "presencial";
+  tipo?: EncomendaTipo;
   status: EncomendaStatus;
   dataPedido: string;
   dataEntrega: string;
@@ -242,6 +256,12 @@ export const produtos: Produto[] = [
     custo: 1.11,
     precoSugerido: 18.0,
     margem: 93.8,
+    prontoEstoque: 12,
+    prontoEstoqueMin: 10,
+    historicoLotes: [
+      { id: "lot-1a", produtoId: "prd-1", quantidade: 20, data: "2026-06-10", observacao: "Lote feira de junho" },
+      { id: "lot-1b", produtoId: "prd-1", quantidade: 15, data: "2026-06-20" },
+    ],
   },
   {
     id: "prd-2",
@@ -255,6 +275,11 @@ export const produtos: Produto[] = [
     custo: 0.49,
     precoSugerido: 10.0,
     margem: 95.1,
+    prontoEstoque: 3,
+    prontoEstoqueMin: 15,
+    historicoLotes: [
+      { id: "lot-2a", produtoId: "prd-2", quantidade: 30, data: "2026-06-05" },
+    ],
   },
   {
     id: "prd-3",
@@ -268,6 +293,8 @@ export const produtos: Produto[] = [
     custo: 0.165,
     precoSugerido: 6.0,
     margem: 97.25,
+    prontoEstoque: 0,
+    prontoEstoqueMin: 20,
   },
   {
     id: "prd-4",
@@ -295,6 +322,11 @@ export const produtos: Produto[] = [
     custo: 7.0,
     precoSugerido: 35.0,
     margem: 80.0,
+    prontoEstoque: 5,
+    prontoEstoqueMin: 5,
+    historicoLotes: [
+      { id: "lot-5a", produtoId: "prd-5", quantidade: 10, data: "2026-06-01", observacao: "Pré-produção mensal" },
+    ],
   },
   {
     id: "prd-6",
@@ -515,6 +547,10 @@ export const custosIndiretos: CustoIndireto[] = [
 // ─────────────────────────────────────────────────────────────
 export const insumosEmAlerta = insumos.filter(
   (i) => i.estoque !== null && i.estoqueMin !== null && i.estoque <= i.estoqueMin
+);
+
+export const produtosComProntoAlerta = produtos.filter(
+  (p) => p.prontoEstoqueMin !== undefined && (p.prontoEstoque ?? 0) <= p.prontoEstoqueMin
 );
 
 export const encomendasAbertas = encomendas.filter(
