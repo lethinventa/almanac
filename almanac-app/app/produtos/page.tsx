@@ -17,6 +17,8 @@ import {
   Calculator,
   PackageCheck,
   History,
+  Layers,
+  Printer,
 } from "lucide-react";
 import {
   produtos as produtosMock,
@@ -24,6 +26,7 @@ import {
   formatBRL,
   Produto,
   LoteProducao,
+  Etapas3D,
   totalCustosIndiretos as totalCustosDefault,
   DEFAULT_CONFIGURACOES,
   type Configuracoes,
@@ -44,6 +47,7 @@ const CATEGORIAS_DEFAULT = [
   "Cartão",
   "Planner",
   "Kit",
+  "Impressão 3D",
   "Outro",
 ];
 
@@ -74,6 +78,32 @@ function calcPrecoSugerido(
   const hourlyRate = config.horasTrabalhoMes > 0 ? total / config.horasTrabalhoMes : 0;
   const timeCost = (tempoMin / 60) * hourlyRate;
   return (materialCost + timeCost) * config.multiplicadorPreco;
+}
+
+function calcPreco3D(
+  materialCost: number,
+  etapas: Etapas3D,
+  config: Configuracoes
+): {
+  custoImpressao: number;
+  custoModelagem: number;
+  custoAcabamento: number;
+  custoTotal: number;
+  precoSugerido: number;
+} {
+  const total = getTotalCustos() || totalCustosDefault;
+  const hourlyRate = config.horasTrabalhoMes > 0 ? total / config.horasTrabalhoMes : 0;
+  const custoImpressao = ((etapas.impressao ?? 0) / 60) * config.custoHoraBambu;
+  const custoModelagem = ((etapas.modelagem ?? 0) / 60) * hourlyRate;
+  const custoAcabamento = ((etapas.acabamento ?? 0) / 60) * hourlyRate;
+  const custoTotal = materialCost + custoImpressao + custoModelagem + custoAcabamento;
+  return {
+    custoImpressao,
+    custoModelagem,
+    custoAcabamento,
+    custoTotal,
+    precoSugerido: custoTotal * config.multiplicadorPreco,
+  };
 }
 
 // ── Modal wrapper ────────────────────────────────────────────
@@ -434,8 +464,13 @@ function DetalheContent({
     config.horasTrabalhoMes > 0
       ? getTotalCustos() / config.horasTrabalhoMes
       : 0;
-  const timeCost = (produto.tempoProducao / 60) * hourlyRate;
-  const precoCalculado = (produto.custo + timeCost) * config.multiplicadorPreco;
+
+  const is3D = produto.categoria === "Impressão 3D" && !!produto.etapas3D;
+  const r3D = is3D ? calcPreco3D(produto.custo, produto.etapas3D!, config) : null;
+  const timeCost = is3D ? 0 : (produto.tempoProducao / 60) * hourlyRate;
+  const precoCalculado = is3D
+    ? r3D!.precoSugerido
+    : (produto.custo + timeCost) * config.multiplicadorPreco;
 
   return (
     <>
@@ -450,7 +485,10 @@ function DetalheContent({
             justifyContent: "center",
           }}
         >
-          <Box size={28} strokeWidth={1} style={{ color: "var(--text-tertiary)" }} />
+          {is3D
+            ? <Layers size={28} strokeWidth={1} style={{ color: "var(--text-tertiary)" }} />
+            : <Box size={28} strokeWidth={1} style={{ color: "var(--text-tertiary)" }} />
+          }
         </div>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ fontWeight: 600, fontSize: 14 }}>{produto.nome}</div>
@@ -520,25 +558,51 @@ function DetalheContent({
             Como foi calculado
           </span>
         </div>
-        {[
-          { label: "Material (insumos)", value: produto.custo },
-          {
-            label: `Tempo (${produto.tempoProducao}min × R$${hourlyRate.toFixed(2)}/h)`,
-            value: timeCost,
-          },
-        ].map(({ label, value }) => (
-          <div
-            key={label}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: 12,
-            }}
-          >
-            <span style={{ color: "var(--text-secondary)" }}>{label}</span>
-            <span style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(value)}</span>
-          </div>
-        ))}
+        {is3D && r3D ? (
+          <>
+            {[
+              { label: "Insumos", value: produto.custo },
+              {
+                label: `Impressão (${produto.etapas3D!.impressao ?? 0}min × R$${config.custoHoraBambu.toFixed(2)}/h)`,
+                value: r3D.custoImpressao,
+              },
+              {
+                label: `Modelagem (${produto.etapas3D!.modelagem ?? 0}min × R$${hourlyRate.toFixed(2)}/h)`,
+                value: r3D.custoModelagem,
+              },
+              {
+                label: `Acabamento (${produto.etapas3D!.acabamento ?? 0}min × R$${hourlyRate.toFixed(2)}/h)`,
+                value: r3D.custoAcabamento,
+              },
+            ].map(({ label, value }) => (
+              <div
+                key={label}
+                style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}
+              >
+                <span style={{ color: "var(--text-secondary)" }}>{label}</span>
+                <span style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(value)}</span>
+              </div>
+            ))}
+          </>
+        ) : (
+          <>
+            {[
+              { label: "Material (insumos)", value: produto.custo },
+              {
+                label: `Tempo (${produto.tempoProducao}min × R$${hourlyRate.toFixed(2)}/h)`,
+                value: timeCost,
+              },
+            ].map(({ label, value }) => (
+              <div
+                key={label}
+                style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}
+              >
+                <span style={{ color: "var(--text-secondary)" }}>{label}</span>
+                <span style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(value)}</span>
+              </div>
+            ))}
+          </>
+        )}
         <div
           style={{
             borderTop: "1px solid var(--border-default)",
@@ -727,6 +791,7 @@ function ProdutoFormContent({
     tempo: number;
     receita: ReceitaRow[];
     multiplicador: number;
+    etapas3D?: Etapas3D;
   }) => void;
   onClose: () => void;
   onAddCategoria: (c: string) => void;
@@ -747,10 +812,21 @@ function ProdutoFormContent({
       : [{ insumoId: INSUMOS_ROTATIVO[0]?.id ?? "", quantidade: "" }]
   );
 
+  const [impressaoMin, setImpressaoMin] = useState(
+    initial?.etapas3D?.impressao !== undefined ? String(initial.etapas3D.impressao) : ""
+  );
+  const [modelagemMin, setModelagemMin] = useState(
+    initial?.etapas3D?.modelagem !== undefined ? String(initial.etapas3D.modelagem) : ""
+  );
+  const [acabamentoMin, setAcabamentoMin] = useState(
+    initial?.etapas3D?.acabamento !== undefined ? String(initial.etapas3D.acabamento) : ""
+  );
+
   const config = loadConfig();
   const [multInput, setMultInput] = useState(String(config.multiplicadorPreco));
 
   const multNum = Math.max(1, parseFloat(multInput) || 1);
+  const is3D = categoria === "Impressão 3D";
 
   const materialCost = receita.reduce((sum, r) => {
     const ins = insumos.find((i) => i.id === r.insumoId);
@@ -759,13 +835,26 @@ function ProdutoFormContent({
     return sum;
   }, 0);
 
-  const tempoNum = parseInt(tempo) || 0;
   const hourlyRate =
     config.horasTrabalhoMes > 0
       ? getTotalCustos() / config.horasTrabalhoMes
       : 0;
-  const timeCost = (tempoNum / 60) * hourlyRate;
-  const precoCalculado = (materialCost + timeCost) * multNum;
+
+  const impressaoNum = parseInt(impressaoMin) || 0;
+  const modelagemNum = parseInt(modelagemMin) || 0;
+  const acabamentoNum = parseInt(acabamentoMin) || 0;
+  const tempoTotal3D = impressaoNum + modelagemNum + acabamentoNum;
+
+  const tempoNum = is3D ? tempoTotal3D : (parseInt(tempo) || 0);
+
+  const r3D = is3D
+    ? calcPreco3D(materialCost, { impressao: impressaoNum, modelagem: modelagemNum, acabamento: acabamentoNum }, { ...config, multiplicadorPreco: multNum })
+    : null;
+
+  const timeCost = is3D ? 0 : (tempoNum / 60) * hourlyRate;
+  const precoCalculado = is3D
+    ? r3D!.precoSugerido
+    : (materialCost + timeCost) * multNum;
 
   const addItem = () =>
     setReceita((prev) => [
@@ -791,6 +880,9 @@ function ProdutoFormContent({
       tempo: tempoNum,
       receita,
       multiplicador: multNum,
+      etapas3D: is3D
+        ? { impressao: impressaoNum, modelagem: modelagemNum, acabamento: acabamentoNum }
+        : undefined,
     });
   };
 
@@ -818,18 +910,114 @@ function ProdutoFormContent({
             onAddCategoria={onAddCategoria}
           />
         </div>
-        <div className="alm-field">
-          <label className="alm-label">Tempo de produção (min)</label>
-          <input
-            className="atlas-input"
-            type="number"
-            min="1"
-            placeholder="15"
-            value={tempo}
-            onChange={(e) => setTempo(e.target.value)}
-          />
-        </div>
+        {!is3D && (
+          <div className="alm-field">
+            <label className="alm-label">Tempo de produção (min)</label>
+            <input
+              className="atlas-input"
+              type="number"
+              min="1"
+              placeholder="15"
+              value={tempo}
+              onChange={(e) => setTempo(e.target.value)}
+            />
+          </div>
+        )}
       </div>
+
+      {/* Etapas 3D — só aparece quando categoria = Impressão 3D */}
+      {is3D && (
+        <div
+          style={{
+            border: "1px solid var(--border-default)",
+            borderRadius: "var(--radius-md, 4px)",
+            padding: "12px 14px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <Layers size={12} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.07em",
+                color: "var(--text-tertiary)",
+              }}
+            >
+              Etapas de produção 3D
+            </span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+            <div className="alm-field" style={{ margin: 0 }}>
+              <label className="alm-label" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <Printer size={10} strokeWidth={1.5} />
+                Impressão (min)
+              </label>
+              <input
+                className="atlas-input"
+                type="number"
+                min="0"
+                placeholder="90"
+                value={impressaoMin}
+                onChange={(e) => setImpressaoMin(e.target.value)}
+              />
+              {impressaoNum > 0 && (
+                <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                  {formatBRL(r3D!.custoImpressao)}
+                </span>
+              )}
+            </div>
+            <div className="alm-field" style={{ margin: 0 }}>
+              <label className="alm-label">Modelagem (min)</label>
+              <input
+                className="atlas-input"
+                type="number"
+                min="0"
+                placeholder="20"
+                value={modelagemMin}
+                onChange={(e) => setModelagemMin(e.target.value)}
+              />
+              {modelagemNum > 0 && (
+                <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                  {formatBRL(r3D!.custoModelagem)}
+                </span>
+              )}
+            </div>
+            <div className="alm-field" style={{ margin: 0 }}>
+              <label className="alm-label">Acabamento (min)</label>
+              <input
+                className="atlas-input"
+                type="number"
+                min="0"
+                placeholder="10"
+                value={acabamentoMin}
+                onChange={(e) => setAcabamentoMin(e.target.value)}
+              />
+              {acabamentoNum > 0 && (
+                <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                  {formatBRL(r3D!.custoAcabamento)}
+                </span>
+              )}
+            </div>
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              color: "var(--text-tertiary)",
+              display: "flex",
+              gap: 4,
+              alignItems: "center",
+            }}
+          >
+            <Clock size={10} strokeWidth={1.5} />
+            Tempo total: {tempoTotal3D} min — todos os campos são opcionais
+          </div>
+        </div>
+      )}
 
       <div className="alm-field">
         <div
@@ -990,20 +1178,43 @@ function ProdutoFormContent({
 
         {/* Breakdown */}
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          {[
-            { label: "Material", value: materialCost },
-            { label: `Tempo (${tempoNum}min × R$${hourlyRate.toFixed(2)}/h)`, value: timeCost },
-          ].map(({ label, value }) => (
-            <div
-              key={label}
-              style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}
-            >
-              <span style={{ color: "var(--text-tertiary)" }}>{label}</span>
-              <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-secondary)" }}>
-                {formatBRL(value)}
-              </span>
-            </div>
-          ))}
+          {is3D && r3D ? (
+            <>
+              {[
+                { label: "Insumos", value: materialCost },
+                { label: `Impressão (${impressaoNum}min × R$${config.custoHoraBambu.toFixed(2)}/h)`, value: r3D.custoImpressao },
+                { label: `Modelagem (${modelagemNum}min × R$${hourlyRate.toFixed(2)}/h)`, value: r3D.custoModelagem },
+                { label: `Acabamento (${acabamentoNum}min × R$${hourlyRate.toFixed(2)}/h)`, value: r3D.custoAcabamento },
+              ].map(({ label, value }) => (
+                <div
+                  key={label}
+                  style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}
+                >
+                  <span style={{ color: "var(--text-tertiary)" }}>{label}</span>
+                  <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-secondary)" }}>
+                    {formatBRL(value)}
+                  </span>
+                </div>
+              ))}
+            </>
+          ) : (
+            <>
+              {[
+                { label: "Material", value: materialCost },
+                { label: `Tempo (${tempoNum}min × R$${hourlyRate.toFixed(2)}/h)`, value: timeCost },
+              ].map(({ label, value }) => (
+                <div
+                  key={label}
+                  style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}
+                >
+                  <span style={{ color: "var(--text-tertiary)" }}>{label}</span>
+                  <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-secondary)" }}>
+                    {formatBRL(value)}
+                  </span>
+                </div>
+              ))}
+            </>
+          )}
         </div>
 
         {/* Multiplicador */}
@@ -1132,6 +1343,7 @@ export default function ProdutosPage() {
     tempo: number;
     receita: ReceitaRow[];
     multiplicador: number;
+    etapas3D?: Etapas3D;
   }) => {
     const config = loadConfig();
     const custo = data.receita.reduce((sum, r) => {
@@ -1141,42 +1353,30 @@ export default function ProdutosPage() {
       return sum;
     }, 0);
     const configComMult = { ...config, multiplicadorPreco: data.multiplicador };
-    const precoSugerido = calcPrecoSugerido(custo, data.tempo, configComMult);
+    const precoSugerido = data.etapas3D
+      ? calcPreco3D(custo, data.etapas3D, configComMult).precoSugerido
+      : calcPrecoSugerido(custo, data.tempo, configComMult);
+
+    const campos = {
+      nome: data.nome,
+      categoria: data.categoria,
+      tempoProducao: data.tempo,
+      precoSugerido,
+      custo,
+      margem: 0,
+      receita: data.receita.map((r) => ({
+        insumoId: r.insumoId,
+        quantidade: parseFloat(r.quantidade) || 0,
+      })),
+      etapas3D: data.etapas3D,
+    };
 
     if (mode === "novo") {
-      const novo: Produto = {
-        id: `prd-${Date.now()}`,
-        nome: data.nome,
-        categoria: data.categoria,
-        tempoProducao: data.tempo,
-        precoSugerido,
-        custo,
-        margem: 0,
-        receita: data.receita.map((r) => ({
-          insumoId: r.insumoId,
-          quantidade: parseFloat(r.quantidade) || 0,
-        })),
-      };
+      const novo: Produto = { id: `prd-${Date.now()}`, ...campos };
       setLista((prev) => [...prev, novo]);
     } else if (mode === "editar" && selected) {
       setLista((prev) =>
-        prev.map((p) =>
-          p.id === selected.id
-            ? {
-                ...p,
-                nome: data.nome,
-                categoria: data.categoria,
-                tempoProducao: data.tempo,
-                precoSugerido,
-                custo,
-                margem: 0,
-                receita: data.receita.map((r) => ({
-                  insumoId: r.insumoId,
-                  quantidade: parseFloat(r.quantidade) || 0,
-                })),
-              }
-            : p
-        )
+        prev.map((p) => (p.id === selected.id ? { ...p, ...campos } : p))
       );
     }
     close();
@@ -1327,7 +1527,9 @@ export default function ProdutosPage() {
               <tbody>
                 {filtrados.map((p) => {
                   const config = loadConfig();
-                  const preco = calcPrecoSugerido(p.custo, p.tempoProducao, config);
+                  const preco = p.categoria === "Impressão 3D" && p.etapas3D
+                    ? calcPreco3D(p.custo, p.etapas3D, config).precoSugerido
+                    : calcPrecoSugerido(p.custo, p.tempoProducao, config);
                   const temProntos = p.prontoEstoque !== undefined;
                   const prontoAlerta =
                     temProntos &&
@@ -1444,7 +1646,9 @@ export default function ProdutosPage() {
           >
             {filtrados.map((p) => {
               const config = loadConfig();
-              const preco = calcPrecoSugerido(p.custo, p.tempoProducao, config);
+              const preco = p.categoria === "Impressão 3D" && p.etapas3D
+                ? calcPreco3D(p.custo, p.etapas3D, config).precoSugerido
+                : calcPrecoSugerido(p.custo, p.tempoProducao, config);
               const temProntos = p.prontoEstoque !== undefined;
               const prontoAlerta =
                 temProntos &&

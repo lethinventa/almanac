@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings, Calculator, Clock, Save } from "lucide-react";
+import { Settings, Calculator, Clock, Save, Printer } from "lucide-react";
 import {
   totalCustosIndiretos,
   DEFAULT_CONFIGURACOES,
@@ -128,6 +128,31 @@ export default function ConfiguracoesPage() {
                 Aplica sobre (material + tempo de produção)
               </span>
             </div>
+          </div>
+
+          <div className="alm-field">
+            <label className="alm-label">
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <Printer size={11} strokeWidth={1.5} />
+                Custo/hora Bambu A1 Mini (R$)
+              </span>
+            </label>
+            <input
+              className="atlas-input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={config.custoHoraBambu}
+              onChange={(e) =>
+                setConfig((prev) => ({
+                  ...prev,
+                  custoHoraBambu: Math.max(0, parseFloat(e.target.value) || 0),
+                }))
+              }
+            />
+            <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+              Energia + depreciação por hora de impressão — usado em produtos "Impressão 3D"
+            </span>
           </div>
 
           {/* Taxa horária derivada */}

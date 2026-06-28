@@ -27,6 +27,12 @@ export interface LoteProducao {
   observacao?: string;
 }
 
+export interface Etapas3D {
+  impressao?: number;  // minutos
+  modelagem?: number;  // minutos
+  acabamento?: number; // minutos
+}
+
 export interface Produto {
   id: string;
   nome: string;
@@ -40,6 +46,7 @@ export interface Produto {
   prontoEstoque?: number;
   prontoEstoqueMin?: number;
   historicoLotes?: LoteProducao[];
+  etapas3D?: Etapas3D;
 }
 
 export type EncomendaStatus =
@@ -87,11 +94,13 @@ export interface CustoIndireto {
 export interface Configuracoes {
   horasTrabalhoMes: number;
   multiplicadorPreco: number;
+  custoHoraBambu: number;
 }
 
 export const DEFAULT_CONFIGURACOES: Configuracoes = {
   horasTrabalhoMes: 160,
   multiplicadorPreco: 3,
+  custoHoraBambu: 4.5,
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -339,6 +348,24 @@ export const produtos: Produto[] = [
     custo: 2.0,
     precoSugerido: 24.0,
     margem: 91.7,
+  },
+  {
+    id: "prd-7",
+    nome: "Suporte para fone 3D",
+    categoria: "Impressão 3D",
+    receita: [
+      { insumoId: "ins-3", quantidade: 45 },
+      { insumoId: "ins-6", quantidade: 1 },
+    ],
+    tempoProducao: 120,
+    custo: 4.45,
+    precoSugerido: 45.0,
+    margem: 90.1,
+    etapas3D: {
+      impressao: 90,
+      modelagem: 20,
+      acabamento: 10,
+    },
   },
 ];
 
