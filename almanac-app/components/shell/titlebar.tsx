@@ -3,7 +3,10 @@
 import { useState, useEffect, useRef } from "react";
 import { BookMarked, Sun, Moon, LogOut, ChevronDown } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
-import { getInitials } from "@/lib/auth";
+
+function getInitials(nome: string): string {
+  return nome.split(" ").slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
+}
 
 export function Titlebar() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
