@@ -23,8 +23,6 @@ import {
   buscarInsumos,
   criarInsumo,
   editarInsumo,
-  deletarInsumo,
-  registrarPreco,
   type Insumo,
   type InsumoCategoria,
 } from "@/lib/repositories/insumos";
@@ -528,7 +526,7 @@ export default function InsumosPage() {
     if (mode === "preco") {
       const novoPreco = parseFloat(precoNovoRef.current?.value ?? "0") || 0;
       if (novoPreco <= 0) return;
-      await registrarPreco(selected.id, novoPreco, new Date().toISOString().slice(0, 10));
+      // editarInsumo already calls registrarPreco internally when precoAtual is provided
       await editarInsumo(selected.id, { precoAtual: novoPreco });
       await refresh();
       closeModal();
