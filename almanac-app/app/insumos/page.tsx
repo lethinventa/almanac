@@ -15,13 +15,19 @@ import {
   ImagePlus,
 } from "lucide-react";
 import {
-  insumos,
-  type Insumo,
-  type InsumoCategoria,
   formatBRL,
   formatDate,
   categoriaLabel,
 } from "@/lib/data";
+import {
+  buscarInsumos,
+  criarInsumo,
+  editarInsumo,
+  deletarInsumo,
+  registrarPreco,
+  type Insumo,
+  type InsumoCategoria,
+} from "@/lib/repositories/insumos";
 
 // ─── helpers ─────────────────────────────────────────────────
 const categoriaBadge: Record<InsumoCategoria, string> = {
@@ -246,7 +252,11 @@ function InfoRow({ label, value, mono, error }: { label: string; value: string; 
   );
 }
 
-function EntradaContent({ insumo }: { insumo: Insumo }) {
+function EntradaContent({ insumo, qtdRef, precoRef }: {
+  insumo: Insumo;
+  qtdRef: React.RefObject<HTMLInputElement | null>;
+  precoRef: React.RefObject<HTMLInputElement | null>;
+}) {
   return (
     <>
       <div className="atlas-alert atlas-alert-info">
@@ -257,26 +267,30 @@ function EntradaContent({ insumo }: { insumo: Insumo }) {
       </div>
       <div className="alm-field">
         <label className="alm-label">Quantidade adquirida ({insumo.unidade})</label>
-        <input className="atlas-input" type="number" placeholder="0" min="0" autoFocus />
+        <input ref={qtdRef} className="atlas-input" type="number" placeholder="0" min="0" autoFocus />
       </div>
       <div className="alm-field">
         <label className="alm-label">Valor pago por {insumo.unidade} (R$) — atualiza preço</label>
-        <input className="atlas-input" type="number" placeholder={String(insumo.precoAtual)} step="0.01" />
+        <input ref={precoRef} className="atlas-input" type="number" placeholder={String(insumo.precoAtual)} step="0.01" />
       </div>
     </>
   );
 }
 
-function AjusteContent({ insumo }: { insumo: Insumo }) {
+function AjusteContent({ insumo, qtdRef, motivoRef }: {
+  insumo: Insumo;
+  qtdRef: React.RefObject<HTMLInputElement | null>;
+  motivoRef: React.RefObject<HTMLSelectElement | null>;
+}) {
   return (
     <>
       <div className="alm-field">
         <label className="alm-label">Nova quantidade ({insumo.unidade})</label>
-        <input className="atlas-input" type="number" defaultValue={insumo.estoque ?? 0} autoFocus />
+        <input ref={qtdRef} className="atlas-input" type="number" defaultValue={insumo.estoque ?? 0} autoFocus />
       </div>
       <div className="alm-field">
         <label className="alm-label">Motivo</label>
-        <select className="alm-select">
+        <select ref={motivoRef} className="alm-select">
           <option>Perda / avaria</option>
           <option>Erro de contagem</option>
           <option>Uso interno</option>
@@ -292,7 +306,10 @@ function AjusteContent({ insumo }: { insumo: Insumo }) {
   );
 }
 
-function PrecoContent({ insumo }: { insumo: Insumo }) {
+function PrecoContent({ insumo, novoPrecoRef }: {
+  insumo: Insumo;
+  novoPrecoRef: React.RefObject<HTMLInputElement | null>;
+}) {
   return (
     <>
       <div className="atlas-alert atlas-alert-warning">
@@ -307,16 +324,36 @@ function PrecoContent({ insumo }: { insumo: Insumo }) {
       </div>
       <div className="alm-field">
         <label className="alm-label">Novo preço por {insumo.unidade} (R$)</label>
-        <input className="atlas-input" type="number" step="0.01" placeholder="0,00" autoFocus />
+        <input ref={novoPrecoRef} className="atlas-input" type="number" step="0.01" placeholder="0,00" autoFocus />
       </div>
     </>
   );
 }
 
-function NovoInsumoContent() {
+function NovoInsumoContent({
+  nomeRef,
+  categoriaRef,
+  unidadeRef,
+  precoRef,
+  estoqueRef,
+  estoqueMinRef,
+}: {
+  nomeRef: React.RefObject<HTMLInputElement | null>;
+  categoriaRef: React.RefObject<HTMLSelectElement | null>;
+  unidadeRef: React.RefObject<HTMLSelectElement | null>;
+  precoRef: React.RefObject<HTMLInputElement | null>;
+  estoqueRef: React.RefObject<HTMLInputElement | null>;
+  estoqueMinRef: React.RefObject<HTMLInputElement | null>;
+}) {
   const [categoria, setCategoria] = useState<InsumoCategoria>("visivel");
   const [foto, setFoto] = useState<string | null>(null);
   const rotativo = categoria === "visivel" || categoria === "invisivel";
+
+  function handleCategoriaChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const val = e.target.value as InsumoCategoria;
+    setCategoria(val);
+    if (categoriaRef.current) categoriaRef.current.value = val;
+  }
 
   return (
     <>
@@ -324,12 +361,17 @@ function NovoInsumoContent() {
 
       <div className="alm-field">
         <label className="alm-label">Nome</label>
-        <input className="atlas-input" type="text" placeholder="Ex: Papel A4 premium" autoFocus />
+        <input ref={nomeRef} className="atlas-input" type="text" placeholder="Ex: Papel A4 premium" autoFocus />
       </div>
 
       <div className="alm-field">
         <label className="alm-label">Categoria</label>
-        <select className="alm-select" value={categoria} onChange={(e) => setCategoria(e.target.value as InsumoCategoria)}>
+        <select
+          ref={categoriaRef}
+          className="alm-select"
+          value={categoria}
+          onChange={handleCategoriaChange}
+        >
           <option value="visivel">Rotativo visível</option>
           <option value="invisivel">Rotativo invisível</option>
           <option value="ferramenta">Ferramenta</option>
@@ -342,7 +384,7 @@ function NovoInsumoContent() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
             <div className="alm-field">
               <label className="alm-label">Unidade</label>
-              <select className="alm-select">
+              <select ref={unidadeRef} className="alm-select">
                 <option>unidade</option>
                 <option>folha</option>
                 <option>metro</option>
@@ -353,17 +395,17 @@ function NovoInsumoContent() {
             </div>
             <div className="alm-field">
               <label className="alm-label">Preço por unidade (R$)</label>
-              <input className="atlas-input" type="number" step="0.01" placeholder="0,00" />
+              <input ref={precoRef} className="atlas-input" type="number" step="0.01" placeholder="0,00" />
             </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
             <div className="alm-field">
               <label className="alm-label">Estoque inicial</label>
-              <input className="atlas-input" type="number" placeholder="0" />
+              <input ref={estoqueRef} className="atlas-input" type="number" placeholder="0" />
             </div>
             <div className="alm-field">
               <label className="alm-label">Estoque mínimo</label>
-              <input className="atlas-input" type="number" placeholder="0" />
+              <input ref={estoqueMinRef} className="atlas-input" type="number" placeholder="0" />
             </div>
           </div>
         </>
@@ -372,7 +414,7 @@ function NovoInsumoContent() {
       {!rotativo && (
         <div className="alm-field">
           <label className="alm-label">Valor de aquisição (R$)</label>
-          <input className="atlas-input" type="number" step="0.01" placeholder="0,00" />
+          <input ref={precoRef} className="atlas-input" type="number" step="0.01" placeholder="0,00" />
         </div>
       )}
 
@@ -393,10 +435,39 @@ const filtroMap: Record<Filtro, InsumoCategoria[]> = {
 };
 
 export default function InsumosPage() {
+  const [insumos, setInsumos] = useState<Insumo[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filtro, setFiltro]     = useState<Filtro>("Todos");
   const [busca, setBusca]       = useState("");
   const [selected, setSelected] = useState<Insumo | null>(null);
   const [mode, setMode]         = useState<ModalMode>("detalhe");
+
+  // Refs para o modal "Novo insumo"
+  const novoNomeRef       = useRef<HTMLInputElement>(null);
+  const novoCategoriaRef  = useRef<HTMLSelectElement>(null);
+  const novoUnidadeRef    = useRef<HTMLSelectElement>(null);
+  const novoPrecoRef      = useRef<HTMLInputElement>(null);
+  const novoEstoqueRef    = useRef<HTMLInputElement>(null);
+  const novoEstoqueMinRef = useRef<HTMLInputElement>(null);
+
+  // Refs para o modal "Entrada"
+  const entradaQtdRef   = useRef<HTMLInputElement>(null);
+  const entradaPrecoRef = useRef<HTMLInputElement>(null);
+
+  // Refs para o modal "Ajuste"
+  const ajusteQtdRef   = useRef<HTMLInputElement>(null);
+  const ajusteMotivoRef = useRef<HTMLSelectElement>(null);
+
+  // Ref para o modal "Preço"
+  const precoNovoRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    buscarInsumos().then(data => { setInsumos(data); setLoading(false); });
+  }, []);
+
+  function refresh() {
+    return buscarInsumos().then(setInsumos);
+  }
 
   const lista = insumos.filter((i) =>
     filtroMap[filtro].includes(i.categoria) &&
@@ -406,6 +477,63 @@ export default function InsumosPage() {
   function open(insumo: Insumo | null, m: ModalMode) {
     setSelected(insumo);
     setMode(m);
+  }
+
+  function closeModal() {
+    setSelected(null);
+    setMode("detalhe");
+  }
+
+  async function handleSalvar() {
+    if (mode === "novo") {
+      const nome      = novoNomeRef.current?.value.trim() ?? "";
+      const categoria = (novoCategoriaRef.current?.value ?? "visivel") as InsumoCategoria;
+      const unidade   = novoUnidadeRef.current?.value ?? "unidade";
+      const preco     = parseFloat(novoPrecoRef.current?.value ?? "0") || 0;
+      const estoque   = novoEstoqueRef.current?.value ? parseFloat(novoEstoqueRef.current.value) : null;
+      const estoqueMin = novoEstoqueMinRef.current?.value ? parseFloat(novoEstoqueMinRef.current.value) : null;
+
+      if (!nome) return;
+
+      await criarInsumo({ nome, categoria, unidade, precoAtual: preco, estoque, estoqueMin });
+      await refresh();
+      closeModal();
+      return;
+    }
+
+    if (!selected) return;
+
+    if (mode === "entrada") {
+      const qtd   = parseFloat(entradaQtdRef.current?.value ?? "0") || 0;
+      const preco = parseFloat(entradaPrecoRef.current?.value ?? "0") || 0;
+      const novoEstoque = (selected.estoque ?? 0) + qtd;
+
+      const updates: Parameters<typeof editarInsumo>[1] = { estoque: novoEstoque };
+      if (preco > 0) updates.precoAtual = preco;
+
+      await editarInsumo(selected.id, updates);
+      await refresh();
+      closeModal();
+      return;
+    }
+
+    if (mode === "ajuste") {
+      const novaQtd = parseFloat(ajusteQtdRef.current?.value ?? "0") || 0;
+      await editarInsumo(selected.id, { estoque: novaQtd });
+      await refresh();
+      closeModal();
+      return;
+    }
+
+    if (mode === "preco") {
+      const novoPreco = parseFloat(precoNovoRef.current?.value ?? "0") || 0;
+      if (novoPreco <= 0) return;
+      await registrarPreco(selected.id, novoPreco, new Date().toISOString().slice(0, 10));
+      await editarInsumo(selected.id, { precoAtual: novoPreco });
+      await refresh();
+      closeModal();
+      return;
+    }
   }
 
   const alertaCount = insumos.filter(isAlerta).length;
@@ -426,8 +554,8 @@ export default function InsumosPage() {
         <div>
           <h1 className="alm-page-title">Insumos</h1>
           <p className="alm-page-subtitle">
-            {insumos.length} cadastrados
-            {alertaCount > 0 && (
+            {loading ? "Carregando…" : `${insumos.length} cadastrados`}
+            {!loading && alertaCount > 0 && (
               <span style={{ color: "var(--status-error)", marginLeft: "8px", fontWeight: 600 }}>
                 · {alertaCount} em alerta
               </span>
@@ -458,7 +586,11 @@ export default function InsumosPage() {
       {/* Tabela */}
       <div className="atlas-card">
         <div className="atlas-card-body" style={{ padding: 0 }}>
-          {lista.length === 0 ? (
+          {loading ? (
+            <div className="atlas-empty" style={{ padding: "40px" }}>
+              <div className="atlas-empty-desc">Carregando insumos…</div>
+            </div>
+          ) : lista.length === 0 ? (
             <div className="atlas-empty" style={{ padding: "40px" }}>
               <div className="atlas-empty-icon"><Package size={24} strokeWidth={1.5} /></div>
               <div className="atlas-empty-title">Nenhum insumo encontrado</div>
@@ -537,16 +669,16 @@ export default function InsumosPage() {
       {/* Modal */}
       <Modal
         open={isOpen}
-        onClose={() => { setSelected(null); setMode("detalhe"); }}
+        onClose={closeModal}
         title={modalTitles[mode]}
         wide={mode === "detalhe" || mode === "novo"}
         footer={
           mode !== "detalhe" ? (
             <>
-              <button className="atlas-btn atlas-btn-ghost" onClick={() => { setSelected(null); setMode("detalhe"); }}>
+              <button className="atlas-btn atlas-btn-ghost" onClick={closeModal}>
                 Cancelar
               </button>
-              <button className="atlas-btn atlas-btn-primary" onClick={() => { setSelected(null); setMode("detalhe"); }}>
+              <button className="atlas-btn atlas-btn-primary" onClick={handleSalvar}>
                 Salvar
               </button>
             </>
@@ -554,10 +686,36 @@ export default function InsumosPage() {
         }
       >
         {mode === "detalhe" && selected && <DetalheContent insumo={selected} />}
-        {mode === "entrada" && selected && <EntradaContent insumo={selected} />}
-        {mode === "ajuste"  && selected && <AjusteContent  insumo={selected} />}
-        {mode === "preco"   && selected && <PrecoContent   insumo={selected} />}
-        {mode === "novo"    && <NovoInsumoContent />}
+        {mode === "entrada" && selected && (
+          <EntradaContent
+            insumo={selected}
+            qtdRef={entradaQtdRef}
+            precoRef={entradaPrecoRef}
+          />
+        )}
+        {mode === "ajuste"  && selected && (
+          <AjusteContent
+            insumo={selected}
+            qtdRef={ajusteQtdRef}
+            motivoRef={ajusteMotivoRef}
+          />
+        )}
+        {mode === "preco"   && selected && (
+          <PrecoContent
+            insumo={selected}
+            novoPrecoRef={precoNovoRef}
+          />
+        )}
+        {mode === "novo" && (
+          <NovoInsumoContent
+            nomeRef={novoNomeRef}
+            categoriaRef={novoCategoriaRef}
+            unidadeRef={novoUnidadeRef}
+            precoRef={novoPrecoRef}
+            estoqueRef={novoEstoqueRef}
+            estoqueMinRef={novoEstoqueMinRef}
+          />
+        )}
       </Modal>
     </div>
   );
