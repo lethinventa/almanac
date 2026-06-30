@@ -31,7 +31,7 @@ import {
   DEFAULT_CONFIGURACOES,
   type Configuracoes,
 } from "@/lib/data";
-import { loadCustos } from "@/app/financeiro/page";
+import { loadCustos } from "@/lib/repositories/financeiro";
 
 type ModalMode = "detalhe" | "novo" | "editar" | null;
 

@@ -36,15 +36,6 @@ interface Movimentacao {
 type Periodo = "semana" | "mes" | "mes_ant" | "custom";
 
 // ── localStorage helpers ─────────────────────────────────────
-/** @deprecated Kept for backward compatibility; migrate callers to buscarCustosIndiretos() */
-export function loadCustos(): CustoIndireto[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const saved = localStorage.getItem("almanac_custos");
-    if (saved) return JSON.parse(saved);
-  } catch {}
-  return [];
-}
 
 function loadManuais(): Movimentacao[] {
   if (typeof window === "undefined") return [];

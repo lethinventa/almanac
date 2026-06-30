@@ -66,3 +66,13 @@ export async function deletarCustoIndireto(id: string): Promise<void> {
   const { error } = await supabase.from('custos_indiretos').delete().eq('id', id)
   if (error) throw new Error(error.message)
 }
+
+export function loadCustos(): CustoIndireto[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const saved = localStorage.getItem('almanac_custos')
+    return saved ? (JSON.parse(saved) as CustoIndireto[]) : []
+  } catch {
+    return []
+  }
+}
