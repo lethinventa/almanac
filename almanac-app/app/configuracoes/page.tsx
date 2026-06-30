@@ -2,37 +2,29 @@
 
 import { useState, useEffect } from "react";
 import { Settings, Calculator, Clock, Save, Printer } from "lucide-react";
-import {
-  totalCustosIndiretos,
-  DEFAULT_CONFIGURACOES,
-  type Configuracoes,
-  formatBRL,
-} from "@/lib/data";
+import { buscarConfiguracoes, salvarConfiguracoes, type Configuracoes } from "@/lib/repositories/configuracoes";
+import { buscarTotalCustosIndiretos } from "@/lib/repositories/financeiro";
+import { formatBRL } from "@/lib/data";
 
-function loadConfig(): Configuracoes {
-  if (typeof window === "undefined") return DEFAULT_CONFIGURACOES;
-  try {
-    const saved = localStorage.getItem("almanac_config");
-    if (saved) return { ...DEFAULT_CONFIGURACOES, ...JSON.parse(saved) };
-  } catch {}
-  return DEFAULT_CONFIGURACOES;
-}
-
-function saveConfig(config: Configuracoes) {
-  localStorage.setItem("almanac_config", JSON.stringify(config));
-}
+const DEFAULT_CONFIGURACOES: Configuracoes = {
+  horasTrabalhoMes: 160,
+  multiplicadorPreco: 3,
+  custoHoraBambu: 4.5,
+};
 
 export default function ConfiguracoesPage() {
   const [config, setConfig] = useState<Configuracoes>(DEFAULT_CONFIGURACOES);
+  const [totalCustos, setTotalCustos] = useState(0);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setConfig(loadConfig());
+    buscarConfiguracoes().then(setConfig);
+    buscarTotalCustosIndiretos().then(setTotalCustos);
   }, []);
 
   const hourlyRate =
     config.horasTrabalhoMes > 0
-      ? totalCustosIndiretos / config.horasTrabalhoMes
+      ? totalCustos / config.horasTrabalhoMes
       : 0;
 
   const exampleMaterial = 5.0;
@@ -40,8 +32,8 @@ export default function ConfiguracoesPage() {
   const exampleTimeCost = (exampleTempo / 60) * hourlyRate;
   const examplePrice = (exampleMaterial + exampleTimeCost) * config.multiplicadorPreco;
 
-  function handleSave() {
-    saveConfig(config);
+  async function handleSave() {
+    await salvarConfiguracoes(config);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -183,7 +175,7 @@ export default function ConfiguracoesPage() {
                 Custos indiretos mensais
               </span>
               <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 600 }}>
-                {formatBRL(totalCustosIndiretos)}/mês
+                {formatBRL(totalCustos)}/mês
               </span>
             </div>
 
