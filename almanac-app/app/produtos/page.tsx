@@ -21,17 +21,23 @@ import {
   Printer,
 } from "lucide-react";
 import {
-  produtos as produtosMock,
-  insumos,
   formatBRL,
-  Produto,
-  LoteProducao,
-  Etapas3D,
   totalCustosIndiretos as totalCustosDefault,
   DEFAULT_CONFIGURACOES,
   type Configuracoes,
 } from "@/lib/data";
 import { loadCustos } from "@/lib/repositories/financeiro";
+import {
+  buscarProdutos,
+  criarProduto,
+  editarProduto,
+  deletarProduto,
+  registrarLote,
+  type Produto,
+  type LoteProducao,
+  type Etapas3D,
+} from "@/lib/repositories/produtos";
+import { buscarInsumos, type Insumo } from "@/lib/repositories/insumos";
 
 type ModalMode = "detalhe" | "novo" | "editar" | null;
 
@@ -50,10 +56,6 @@ const CATEGORIAS_DEFAULT = [
   "Impressão 3D",
   "Outro",
 ];
-
-const INSUMOS_ROTATIVO = insumos.filter(
-  (i) => i.categoria === "visivel" || i.categoria === "invisivel"
-);
 
 function loadConfig(): Configuracoes {
   if (typeof window === "undefined") return DEFAULT_CONFIGURACOES;
@@ -449,14 +451,16 @@ function ProntoEstoqueSection({
 // ── Detalhe content ──────────────────────────────────────────
 function DetalheContent({
   produto,
+  insumos,
   onRegistrarLote,
 }: {
   produto: Produto;
+  insumos: Insumo[];
   onRegistrarLote: () => void;
 }) {
   const receitaComInsumo = produto.receita.map((r) => ({
     ...r,
-    insumo: insumos.find((i) => i.id === r.insumoId)!,
+    insumo: insumos.find((i) => i.id === r.insumoId),
   }));
 
   const config = loadConfig();
@@ -640,12 +644,12 @@ function DetalheContent({
           <tbody>
             {receitaComInsumo.map((r, i) => (
               <tr key={i} style={{ cursor: "default" }}>
-                <td style={{ fontWeight: 500 }}>{r.insumo.nome}</td>
+                <td style={{ fontWeight: 500 }}>{r.insumo?.nome ?? r.insumoId}</td>
                 <td
                   className="num"
                   style={{ fontFamily: "var(--font-mono)", color: "var(--text-secondary)" }}
                 >
-                  {r.quantidade} {r.insumo.unidade}
+                  {r.quantidade} {r.insumo?.unidade ?? ""}
                 </td>
                 <td
                   className="num"
@@ -655,10 +659,10 @@ function DetalheContent({
                     fontSize: 11,
                   }}
                 >
-                  {formatBRL(r.insumo.precoAtual)}/{r.insumo.unidade}
+                  {r.insumo ? `${formatBRL(r.insumo.precoAtual)}/${r.insumo.unidade}` : "—"}
                 </td>
                 <td className="num" style={{ fontFamily: "var(--font-mono)" }}>
-                  {formatBRL(r.insumo.precoAtual * r.quantidade)}
+                  {r.insumo ? formatBRL(r.insumo.precoAtual * r.quantidade) : "—"}
                 </td>
               </tr>
             ))}
@@ -779,12 +783,14 @@ const MULT_PRESETS = [2, 3, 4, 5];
 function ProdutoFormContent({
   initial,
   categorias,
+  insumos,
   onSave,
   onClose,
   onAddCategoria,
 }: {
   initial?: Produto;
   categorias: string[];
+  insumos: Insumo[];
   onSave: (data: {
     nome: string;
     categoria: string;
@@ -796,6 +802,10 @@ function ProdutoFormContent({
   onClose: () => void;
   onAddCategoria: (c: string) => void;
 }) {
+  const insumosRotativo = insumos.filter(
+    (i) => i.categoria === "visivel" || i.categoria === "invisivel"
+  );
+
   const [nome, setNome] = useState(initial?.nome ?? "");
   const [categoria, setCategoria] = useState(
     initial?.categoria ?? categorias[0] ?? "Outro"
@@ -809,7 +819,7 @@ function ProdutoFormContent({
           insumoId: r.insumoId,
           quantidade: String(r.quantidade),
         }))
-      : [{ insumoId: INSUMOS_ROTATIVO[0]?.id ?? "", quantidade: "" }]
+      : [{ insumoId: insumosRotativo[0]?.id ?? "", quantidade: "" }]
   );
 
   const [impressaoMin, setImpressaoMin] = useState(
@@ -859,7 +869,7 @@ function ProdutoFormContent({
   const addItem = () =>
     setReceita((prev) => [
       ...prev,
-      { insumoId: INSUMOS_ROTATIVO[0]?.id ?? "", quantidade: "" },
+      { insumoId: insumosRotativo[0]?.id ?? "", quantidade: "" },
     ]);
 
   const removeItem = (idx: number) =>
@@ -1053,7 +1063,7 @@ function ProdutoFormContent({
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {receita.map((row, idx) => {
-            const ins = insumos.find((i) => i.id === row.insumoId)!;
+            const ins = insumos.find((i) => i.id === row.insumoId);
             const qtd = parseFloat(row.quantidade);
             const subtotal =
               ins && !isNaN(qtd) && qtd > 0 ? ins.precoAtual * qtd : null;
@@ -1074,7 +1084,7 @@ function ProdutoFormContent({
                   value={row.insumoId}
                   onChange={(e) => updateItem(idx, "insumoId", e.target.value)}
                 >
-                  {INSUMOS_ROTATIVO.map((i) => (
+                  {insumosRotativo.map((i) => (
                     <option key={i.id} value={i.id}>
                       {i.nome}
                     </option>
@@ -1304,7 +1314,12 @@ function ProdutoFormContent({
 
 // ── Page ─────────────────────────────────────────────────────
 export default function ProdutosPage() {
-  const [lista, setLista] = useState<Produto[]>(produtosMock);
+  const [lista, setLista] = useState<Produto[]>([]);
+  const [insumos, setInsumos] = useState<Insumo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
   const [busca, setBusca] = useState("");
   const [view, setView] = useState<"tabela" | "galeria">("tabela");
   const [selected, setSelected] = useState<Produto | null>(null);
@@ -1312,6 +1327,26 @@ export default function ProdutosPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [categorias, setCategorias] = useState<string[]>(CATEGORIAS_DEFAULT);
   const [showLoteForm, setShowLoteForm] = useState(false);
+
+  // Load initial data
+  useEffect(() => {
+    Promise.all([buscarProdutos(), buscarInsumos()])
+      .then(([prods, inss]) => {
+        setLista(prods);
+        setInsumos(inss);
+      })
+      .catch((e) => setErro(String(e)))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const reloadProdutos = async () => {
+    try {
+      const prods = await buscarProdutos();
+      setLista(prods);
+    } catch (e) {
+      setErro(String(e));
+    }
+  };
 
   const filtrados = lista.filter(
     (p) =>
@@ -1337,7 +1372,7 @@ export default function ProdutosPage() {
     );
   };
 
-  const handleSave = (data: {
+  const handleSave = async (data: {
     nome: string;
     categoria: string;
     tempo: number;
@@ -1364,61 +1399,77 @@ export default function ProdutosPage() {
       precoSugerido,
       custo,
       margem: 0,
-      receita: data.receita.map((r) => ({
-        insumoId: r.insumoId,
-        quantidade: parseFloat(r.quantidade) || 0,
-      })),
-      etapas3D: data.etapas3D,
+      receita: data.receita
+        .filter((r) => r.insumoId && parseFloat(r.quantidade) > 0)
+        .map((r) => ({
+          insumoId: r.insumoId,
+          quantidade: parseFloat(r.quantidade) || 0,
+        })),
+      etapas3D: data.etapas3D ?? null,
     };
 
-    if (mode === "novo") {
-      const novo: Produto = { id: `prd-${Date.now()}`, ...campos };
-      setLista((prev) => [...prev, novo]);
-    } else if (mode === "editar" && selected) {
-      setLista((prev) =>
-        prev.map((p) => (p.id === selected.id ? { ...p, ...campos } : p))
-      );
+    setSaving(true);
+    setErro(null);
+    try {
+      if (mode === "novo") {
+        await criarProduto(campos);
+      } else if (mode === "editar" && selected) {
+        await editarProduto(selected.id, campos);
+      }
+      await reloadProdutos();
+      close();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
     }
-    close();
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selected) return;
-    setLista((prev) => prev.filter((p) => p.id !== selected.id));
-    close();
+    setSaving(true);
+    setErro(null);
+    try {
+      await deletarProduto(selected.id);
+      await reloadProdutos();
+      close();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleRegistrarLote = (qtd: number, data: string, obs: string) => {
+  const handleRegistrarLote = async (qtd: number, data: string, obs: string) => {
     if (!selected) return;
-    const novoLote: LoteProducao = {
-      id: `lot-${Date.now()}`,
-      produtoId: selected.id,
-      quantidade: qtd,
-      data,
-      observacao: obs || undefined,
-    };
-    setLista((prev) =>
-      prev.map((p) =>
-        p.id === selected.id
-          ? {
-              ...p,
-              prontoEstoque: (p.prontoEstoque ?? 0) + qtd,
-              historicoLotes: [...(p.historicoLotes ?? []), novoLote],
-            }
-          : p
-      )
-    );
-    setSelected((prev) =>
-      prev
-        ? {
-            ...prev,
-            prontoEstoque: (prev.prontoEstoque ?? 0) + qtd,
-            historicoLotes: [...(prev.historicoLotes ?? []), novoLote],
-          }
-        : prev
-    );
-    setShowLoteForm(false);
+    setSaving(true);
+    setErro(null);
+    try {
+      await registrarLote(selected.id, { quantidade: qtd, data, observacao: obs || undefined });
+      const prods = await buscarProdutos();
+      setLista(prods);
+      const updated = prods.find((p) => p.id === selected.id);
+      if (updated) setSelected(updated);
+      setShowLoteForm(false);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="alm-page">
+        <div className="alm-page-header">
+          <h1 className="alm-page-title">Produtos</h1>
+        </div>
+        <div style={{ color: "var(--text-tertiary)", fontSize: 13, padding: "32px 0" }}>
+          Carregando produtos…
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="alm-page">
@@ -1435,11 +1486,39 @@ export default function ProdutosPage() {
           className="atlas-btn atlas-btn-primary atlas-btn-sm"
           style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
           onClick={() => setMode("novo")}
+          disabled={saving}
         >
           <Plus size={13} strokeWidth={1.5} />
           Novo produto
         </button>
       </div>
+
+      {/* Error banner */}
+      {erro && (
+        <div
+          style={{
+            background: "rgba(244,71,71,0.08)",
+            border: "1px solid rgba(244,71,71,0.3)",
+            borderRadius: "var(--radius-md, 4px)",
+            padding: "10px 14px",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 13,
+            color: "var(--status-error)",
+          }}
+        >
+          <AlertTriangle size={14} strokeWidth={1.5} />
+          {erro}
+          <button
+            className="atlas-btn atlas-btn-ghost atlas-btn-sm"
+            style={{ marginLeft: "auto", padding: "0 4px" }}
+            onClick={() => setErro(null)}
+          >
+            <X size={13} strokeWidth={1.5} />
+          </button>
+        </div>
+      )}
 
       {/* Busca + toggle de visualização */}
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1795,6 +1874,7 @@ export default function ProdutosPage() {
               <button
                 className="atlas-btn atlas-btn-secondary atlas-btn-sm"
                 onClick={() => setConfirmDelete(false)}
+                disabled={saving}
               >
                 Cancelar
               </button>
@@ -1806,8 +1886,9 @@ export default function ProdutosPage() {
                   border: "none",
                 }}
                 onClick={handleDelete}
+                disabled={saving}
               >
-                Excluir
+                {saving ? "Excluindo…" : "Excluir"}
               </button>
             </div>
           ) : (
@@ -1822,6 +1903,7 @@ export default function ProdutosPage() {
                   marginRight: "auto",
                 }}
                 onClick={() => setConfirmDelete(true)}
+                disabled={saving}
               >
                 <Trash2 size={13} strokeWidth={1.5} />
                 Excluir
@@ -1829,6 +1911,7 @@ export default function ProdutosPage() {
               <button
                 className="atlas-btn atlas-btn-secondary atlas-btn-sm"
                 onClick={close}
+                disabled={saving}
               >
                 Fechar
               </button>
@@ -1838,6 +1921,7 @@ export default function ProdutosPage() {
                 onClick={() => {
                   setMode("editar");
                 }}
+                disabled={saving}
               >
                 <Pencil size={12} strokeWidth={1.5} />
                 Editar
@@ -1850,6 +1934,7 @@ export default function ProdutosPage() {
           <>
             <DetalheContent
               produto={selected}
+              insumos={insumos}
               onRegistrarLote={() => setShowLoteForm(true)}
             />
             {showLoteForm && (
@@ -1867,6 +1952,7 @@ export default function ProdutosPage() {
       <Modal open={mode === "novo"} onClose={close} title="Novo produto" wide>
         <ProdutoFormContent
           categorias={categorias}
+          insumos={insumos}
           onSave={handleSave}
           onClose={close}
           onAddCategoria={handleAddCategoria}
@@ -1884,6 +1970,7 @@ export default function ProdutosPage() {
           <ProdutoFormContent
             initial={selected}
             categorias={categorias}
+            insumos={insumos}
             onSave={handleSave}
             onClose={close}
             onAddCategoria={handleAddCategoria}
