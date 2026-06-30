@@ -3,12 +3,17 @@
 import { useState, useEffect, useMemo } from "react";
 import { Plus, Pencil, Trash2, X, Check, ArrowDown, ArrowUp } from "lucide-react";
 import {
-  custosIndiretos as custosDefault,
   encomendas,
   formatBRL,
   formatDate,
-  type CustoIndireto,
 } from "@/lib/data";
+import {
+  buscarCustosIndiretos,
+  criarCustoIndireto,
+  editarCustoIndireto,
+  deletarCustoIndireto,
+  type CustoIndireto,
+} from "@/lib/repositories/financeiro";
 
 // ── Types ─────────────────────────────────────────────────────
 type MovCategoria =
@@ -31,17 +36,14 @@ interface Movimentacao {
 type Periodo = "semana" | "mes" | "mes_ant" | "custom";
 
 // ── localStorage helpers ─────────────────────────────────────
+/** @deprecated Kept for backward compatibility; migrate callers to buscarCustosIndiretos() */
 export function loadCustos(): CustoIndireto[] {
-  if (typeof window === "undefined") return custosDefault;
+  if (typeof window === "undefined") return [];
   try {
     const saved = localStorage.getItem("almanac_custos");
     if (saved) return JSON.parse(saved);
   } catch {}
-  return custosDefault;
-}
-
-function saveCustos(items: CustoIndireto[]) {
-  localStorage.setItem("almanac_custos", JSON.stringify(items));
+  return [];
 }
 
 function loadManuais(): Movimentacao[] {
@@ -766,7 +768,7 @@ function FluxoCaixaTab({ custos }: { custos: CustoIndireto[] }) {
 // ── Página ────────────────────────────────────────────────────
 export default function FinanceiroPage() {
   const [tab, setTab] = useState<"visao_geral" | "fluxo">("visao_geral");
-  const [custos, setCustos] = useState<CustoIndireto[]>(custosDefault);
+  const [custos, setCustos] = useState<CustoIndireto[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBuf, setEditBuf] = useState<Omit<CustoIndireto, "id">>({
     nome: "",
@@ -775,7 +777,7 @@ export default function FinanceiroPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
-    setCustos(loadCustos());
+    buscarCustosIndiretos().then(setCustos);
   }, []);
 
   const totalFixo = custos.reduce((s, c) => s + c.valorMensal, 0);
@@ -794,25 +796,14 @@ export default function FinanceiroPage() {
     setConfirmDeleteId(null);
   }
 
-  function saveEdit() {
+  async function saveEdit() {
     if (!editBuf.nome.trim()) return;
-    let updated: CustoIndireto[];
     if (editingId === "__novo__") {
-      updated = [
-        ...custos,
-        {
-          id: `ci-${Date.now()}`,
-          nome: editBuf.nome.trim(),
-          valorMensal: editBuf.valorMensal,
-        },
-      ];
-    } else {
-      updated = custos.map((c) =>
-        c.id === editingId ? { ...c, ...editBuf, nome: editBuf.nome.trim() } : c
-      );
+      await criarCustoIndireto({ nome: editBuf.nome.trim(), valorMensal: editBuf.valorMensal });
+    } else if (editingId) {
+      await editarCustoIndireto(editingId, { nome: editBuf.nome.trim(), valorMensal: editBuf.valorMensal });
     }
-    setCustos(updated);
-    saveCustos(updated);
+    buscarCustosIndiretos().then(setCustos);
     setEditingId(null);
   }
 
@@ -820,10 +811,9 @@ export default function FinanceiroPage() {
     setEditingId(null);
   }
 
-  function deleteCusto(id: string) {
-    const updated = custos.filter((c) => c.id !== id);
-    setCustos(updated);
-    saveCustos(updated);
+  async function deleteCusto(id: string) {
+    await deletarCustoIndireto(id);
+    buscarCustosIndiretos().then(setCustos);
     setConfirmDeleteId(null);
   }
 
