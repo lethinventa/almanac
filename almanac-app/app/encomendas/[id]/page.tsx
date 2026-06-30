@@ -21,18 +21,24 @@ import {
   Info,
 } from "lucide-react";
 import {
-  encomendas as encomendasMock,
-  produtos,
-  insumos,
   formatBRL,
   formatDate,
   statusLabels,
   statusBadge,
-  EncomendaStatus,
-  LinkUtil,
-  EncomendaItem,
-  Produto,
 } from "@/lib/data";
+import {
+  buscarEncomenda,
+  editarEncomenda,
+  atualizarStatus,
+  adicionarLink,
+  removerLink,
+  type Encomenda,
+  type EncomendaStatus,
+  type LinkUtil,
+  type EncomendaItem,
+} from "@/lib/repositories/encomendas";
+import { buscarProdutos, type Produto } from "@/lib/repositories/produtos";
+import { buscarInsumos, type Insumo } from "@/lib/repositories/insumos";
 import { PainelPagamento } from "@/components/shared/painel-pagamento";
 
 // ── Status flow ───────────────────────────────────────────────
@@ -125,11 +131,13 @@ function VisualGaleria({
   onFotoChange,
   itens,
   onPreview,
+  produtos,
 }: {
   foto: string | null;
   onFotoChange: (url: string) => void;
   itens: EncomendaItem[];
   onPreview: (src: string, alt: string) => void;
+  produtos: Produto[];
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -317,11 +325,13 @@ function TabelaProdutos({
   onChange,
   onPreview,
   onProdutoClick,
+  produtos,
 }: {
   itens: EncomendaItem[];
   onChange: (itens: EncomendaItem[]) => void;
   onPreview?: (src: string, alt: string) => void;
   onProdutoClick?: (prod: Produto) => void;
+  produtos: Produto[];
 }) {
   const [editCell, setEditCell] = useState<{
     row: number;
@@ -785,7 +795,15 @@ function Lightbox({ src, alt, onClose }: { src: string; alt: string; onClose: ()
 }
 
 // ── ProdutoDetalheModal ───────────────────────────────────────
-function ProdutoDetalheModal({ produto, onClose }: { produto: Produto; onClose: () => void }) {
+function ProdutoDetalheModal({
+  produto,
+  onClose,
+  insumos,
+}: {
+  produto: Produto;
+  onClose: () => void;
+  insumos: Insumo[];
+}) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
@@ -899,22 +917,22 @@ function ProdutoDetalheModal({ produto, onClose }: { produto: Produto; onClose: 
 // ── ArquivosPedido ────────────────────────────────────────────
 function ArquivosPedido({
   arquivos,
-  onChange,
+  onAdd,
+  onRemove,
 }: {
   arquivos: LinkUtil[];
-  onChange: (a: LinkUtil[]) => void;
+  onAdd: (link: { label: string; url: string }) => void;
+  onRemove: (id: string) => void;
 }) {
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
 
   const add = () => {
     if (!url.trim()) return;
-    onChange([...arquivos, { label: label.trim() || url.trim(), url: url.trim() }]);
+    onAdd({ label: label.trim() || url.trim(), url: url.trim() });
     setLabel("");
     setUrl("");
   };
-
-  const remove = (idx: number) => onChange(arquivos.filter((_, i) => i !== idx));
 
   return (
     <div className="atlas-card">
@@ -928,11 +946,11 @@ function ArquivosPedido({
           </p>
         )}
 
-        {arquivos.map((arq, i) => {
+        {arquivos.map((arq) => {
           const ext = getFileExt(arq.url, arq.label);
           const colors = EXT_COLORS[ext] ?? { bg: "var(--bg-raised)", color: "var(--text-secondary)" };
           return (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div key={arq.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <div
                 style={{
                   width: 28,
@@ -977,7 +995,7 @@ function ArquivosPedido({
                   <Eye size={13} strokeWidth={1.5} />
                 </a>
                 <button
-                  onClick={() => remove(i)}
+                  onClick={() => onRemove(arq.id)}
                   className="atlas-btn-icon"
                   title="Remover"
                   style={{ width: 26, height: 26, color: "var(--text-tertiary)" }}
@@ -1108,33 +1126,52 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
 // ── Page ──────────────────────────────────────────────────────
 export default function EncomendaDetalhePage() {
   const { id } = useParams<{ id: string }>();
-  const encBase = encomendasMock.find((e) => e.id === id);
 
-  const [status, setStatus] = useState<EncomendaStatus>(encBase?.status ?? "aguardando");
-  const storedFotos: Record<string, string> =
-    typeof window !== "undefined"
-      ? JSON.parse(localStorage.getItem("almanac_enc_fotos") ?? "{}")
-      : {};
-  const encId = encBase?.id ?? "";
-  const [foto, setFoto] = useState<string | null>(storedFotos[encId] ?? encBase?.foto ?? null);
+  const [enc, setEnc] = useState<Encomenda | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [produtosList, setProdutosList] = useState<Produto[]>([]);
+  const [insumosList, setInsumosList] = useState<Insumo[]>([]);
 
-  const handleFotoChange = (src: string | null) => {
-    setFoto(src);
-    if (!encId) return;
-    const fotos: Record<string, string> = JSON.parse(localStorage.getItem("almanac_enc_fotos") ?? "{}");
-    if (src) fotos[encId] = src;
-    else delete fotos[encId];
-    localStorage.setItem("almanac_enc_fotos", JSON.stringify(fotos));
-  };
-  const [arquivos, setArquivos] = useState<LinkUtil[]>(encBase?.linksUteis ?? []);
-  const [itens, setItens] = useState<EncomendaItem[]>(encBase?.itens ?? []);
-  const [observacoes, setObservacoes] = useState(encBase?.observacoes ?? "");
-  const [observacoesInternas, setObservacoesInternas] = useState(encBase?.observacoesInternas ?? "");
+  const [status, setStatus] = useState<EncomendaStatus>("aguardando");
+  const [foto, setFoto] = useState<string | null>(null);
+  const [arquivos, setArquivos] = useState<LinkUtil[]>([]);
+  const [itens, setItens] = useState<EncomendaItem[]>([]);
+  const [observacoes, setObservacoes] = useState("");
+  const [observacoesInternas, setObservacoesInternas] = useState("");
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
   const [produtoModal, setProdutoModal] = useState<Produto | null>(null);
 
-  if (!encBase) {
+  useEffect(() => {
+    Promise.all([
+      buscarEncomenda(id),
+      buscarProdutos(),
+      buscarInsumos(),
+    ]).then(([e, prods, ins]) => {
+      setEnc(e);
+      setProdutosList(prods);
+      setInsumosList(ins);
+      setLoading(false);
+      if (e) {
+        setStatus(e.status);
+        setFoto(e.foto ?? null);
+        setArquivos(e.linksUteis);
+        setItens(e.itens);
+        setObservacoes(e.observacoes ?? "");
+        setObservacoesInternas(e.observacoesInternas ?? "");
+      }
+    });
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="alm-page">
+        <p style={{ color: "var(--text-tertiary)", padding: 32 }}>Carregando...</p>
+      </div>
+    );
+  }
+
+  if (!enc) {
     return (
       <div className="alm-page">
         <div className="alm-page-header">
@@ -1147,13 +1184,13 @@ export default function EncomendaDetalhePage() {
     );
   }
 
-  const orderNumber = formatOrderNumber(encBase.id);
+  const orderNumber = formatOrderNumber(enc.id);
 
   const subtotal = itens.reduce((s, i) => s + i.quantidade * i.precoUnitario, 0);
-  const desconto = encBase.desconto ?? 0;
+  const desconto = enc.desconto ?? 0;
   const totalCobrado = Math.max(subtotal - desconto, 0);
   const custoProducao = itens.reduce((s, i) => {
-    const prod = produtos.find((p) => p.id === i.produtoId);
+    const prod = produtosList.find((p) => p.id === i.produtoId);
     return s + (prod?.custo ?? 0) * i.quantidade;
   }, 0);
   const margem = totalCobrado > 0 ? ((totalCobrado - custoProducao) / totalCobrado) * 100 : 0;
@@ -1163,19 +1200,72 @@ export default function EncomendaDetalhePage() {
   const isLate =
     status !== "entregue" &&
     status !== "cancelado" &&
-    new Date(`${encBase.dataEntrega}T00:00:00`) < new Date();
+    new Date(`${enc.dataEntrega}T00:00:00`) < new Date();
 
-  const daysLabel = getDaysLabel(encBase.dataEntrega, status);
+  const daysLabel = getDaysLabel(enc.dataEntrega, status);
   const nextStatus = NEXT_STATUS[status];
   const nextLabel = NEXT_LABEL[status];
 
   const canalIcon =
-    encBase.canal === "whatsapp" ? (
+    enc.canal === "whatsapp" ? (
       <MessageCircle size={12} strokeWidth={1.5} />
     ) : (
       <Users size={12} strokeWidth={1.5} />
     );
-  const canalLabel = encBase.canal === "whatsapp" ? "WhatsApp" : "Presencial";
+  const canalLabel = enc.canal === "whatsapp" ? "WhatsApp" : "Presencial";
+
+  const handleFotoChange = (src: string | null) => {
+    setFoto(src);
+  };
+
+  const handleStatusAdvance = (nextSt: EncomendaStatus) => {
+    atualizarStatus(enc.id, nextSt);
+    setStatus(nextSt);
+  };
+
+  const handleCancelConfirm = () => {
+    atualizarStatus(enc.id, "cancelado");
+    setStatus("cancelado");
+    setConfirmCancel(false);
+  };
+
+  const handleItensChange = (newItens: EncomendaItem[]) => {
+    setItens(newItens);
+    const sub = newItens.reduce((s, i) => s + i.quantidade * i.precoUnitario, 0);
+    const newTotal = Math.max(sub - desconto, 0);
+    const newCusto = newItens.reduce((s, i) => {
+      const prod = produtosList.find((p) => p.id === i.produtoId);
+      return s + (prod?.custo ?? 0) * i.quantidade;
+    }, 0);
+    const newMargem = newTotal > 0 ? ((newTotal - newCusto) / newTotal) * 100 : 0;
+    editarEncomenda(enc.id, {
+      itens: newItens,
+      totalCobrado: newTotal,
+      custoProducao: newCusto,
+      margem: newMargem,
+    });
+  };
+
+  const handleObservacoesChange = (v: string) => {
+    setObservacoes(v);
+    editarEncomenda(enc.id, { observacoes: v });
+  };
+
+  const handleObservacoesInternasChange = (v: string) => {
+    setObservacoesInternas(v);
+    editarEncomenda(enc.id, { observacoesInternas: v });
+  };
+
+  const handleAddArquivo = async (link: { label: string; url: string }) => {
+    await adicionarLink(enc.id, link);
+    const updated = await buscarEncomenda(enc.id);
+    if (updated) setArquivos(updated.linksUteis);
+  };
+
+  const handleRemoveArquivo = async (linkId: string) => {
+    await removerLink(linkId);
+    setArquivos((prev) => prev.filter((a) => a.id !== linkId));
+  };
 
   return (
     <div className="alm-page">
@@ -1202,7 +1292,7 @@ export default function EncomendaDetalhePage() {
                 <button
                   className="atlas-btn atlas-btn-sm"
                   style={{ background: "var(--status-error)", color: "#fff", border: "none" }}
-                  onClick={() => { setStatus("cancelado"); setConfirmCancel(false); }}
+                  onClick={handleCancelConfirm}
                 >
                   Sim, cancelar
                 </button>
@@ -1222,7 +1312,7 @@ export default function EncomendaDetalhePage() {
                   <button
                     className="atlas-btn atlas-btn-primary atlas-btn-sm"
                     style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
-                    onClick={() => setStatus(nextStatus)}
+                    onClick={() => handleStatusAdvance(nextStatus)}
                   >
                     {nextLabel}
                     <ChevronRight size={13} strokeWidth={1.5} />
@@ -1250,7 +1340,7 @@ export default function EncomendaDetalhePage() {
             }}
           >
             {canalIcon}
-            {encBase.cliente}
+            {enc.cliente}
             <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>· {canalLabel}</span>
           </div>
         </div>
@@ -1260,12 +1350,12 @@ export default function EncomendaDetalhePage() {
           <span className={statusBadge[status]}>{statusLabels[status]}</span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text-tertiary)" }}>
             <Calendar size={11} strokeWidth={1.5} />
-            Pedido em {formatDate(encBase.dataPedido)}
+            Pedido em {formatDate(enc.dataPedido)}
           </span>
           <span style={{ color: "var(--border-strong)", fontSize: 12 }}>·</span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: isLate ? "var(--status-error)" : "var(--text-tertiary)" }}>
             <Calendar size={11} strokeWidth={1.5} />
-            Entrega {formatDate(encBase.dataEntrega)}
+            Entrega {formatDate(enc.dataEntrega)}
             {daysLabel && (
               <span
                 style={{
@@ -1292,29 +1382,30 @@ export default function EncomendaDetalhePage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <TabelaProdutos
             itens={itens}
-            onChange={setItens}
+            onChange={handleItensChange}
             onPreview={(src, alt) => setLightbox({ src, alt })}
             onProdutoClick={(prod) => setProdutoModal(prod)}
+            produtos={produtosList}
           />
 
-          <PainelPagamento recordId={encBase.id} totalCobrado={totalCobrado} />
+          <PainelPagamento recordId={enc.id} totalCobrado={totalCobrado} />
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <ObservacoesCard
               title="Observações do cliente"
               value={observacoes}
-              onChange={setObservacoes}
+              onChange={handleObservacoesChange}
               placeholder="Nenhuma observação do cliente."
             />
             <ObservacoesCard
               title="Observações internas"
               value={observacoesInternas}
-              onChange={setObservacoesInternas}
+              onChange={handleObservacoesInternasChange}
               placeholder="Nenhuma anotação interna."
             />
           </div>
 
-          <TimelinePedido status={status} dataPedido={encBase.dataPedido} />
+          <TimelinePedido status={status} dataPedido={enc.dataPedido} />
         </div>
 
         {/* Sidebar */}
@@ -1331,11 +1422,11 @@ export default function EncomendaDetalhePage() {
                   {canalLabel}
                 </span>
               </InfoRow>
-              <InfoRow label="Pedido em">{formatDate(encBase.dataPedido)}</InfoRow>
+              <InfoRow label="Pedido em">{formatDate(enc.dataPedido)}</InfoRow>
               <InfoRow label="Entrega prevista">
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: isLate ? "var(--status-error)" : undefined }}>
                   <Calendar size={11} strokeWidth={1.5} />
-                  {formatDate(encBase.dataEntrega)}
+                  {formatDate(enc.dataEntrega)}
                 </span>
               </InfoRow>
               <InfoRow label="Código do pedido">
@@ -1386,11 +1477,16 @@ export default function EncomendaDetalhePage() {
                 onFotoChange={handleFotoChange}
                 itens={itens}
                 onPreview={(src, alt) => setLightbox({ src, alt })}
+                produtos={produtosList}
               />
             </div>
           </div>
 
-          <ArquivosPedido arquivos={arquivos} onChange={setArquivos} />
+          <ArquivosPedido
+            arquivos={arquivos}
+            onAdd={handleAddArquivo}
+            onRemove={handleRemoveArquivo}
+          />
         </div>
       </div>
 
@@ -1399,7 +1495,11 @@ export default function EncomendaDetalhePage() {
       )}
 
       {produtoModal && (
-        <ProdutoDetalheModal produto={produtoModal} onClose={() => setProdutoModal(null)} />
+        <ProdutoDetalheModal
+          produto={produtoModal}
+          onClose={() => setProdutoModal(null)}
+          insumos={insumosList}
+        />
       )}
     </div>
   );

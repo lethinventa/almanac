@@ -4,12 +4,19 @@ import { useState, useRef } from "react";
 import {
   Plus, Trash2, Package, ImagePlus, Link2, FileText,
 } from "lucide-react";
-import { produtos, formatBRL, Encomenda, LinkUtil } from "@/lib/data";
+import { formatBRL } from "@/lib/data";
+import type { Produto } from "@/lib/repositories/produtos";
+import type { EncomendaInput } from "@/lib/repositories/encomendas";
 
 interface ItemRow {
   produtoId: string;
   quantidade: string;
   precoUnitario: string;
+}
+
+interface LinkUtil {
+  label: string;
+  url: string;
 }
 
 function FotoUploadSmall({ value, onChange }: { value: string | null; onChange: (url: string) => void }) {
@@ -37,9 +44,11 @@ function FotoUploadSmall({ value, onChange }: { value: string | null; onChange: 
 export function NovaEncomendaForm({
   onSave,
   onClose,
+  produtos,
 }: {
-  onSave: (enc: Omit<Encomenda, "id">) => void;
+  onSave: (enc: EncomendaInput) => void;
   onClose: () => void;
+  produtos: Produto[];
 }) {
   const hoje = new Date().toISOString().slice(0, 10);
 
@@ -47,9 +56,11 @@ export function NovaEncomendaForm({
   const [cliente, setCliente] = useState("");
   const [canal, setCanal] = useState<"whatsapp" | "presencial">("whatsapp");
   const [dataEntrega, setDataEntrega] = useState("");
-  const [itens, setItens] = useState<ItemRow[]>([
-    { produtoId: produtos[0].id, quantidade: "1", precoUnitario: String(produtos[0].precoSugerido) },
-  ]);
+  const [itens, setItens] = useState<ItemRow[]>(
+    produtos.length > 0
+      ? [{ produtoId: produtos[0].id, quantidade: "1", precoUnitario: String(produtos[0].precoSugerido) }]
+      : []
+  );
   const [desconto, setDesconto] = useState("0");
   const [links, setLinks] = useState<LinkUtil[]>([]);
   const [novoLinkLabel, setNovoLinkLabel] = useState("");
@@ -67,7 +78,10 @@ export function NovaEncomendaForm({
   const margemColor = margem >= 60 ? "var(--status-success)" : margem >= 30 ? "var(--status-warning)" : "var(--status-error)";
 
   const addItem = () =>
-    setItens((prev) => [...prev, { produtoId: produtos[0].id, quantidade: "1", precoUnitario: String(produtos[0].precoSugerido) }]);
+    setItens((prev) => [
+      ...prev,
+      { produtoId: produtos[0]?.id ?? "", quantidade: "1", precoUnitario: String(produtos[0]?.precoSugerido ?? 0) },
+    ]);
 
   const removeItem = (idx: number) =>
     setItens((prev) => prev.filter((_, i) => i !== idx));
@@ -112,7 +126,6 @@ export function NovaEncomendaForm({
       margem,
       observacoes: obs.trim() || undefined,
       foto: foto ?? undefined,
-      linksUteis: links.length > 0 ? links : undefined,
     });
   };
 

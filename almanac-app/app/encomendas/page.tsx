@@ -1,43 +1,29 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   X,
   Plus,
-  Trash2,
   Search,
   LayoutList,
   Columns,
   MessageCircle,
   Users,
   AlertTriangle,
-  Calendar,
-  Package,
-  ImagePlus,
-  Link2,
-  FileText,
-  ExternalLink,
 } from "lucide-react";
 import {
-  encomendas as encomendasMock,
   formatBRL,
   formatDate,
   statusLabels,
   statusBadge,
-  Encomenda,
-  EncomendaStatus,
 } from "@/lib/data";
+import { buscarEncomendas, criarEncomenda, atualizarStatus, type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
+import { buscarProdutos, type Produto } from "@/lib/repositories/produtos";
 import { KanbanBoard } from "@/components/kanban-board";
 import { NovaEncomendaForm } from "@/components/shared/nova-encomenda-form";
 
 type ModalMode = "nova" | null;
-
-interface ItemRow {
-  produtoId: string;
-  quantidade: string;
-  precoUnitario: string;
-}
 
 // ── Modal wrapper ────────────────────────────────────────────
 function Modal({
@@ -110,10 +96,16 @@ function Modal({
 // ── Page ─────────────────────────────────────────────────────
 export default function EncomendasPage() {
   const router = useRouter();
-  const [lista, setLista] = useState<Encomenda[]>(encomendasMock);
+  const [lista, setLista] = useState<Encomenda[]>([]);
+  const [produtosList, setProdutosList] = useState<Produto[]>([]);
   const [busca, setBusca] = useState("");
   const [view, setView] = useState<"kanban" | "lista">("kanban");
   const [mode, setMode] = useState<ModalMode>(null);
+
+  useEffect(() => {
+    buscarEncomendas().then(setLista);
+    buscarProdutos().then(setProdutosList);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.location.search.includes("novo=1")) {
@@ -131,12 +123,13 @@ export default function EncomendasPage() {
 
   const close = () => setMode(null);
 
-  const handleStatusChange = (id: string, status: EncomendaStatus) =>
+  const handleStatusChange = (id: string, status: EncomendaStatus) => {
+    atualizarStatus(id, status);
     setLista((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
+  };
 
-  const handleNova = (enc: Omit<Encomenda, "id">) => {
-    const nova: Encomenda = { ...enc, id: `enc-${Date.now()}` };
-    setLista((prev) => [nova, ...prev]);
+  const handleNova = async (enc: import("@/lib/repositories/encomendas").EncomendaInput) => {
+    const nova = await criarEncomenda(enc);
     close();
     router.push(`/encomendas/${nova.id}`);
   };
@@ -275,7 +268,7 @@ export default function EncomendasPage() {
 
       {/* Modal nova encomenda */}
       <Modal open={mode === "nova"} onClose={close} title="Nova encomenda" wide>
-        <NovaEncomendaForm onSave={handleNova} onClose={close} />
+        <NovaEncomendaForm onSave={handleNova} onClose={close} produtos={produtosList} />
       </Modal>
     </div>
   );

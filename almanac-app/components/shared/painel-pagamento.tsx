@@ -3,40 +3,13 @@
 import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { formatBRL, formatDate } from "@/lib/data";
+import { buscarPagamentos, registrarPagamento, estornarPagamento, type Pagamento } from "@/lib/repositories/pagamentos";
 
-interface Pagamento {
-  id: string;
-  valor: number;
-  data: string;
-  forma: "pix" | "dinheiro" | "cartao" | "outro";
-  observacao?: string;
-}
-
-const FORMA_PAG_LABEL: Record<string, string> = {
+const METODO_LABEL: Record<string, string> = {
   pix: "Pix",
   dinheiro: "Dinheiro",
   cartao: "Cartão",
-  outro: "Outro",
 };
-
-function loadPagamentos(recordId: string): Pagamento[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const all = localStorage.getItem("almanac_pagamentos");
-    if (!all) return [];
-    return JSON.parse(all)[recordId] ?? [];
-  } catch { return []; }
-}
-
-function savePagamentos(recordId: string, pags: Pagamento[]) {
-  if (typeof window === "undefined") return;
-  try {
-    const all = localStorage.getItem("almanac_pagamentos");
-    const parsed = all ? JSON.parse(all) : {};
-    parsed[recordId] = pags;
-    localStorage.setItem("almanac_pagamentos", JSON.stringify(parsed));
-  } catch {}
-}
 
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -71,51 +44,32 @@ export function PainelPagamento({
 
   const [fValor, setFValor] = useState("");
   const [fData, setFData] = useState(hoje);
-  const [fForma, setFForma] = useState<"pix" | "dinheiro" | "cartao" | "outro">("pix");
+  const [fMetodo, setFMetodo] = useState<"pix" | "dinheiro" | "cartao">("pix");
   const [fObs, setFObs] = useState("");
 
   useEffect(() => {
-    setPagamentos(loadPagamentos(recordId));
+    buscarPagamentos(recordId).then(setPagamentos);
   }, [recordId]);
 
-  function persist(pags: Pagamento[]) {
-    setPagamentos(pags);
-    savePagamentos(recordId, pags);
+  function reload() {
+    buscarPagamentos(recordId).then(setPagamentos);
   }
 
-  function handleAdd() {
+  async function handleAdd() {
     const valor = parseFloat(fValor);
     if (!valor || valor <= 0) return;
-    persist([
-      ...pagamentos,
-      {
-        id: `pag-${Date.now()}`,
-        valor,
-        data: fData,
-        forma: fForma,
-        observacao: fObs.trim() || undefined,
-      },
-    ]);
+    await registrarPagamento({ encomendaId: recordId, valor, metodo: fMetodo, data: fData });
+    reload();
     setShowForm(false);
     setFValor("");
-    setFObs("");
     setFData(hoje);
-    setFForma("pix");
+    setFMetodo("pix");
+    setFObs("");
   }
 
-  function handleEstorno(id: string) {
-    const orig = pagamentos.find((p) => p.id === id);
-    if (!orig) return;
-    persist([
-      ...pagamentos,
-      {
-        id: `est-${Date.now()}`,
-        valor: -Math.abs(orig.valor),
-        data: hoje,
-        forma: orig.forma,
-        observacao: `Estorno: ${estornoMotivo.trim() || "sem motivo"}`,
-      },
-    ]);
+  async function handleEstorno(id: string) {
+    await estornarPagamento(id, estornoMotivo.trim() || "sem motivo");
+    reload();
     setEstornoId(null);
     setEstornoMotivo("");
   }
@@ -195,7 +149,7 @@ export function PainelPagamento({
         {pagamentos.length > 0 && (
           <div style={{ marginTop: 10 }}>
             {pagamentos.map((p) => {
-              const isNeg = p.valor < 0;
+              const isNeg = p.tipo === "estorno";
               const isEstornando = estornoId === p.id;
 
               if (isEstornando) {
@@ -248,11 +202,11 @@ export function PainelPagamento({
                 >
                   <div>
                     <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                      {formatDate(p.data)} · {FORMA_PAG_LABEL[p.forma]}
+                      {formatDate(p.data)} · {METODO_LABEL[p.metodo]}
                     </div>
-                    {p.observacao && (
+                    {p.motivoEstorno && (
                       <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>
-                        {p.observacao}
+                        {p.motivoEstorno}
                       </div>
                     )}
                   </div>
@@ -332,13 +286,12 @@ export function PainelPagamento({
               <select
                 className="alm-select"
                 style={{ height: 32 }}
-                value={fForma}
-                onChange={(e) => setFForma(e.target.value as typeof fForma)}
+                value={fMetodo}
+                onChange={(e) => setFMetodo(e.target.value as typeof fMetodo)}
               >
                 <option value="pix">Pix</option>
                 <option value="dinheiro">Dinheiro</option>
                 <option value="cartao">Cartão</option>
-                <option value="outro">Outro</option>
               </select>
             </div>
             <div className="alm-field" style={{ margin: 0 }}>

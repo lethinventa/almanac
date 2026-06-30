@@ -3,13 +3,12 @@
 import { useState, useEffect } from "react";
 import { Calendar, AlertTriangle } from "lucide-react";
 import {
-  Encomenda,
-  EncomendaStatus,
-  produtos,
   formatBRL,
   formatDate,
   statusLabels,
 } from "@/lib/data";
+import { type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
+import { buscarProdutos, type Produto } from "@/lib/repositories/produtos";
 
 const STATUS_ORDER: EncomendaStatus[] = [
   "aguardando",
@@ -42,18 +41,16 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<EncomendaStatus | null>(null);
-  const [encFotos, setEncFotos] = useState<Record<string, string>>({});
+  const [produtosList, setProdutosList] = useState<Produto[]>([]);
 
   useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem("almanac_enc_fotos") ?? "{}");
-    setEncFotos(stored);
+    buscarProdutos().then(setProdutosList);
   }, []);
 
   const getCardFoto = (enc: Encomenda): string | undefined => {
-    if (encFotos[enc.id]) return encFotos[enc.id];
     if (enc.foto) return enc.foto;
     for (const item of enc.itens) {
-      const prod = produtos.find((p) => p.id === item.produtoId);
+      const prod = produtosList.find((p) => p.id === item.produtoId);
       if (prod?.foto) return prod.foto;
     }
     return undefined;
@@ -145,7 +142,7 @@ export function KanbanBoard({
                 const cardFoto = getCardFoto(enc);
                 const resumo = enc.itens
                   .map((item) => {
-                    const prod = produtos.find((p) => p.id === item.produtoId);
+                    const prod = produtosList.find((p) => p.id === item.produtoId);
                     return `${item.quantidade}× ${prod?.nome ?? "?"}`;
                   })
                   .join(", ");
