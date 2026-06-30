@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Plus, Minus, TrendingUp, TrendingDown, X, Check } from "lucide-react";
-import { produtosPE, formatBRL, formatDate } from "@/lib/data";
+import { formatBRL, formatDate } from "@/lib/data";
+import { buscarProdutoPE, editarProdutoPE, type ProdutoPE } from "@/lib/repositories/pronta-entrega";
 
 interface MovPE {
   id: string;
@@ -123,18 +124,25 @@ function VendaModal({ precoVenda, estoqueAtual, onClose, onSave }: { precoVenda:
 
 export default function ProdutoPEPage() {
   const { id } = useParams<{ id: string }>();
-  const base = produtosPE.find((p) => p.id === id);
 
+  const [base, setBase] = useState<ProdutoPE | null>(null);
+  const [loading, setLoading] = useState(true);
   const [estoque, setEstoque] = useState(0);
   const [movs, setMovs] = useState<MovPE[]>([]);
   const [showEntrada, setShowEntrada] = useState(false);
   const [showVenda, setShowVenda] = useState(false);
 
   useEffect(() => {
+    buscarProdutoPE(id).then(p => { setBase(p); setLoading(false); });
+  }, [id]);
+
+  useEffect(() => {
     if (!base) return;
     setEstoque(loadEstoque(base.id, base.estoqueAtual));
     setMovs(loadMovs(base.id));
   }, [base?.id]);
+
+  if (loading) return <div className="alm-page"><p style={{ color: "var(--text-tertiary)" }}>Carregando...</p></div>;
 
   if (!base) {
     return (
@@ -154,6 +162,7 @@ export default function ProdutoPEPage() {
     const novasMovs = [mov, ...movs];
     setEstoque(novoEst); saveEstoque(base!.id, novoEst);
     setMovs(novasMovs); saveMovs(base!.id, novasMovs);
+    editarProdutoPE(base!.id, { estoqueAtual: novoEst });
   }
 
   function addVenda(qtd: number, cliente: string, obs: string, total: number) {
@@ -162,6 +171,7 @@ export default function ProdutoPEPage() {
     const novasMovs = [mov, ...movs];
     setEstoque(novoEst); saveEstoque(base!.id, novoEst);
     setMovs(novasMovs); saveMovs(base!.id, novasMovs);
+    editarProdutoPE(base!.id, { estoqueAtual: novoEst });
   }
 
   return (

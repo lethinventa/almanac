@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Plus, Package, X, Check } from "lucide-react";
-import { produtosPE, ProdutoPE, formatBRL } from "@/lib/data";
+import { formatBRL } from "@/lib/data";
+import { buscarProdutosPE, criarProdutoPE, type ProdutoPE, type ProdutoPEInput } from "@/lib/repositories/pronta-entrega";
 
 function CadastrarModal({ onClose, onSave }: {
   onClose: () => void;
-  onSave: (p: ProdutoPE) => void;
+  onSave: (input: ProdutoPEInput) => void;
 }) {
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
@@ -57,7 +58,7 @@ function CadastrarModal({ onClose, onSave }: {
             style={{ display: "inline-flex", alignItems: "center", gap: 5, opacity: canSave ? 1 : 0.4 }}
             disabled={!canSave}
             onClick={() => {
-              onSave({ id: `pe-${Date.now()}`, nome: nome.trim(), descricao: descricao.trim() || undefined, precoVenda: parseFloat(preco), estoqueAtual: parseInt(estoque) || 0, estoqueMin: parseInt(estoqueMin) || 5 });
+              onSave({ nome: nome.trim(), descricao: descricao.trim() || undefined, precoVenda: parseFloat(preco), estoqueAtual: parseInt(estoque) || 0, estoqueMin: parseInt(estoqueMin) || 5 });
               onClose();
             }}
           >
@@ -71,8 +72,10 @@ function CadastrarModal({ onClose, onSave }: {
 }
 
 export default function ProntaEntregaPage() {
-  const [produtos, setProdutos] = useState<ProdutoPE[]>(produtosPE);
+  const [produtos, setProdutos] = useState<ProdutoPE[]>([]);
   const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => { buscarProdutosPE().then(setProdutos) }, []);
 
   const emAlerta = produtos.filter((p) => p.estoqueAtual <= p.estoqueMin && p.estoqueAtual > 0).length;
   const semEstoque = produtos.filter((p) => p.estoqueAtual === 0).length;
@@ -155,7 +158,7 @@ export default function ProntaEntregaPage() {
       {showModal && (
         <CadastrarModal
           onClose={() => setShowModal(false)}
-          onSave={(p) => setProdutos((prev) => [...prev, p])}
+          onSave={(input) => { criarProdutoPE(input).then(() => buscarProdutosPE().then(setProdutos)) }}
         />
       )}
     </div>
