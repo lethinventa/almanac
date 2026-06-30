@@ -2,16 +2,18 @@
 
 import { useState, FormEvent } from "react";
 import { BookMarked } from "lucide-react";
-import { useAuth } from "@/contexts/auth-context";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const supabase = createClient();
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setErro("");
     if (!email.trim() || !senha.trim()) {
@@ -19,10 +21,16 @@ export default function LoginPage() {
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      const ok = login(email, senha);
-      if (!ok) { setErro("Credenciais inválidas."); setLoading(false); }
-    }, 400);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: senha,
+    });
+    if (error) {
+      setErro("E-mail ou senha incorretos.");
+      setLoading(false);
+    } else {
+      router.push("/");
+    }
   }
 
   return (
@@ -45,7 +53,6 @@ export default function LoginPage() {
           gap: 32,
         }}
       >
-        {/* Logo */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
           <div
             style={{
@@ -67,7 +74,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Form */}
         <form
           onSubmit={handleSubmit}
           style={{

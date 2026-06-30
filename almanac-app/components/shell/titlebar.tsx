@@ -84,10 +84,10 @@ export function Titlebar() {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 9, fontWeight: 700, color: "#fff", flexShrink: 0,
               }}>
-                {getInitials(user.nome)}
+                {getInitials(user.email?.split('@')[0] ?? '')}
               </div>
               <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
-                {user.nome}
+                {user.email?.split('@')[0] ?? ''}
               </span>
               <ChevronDown
                 size={12} strokeWidth={1.5}
@@ -106,7 +106,7 @@ export function Titlebar() {
                 zIndex: 100, overflow: "hidden",
               }}>
                 <div style={{ padding: "8px 12px 7px", borderBottom: "1px solid var(--border-subtle)" }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>{user.nome}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>{user.email?.split('@')[0] ?? ''}</div>
                   <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>{user.email}</div>
                 </div>
                 <button
