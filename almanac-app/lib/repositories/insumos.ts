@@ -109,8 +109,27 @@ export async function editarInsumo(id: string, dados: Partial<InsumoInput>): Pro
     await registrarPreco(id, dados.precoAtual, new Date().toISOString().slice(0, 10))
   }
 
-  const insumos = await buscarInsumos()
-  return insumos.find(i => i.id === id)!
+  const { data: updatedRow, error: selectError } = await supabase
+    .from('insumos')
+    .select(`*, insumo_historico_preco(id, data, preco)`)
+    .eq('id', id)
+    .single()
+
+  if (selectError || !updatedRow) throw new Error(selectError?.message ?? 'Erro ao buscar insumo atualizado')
+
+  return {
+    id: updatedRow.id,
+    nome: updatedRow.nome,
+    categoria: updatedRow.categoria as InsumoCategoria,
+    unidade: updatedRow.unidade,
+    precoAtual: updatedRow.preco_atual,
+    estoque: updatedRow.estoque,
+    estoqueMin: updatedRow.estoque_min,
+    fornecedor: updatedRow.fornecedor ?? undefined,
+    historico: (updatedRow.insumo_historico_preco ?? [])
+      .sort((a: { data: string }, b: { data: string }) => a.data.localeCompare(b.data))
+      .map((h: { data: string; preco: number }) => ({ data: h.data, preco: h.preco })),
+  }
 }
 
 export async function deletarInsumo(id: string): Promise<void> {
@@ -121,5 +140,6 @@ export async function deletarInsumo(id: string): Promise<void> {
 
 export async function registrarPreco(insumoId: string, preco: number, data: string): Promise<void> {
   const supabase = createClient()
-  await supabase.from('insumo_historico_preco').insert({ insumo_id: insumoId, preco, data })
+  const { error } = await supabase.from('insumo_historico_preco').insert({ insumo_id: insumoId, preco, data })
+  if (error) throw new Error(error.message)
 }

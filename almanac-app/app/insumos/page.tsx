@@ -439,6 +439,7 @@ export default function InsumosPage() {
   const [busca, setBusca]       = useState("");
   const [selected, setSelected] = useState<Insumo | null>(null);
   const [mode, setMode]         = useState<ModalMode>("detalhe");
+  const [erroSalvar, setErroSalvar] = useState<string>("");
 
   // Refs para o modal "Novo insumo"
   const novoNomeRef       = useRef<HTMLInputElement>(null);
@@ -483,54 +484,61 @@ export default function InsumosPage() {
   }
 
   async function handleSalvar() {
-    if (mode === "novo") {
-      const nome      = novoNomeRef.current?.value.trim() ?? "";
-      const categoria = (novoCategoriaRef.current?.value ?? "visivel") as InsumoCategoria;
-      const unidade   = novoUnidadeRef.current?.value ?? "unidade";
-      const preco     = parseFloat(novoPrecoRef.current?.value ?? "0") || 0;
-      const estoque   = novoEstoqueRef.current?.value ? parseFloat(novoEstoqueRef.current.value) : null;
-      const estoqueMin = novoEstoqueMinRef.current?.value ? parseFloat(novoEstoqueMinRef.current.value) : null;
+    try {
+      setErroSalvar("");
 
-      if (!nome) return;
+      if (mode === "novo") {
+        const nome      = novoNomeRef.current?.value.trim() ?? "";
+        const categoria = (novoCategoriaRef.current?.value ?? "visivel") as InsumoCategoria;
+        const unidade   = novoUnidadeRef.current?.value ?? "unidade";
+        const preco     = parseFloat(novoPrecoRef.current?.value ?? "0") || 0;
+        const estoque   = novoEstoqueRef.current?.value ? parseFloat(novoEstoqueRef.current.value) : null;
+        const estoqueMin = novoEstoqueMinRef.current?.value ? parseFloat(novoEstoqueMinRef.current.value) : null;
 
-      await criarInsumo({ nome, categoria, unidade, precoAtual: preco, estoque, estoqueMin });
-      await refresh();
-      closeModal();
-      return;
-    }
+        if (!nome) return;
 
-    if (!selected) return;
+        await criarInsumo({ nome, categoria, unidade, precoAtual: preco, estoque, estoqueMin });
+        await refresh();
+        closeModal();
+        return;
+      }
 
-    if (mode === "entrada") {
-      const qtd   = parseFloat(entradaQtdRef.current?.value ?? "0") || 0;
-      const preco = parseFloat(entradaPrecoRef.current?.value ?? "0") || 0;
-      const novoEstoque = (selected.estoque ?? 0) + qtd;
+      if (!selected) return;
 
-      const updates: Parameters<typeof editarInsumo>[1] = { estoque: novoEstoque };
-      if (preco > 0) updates.precoAtual = preco;
+      if (mode === "entrada") {
+        const qtd   = parseFloat(entradaQtdRef.current?.value ?? "0") || 0;
+        const preco = parseFloat(entradaPrecoRef.current?.value ?? "0") || 0;
+        const novoEstoque = (selected.estoque ?? 0) + qtd;
 
-      await editarInsumo(selected.id, updates);
-      await refresh();
-      closeModal();
-      return;
-    }
+        const updates: Parameters<typeof editarInsumo>[1] = { estoque: novoEstoque };
+        if (preco > 0) updates.precoAtual = preco;
 
-    if (mode === "ajuste") {
-      const novaQtd = parseFloat(ajusteQtdRef.current?.value ?? "0") || 0;
-      await editarInsumo(selected.id, { estoque: novaQtd });
-      await refresh();
-      closeModal();
-      return;
-    }
+        await editarInsumo(selected.id, updates);
+        await refresh();
+        closeModal();
+        return;
+      }
 
-    if (mode === "preco") {
-      const novoPreco = parseFloat(precoNovoRef.current?.value ?? "0") || 0;
-      if (novoPreco <= 0) return;
-      // editarInsumo already calls registrarPreco internally when precoAtual is provided
-      await editarInsumo(selected.id, { precoAtual: novoPreco });
-      await refresh();
-      closeModal();
-      return;
+      if (mode === "ajuste") {
+        const novaQtd = parseFloat(ajusteQtdRef.current?.value ?? "0") || 0;
+        await editarInsumo(selected.id, { estoque: novaQtd });
+        await refresh();
+        closeModal();
+        return;
+      }
+
+      if (mode === "preco") {
+        const novoPreco = parseFloat(precoNovoRef.current?.value ?? "0") || 0;
+        if (novoPreco <= 0) return;
+        // editarInsumo already calls registrarPreco internally when precoAtual is provided
+        await editarInsumo(selected.id, { precoAtual: novoPreco });
+        await refresh();
+        closeModal();
+        return;
+      }
+    } catch (err) {
+      console.error("Erro ao salvar insumo:", err);
+      setErroSalvar(`Erro ao salvar. Tente novamente.`);
     }
   }
 
@@ -673,6 +681,11 @@ export default function InsumosPage() {
         footer={
           mode !== "detalhe" ? (
             <>
+              {erroSalvar && (
+                <div className="atlas-alert atlas-alert-error" style={{ marginBottom: "12px" }}>
+                  <div className="atlas-alert-desc">{erroSalvar}</div>
+                </div>
+              )}
               <button className="atlas-btn atlas-btn-ghost" onClick={closeModal}>
                 Cancelar
               </button>
