@@ -11,31 +11,39 @@ import {
   BarChart2,
   Settings,
 } from "lucide-react";
-import { insumosEmAlerta, encomendasAbertas, vendasProntaEntregaPendentes } from "@/lib/data";
+import type { LucideIcon } from "lucide-react";
 
-const mainNav = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  badge?: number | null;
+  badgeType?: "error" | "neutral";
+}
+
+const mainNav: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   {
     href: "/insumos",
     label: "Insumos",
     icon: Package,
-    badge: insumosEmAlerta.length > 0 ? insumosEmAlerta.length : null,
-    badgeType: "error" as const,
+    badge: null,
+    badgeType: "error",
   },
   { href: "/produtos", label: "Produtos", icon: Box },
   {
     href: "/encomendas",
     label: "Encomendas",
     icon: ClipboardList,
-    badge: encomendasAbertas.length > 0 ? encomendasAbertas.length : null,
-    badgeType: "neutral" as const,
+    badge: null,
+    badgeType: "neutral",
   },
   {
     href: "/pronta-entrega",
     label: "Pronta Entrega",
     icon: PackageCheck,
-    badge: vendasProntaEntregaPendentes.length > 0 ? vendasProntaEntregaPendentes.length : null,
-    badgeType: "neutral" as const,
+    badge: null,
+    badgeType: "neutral",
   },
   { href: "/financeiro", label: "Financeiro", icon: BarChart2 },
 ];

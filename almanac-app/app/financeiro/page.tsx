@@ -2,11 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Plus, Pencil, Trash2, X, Check, ArrowDown, ArrowUp } from "lucide-react";
-import {
-  encomendas,
-  formatBRL,
-  formatDate,
-} from "@/lib/data";
+import { formatBRL, formatDate } from "@/lib/utils";
 import {
   buscarCustosIndiretos,
   criarCustoIndireto,
@@ -14,6 +10,7 @@ import {
   deletarCustoIndireto,
   type CustoIndireto,
 } from "@/lib/repositories/financeiro";
+import { buscarEncomendas, type Encomenda } from "@/lib/repositories/encomendas";
 
 // ── Types ─────────────────────────────────────────────────────
 type MovCategoria =
@@ -48,11 +45,6 @@ function loadManuais(): Movimentacao[] {
 function saveManuaisLS(items: Movimentacao[]) {
   localStorage.setItem("almanac_manuais", JSON.stringify(items));
 }
-
-// ── DRE data ─────────────────────────────────────────────────
-const encEntregues = encomendas.filter((e) => e.status === "entregue");
-const receitaJun = encEntregues.reduce((s, e) => s + e.totalCobrado, 0);
-const custoVarJun = encEntregues.reduce((s, e) => s + e.custoProducao, 0);
 
 // ── Histórico mock ────────────────────────────────────────────
 const HISTORICO = [
@@ -98,12 +90,13 @@ function loadAllPagamentos(): AllPagamentos {
 
 function gerarAutoMovimentacoes(
   custos: CustoIndireto[],
-  allPagamentos: AllPagamentos
+  allPagamentos: AllPagamentos,
+  encomendasData: Encomenda[]
 ): Movimentacao[] {
   const result: Movimentacao[] = [];
 
   // Entradas: usa pagamentos reais quando existem, senão totalCobrado (só entregues)
-  encomendas
+  encomendasData
     .filter((e) => e.status !== "cancelado")
     .forEach((e) => {
       const pags = allPagamentos[e.id] ?? [];
@@ -294,7 +287,7 @@ function SummaryCard({
 }
 
 // ── FluxoCaixaTab ─────────────────────────────────────────────
-function FluxoCaixaTab({ custos }: { custos: CustoIndireto[] }) {
+function FluxoCaixaTab({ custos, encomendasData }: { custos: CustoIndireto[]; encomendasData: Encomenda[] }) {
   const hoje = new Date().toISOString().slice(0, 10);
 
   const [filtro, setFiltro] = useState<Periodo>("mes");
@@ -318,8 +311,8 @@ function FluxoCaixaTab({ custos }: { custos: CustoIndireto[] }) {
   }, []);
 
   const autoMovs = useMemo(
-    () => gerarAutoMovimentacoes(custos, allPagamentos),
-    [custos, allPagamentos]
+    () => gerarAutoMovimentacoes(custos, allPagamentos, encomendasData),
+    [custos, allPagamentos, encomendasData]
   );
 
   const todas = useMemo(
@@ -760,6 +753,7 @@ function FluxoCaixaTab({ custos }: { custos: CustoIndireto[] }) {
 export default function FinanceiroPage() {
   const [tab, setTab] = useState<"visao_geral" | "fluxo">("visao_geral");
   const [custos, setCustos] = useState<CustoIndireto[]>([]);
+  const [encomendasData, setEncomendasData] = useState<Encomenda[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBuf, setEditBuf] = useState<Omit<CustoIndireto, "id">>({
     nome: "",
@@ -769,7 +763,12 @@ export default function FinanceiroPage() {
 
   useEffect(() => {
     buscarCustosIndiretos().then(setCustos);
+    buscarEncomendas().then(setEncomendasData);
   }, []);
+
+  const encEntregues = encomendasData.filter((e) => e.status === "entregue");
+  const receitaJun = encEntregues.reduce((s, e) => s + e.totalCobrado, 0);
+  const custoVarJun = encEntregues.reduce((s, e) => s + e.custoProducao, 0);
 
   const totalFixo = custos.reduce((s, c) => s + c.valorMensal, 0);
   const lucroBruto = receitaJun - custoVarJun;
@@ -1281,7 +1280,7 @@ export default function FinanceiroPage() {
       )}
 
       {/* ── Fluxo de caixa ──────────────────────────────────── */}
-      {tab === "fluxo" && <FluxoCaixaTab custos={custos} />}
+      {tab === "fluxo" && <FluxoCaixaTab custos={custos} encomendasData={encomendasData} />}
     </div>
   );
 }

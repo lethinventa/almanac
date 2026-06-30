@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import {
   Plus, Trash2, Package, ImagePlus, Link2, FileText,
 } from "lucide-react";
-import { formatBRL } from "@/lib/data";
+import { formatBRL } from "@/lib/utils";
 import type { Produto } from "@/lib/repositories/produtos";
 import type { EncomendaInput } from "@/lib/repositories/encomendas";
 

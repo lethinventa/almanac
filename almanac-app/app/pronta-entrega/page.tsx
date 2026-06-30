@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Plus, Package, X, Check } from "lucide-react";
-import { formatBRL } from "@/lib/data";
+import { formatBRL } from "@/lib/utils";
 import { buscarProdutosPE, criarProdutoPE, type ProdutoPE, type ProdutoPEInput } from "@/lib/repositories/pronta-entrega";
 
 function CadastrarModal({ onClose, onSave }: {

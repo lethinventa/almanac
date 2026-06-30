@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Settings, Calculator, Clock, Save, Printer } from "lucide-react";
 import { buscarConfiguracoes, salvarConfiguracoes, type Configuracoes } from "@/lib/repositories/configuracoes";
 import { buscarTotalCustosIndiretos } from "@/lib/repositories/financeiro";
-import { formatBRL } from "@/lib/data";
+import { formatBRL } from "@/lib/utils";
 
 const DEFAULT_CONFIGURACOES: Configuracoes = {
   horasTrabalhoMes: 160,

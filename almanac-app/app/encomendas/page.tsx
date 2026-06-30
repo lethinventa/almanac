@@ -17,7 +17,7 @@ import {
   formatDate,
   statusLabels,
   statusBadge,
-} from "@/lib/data";
+} from "@/lib/utils";
 import { buscarEncomendas, criarEncomenda, atualizarStatus, type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
 import { buscarProdutos, type Produto } from "@/lib/repositories/produtos";
 import { KanbanBoard } from "@/components/kanban-board";

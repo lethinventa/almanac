@@ -6,7 +6,7 @@ import {
   formatBRL,
   formatDate,
   statusLabels,
-} from "@/lib/data";
+} from "@/lib/utils";
 import { type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
 import { buscarProdutos, type Produto } from "@/lib/repositories/produtos";
 

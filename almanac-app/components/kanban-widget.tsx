@@ -1,24 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
-import {
-  encomendas as encomendasMock,
-  Encomenda,
-  EncomendaStatus,
-} from "@/lib/data";
+import { buscarEncomendas, atualizarStatus, type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
 import { KanbanBoard } from "@/components/kanban-board";
 
 export function KanbanWidget() {
   const router = useRouter();
-  const [lista, setLista] = useState<Encomenda[]>(encomendasMock);
+  const [lista, setLista] = useState<Encomenda[]>([]);
+
+  useEffect(() => {
+    buscarEncomendas().then(setLista);
+  }, []);
 
   const handleStatusChange = (id: string, newStatus: EncomendaStatus) => {
-    setLista((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, status: newStatus } : e))
-    );
+    atualizarStatus(id, newStatus);
+    setLista((prev) => prev.map((e) => (e.id === id ? { ...e, status: newStatus } : e)));
   };
 
   return (

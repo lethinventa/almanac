@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Plus, Minus, TrendingUp, TrendingDown, X, Check } from "lucide-react";
-import { formatBRL, formatDate } from "@/lib/data";
+import { formatBRL, formatDate } from "@/lib/utils";
 import { buscarProdutoPE, editarProdutoPE, type ProdutoPE } from "@/lib/repositories/pronta-entrega";
 
 interface MovPE {

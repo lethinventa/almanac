@@ -18,7 +18,7 @@ import {
   formatBRL,
   formatDate,
   categoriaLabel,
-} from "@/lib/data";
+} from "@/lib/utils";
 import {
   buscarInsumos,
   criarInsumo,

@@ -20,13 +20,22 @@ import {
   Layers,
   Printer,
 } from "lucide-react";
-import {
-  formatBRL,
-  totalCustosIndiretos as totalCustosDefault,
-  DEFAULT_CONFIGURACOES,
-  type Configuracoes,
-} from "@/lib/data";
+import { formatBRL } from "@/lib/utils";
 import { loadCustos } from "@/lib/repositories/financeiro";
+
+interface Configuracoes {
+  horasTrabalhoMes: number;
+  multiplicadorPreco: number;
+  custoHoraBambu: number;
+}
+
+const DEFAULT_CONFIGURACOES: Configuracoes = {
+  horasTrabalhoMes: 160,
+  multiplicadorPreco: 3,
+  custoHoraBambu: 4.5,
+};
+
+const totalCustosDefault = 714.89; // fallback when no custos loaded yet
 import {
   buscarProdutos,
   criarProduto,

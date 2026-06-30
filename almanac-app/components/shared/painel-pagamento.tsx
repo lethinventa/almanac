@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
-import { formatBRL, formatDate } from "@/lib/data";
+import { formatBRL, formatDate } from "@/lib/utils";
 import { buscarPagamentos, registrarPagamento, estornarPagamento, type Pagamento } from "@/lib/repositories/pagamentos";
 
 const METODO_LABEL: Record<string, string> = {

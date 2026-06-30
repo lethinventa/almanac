@@ -2,23 +2,17 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle, TrendingUp, ShoppingBag, Package, Plus,
   ClipboardList, Box, PackageCheck, X,
 } from "lucide-react";
 import { KanbanWidget } from "@/components/kanban-widget";
-import {
-  insumosEmAlerta,
-  produtosComProntoAlerta,
-  encomendasAbertas,
-  formatBRL,
-  receitaMes,
-  lucroBruto,
-  lucroLiquido,
-  categoriaLabel,
-  type InsumoCategoria,
-  type Encomenda,
-} from "@/lib/data";
+import { formatBRL, categoriaLabel } from "@/lib/utils";
+import { buscarInsumos, type Insumo, type InsumoCategoria } from "@/lib/repositories/insumos";
+import { buscarProdutos, type Produto } from "@/lib/repositories/produtos";
+import { buscarEncomendas, criarEncomenda, type Encomenda, type EncomendaInput } from "@/lib/repositories/encomendas";
+import { buscarTotalCustosIndiretos } from "@/lib/repositories/financeiro";
 import { NovaEncomendaForm } from "@/components/shared/nova-encomenda-form";
 
 // ── Modal wrapper ─────────────────────────────────────────────
@@ -215,7 +209,42 @@ function StatCard({ label, value, delta, deltaUp, icon: Icon, accent }: {
 type ModalType = "encomenda" | "insumo" | "produto" | null;
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [modal, setModal] = useState<ModalType>(null);
+  const [insumosAlerta, setInsumosAlerta] = useState<Insumo[]>([]);
+  const [produtosAlerta, setProdutosAlerta] = useState<Produto[]>([]);
+  const [encomendasAbertas, setEncomendasAbertas] = useState<Encomenda[]>([]);
+  const [receitaMes, setReceitaMes] = useState(0);
+  const [lucroBruto, setLucroBruto] = useState(0);
+  const [lucroLiquido, setLucroLiquido] = useState(0);
+  const [produtosList, setProdutosList] = useState<Produto[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      buscarInsumos(),
+      buscarProdutos(),
+      buscarEncomendas(),
+      buscarTotalCustosIndiretos(),
+    ]).then(([ins, prods, encs, totalCustos]) => {
+      setInsumosAlerta(ins.filter(i => i.estoque !== null && i.estoqueMin !== null && (i.estoque ?? 0) <= (i.estoqueMin ?? 0)));
+      setProdutosAlerta(prods.filter(p => p.prontoEstoqueMin !== undefined && (p.prontoEstoque ?? 0) <= p.prontoEstoqueMin));
+      const abertas = encs.filter(e => e.status !== 'entregue' && e.status !== 'cancelado');
+      setEncomendasAbertas(abertas);
+      setProdutosList(prods);
+      const entregues = encs.filter(e => e.status === 'entregue');
+      const receita = entregues.reduce((s, e) => s + e.totalCobrado, 0);
+      const custo = entregues.reduce((s, e) => s + e.custoProducao, 0);
+      setReceitaMes(receita);
+      setLucroBruto(receita - custo);
+      setLucroLiquido(receita - custo - totalCustos);
+    });
+  }, []);
+
+  const handleNovaDashboard = async (enc: EncomendaInput) => {
+    const nova = await criarEncomenda(enc);
+    setModal(null);
+    router.push(`/encomendas/${nova.id}`);
+  };
 
   return (
     <div className="alm-page">
@@ -235,7 +264,7 @@ export default function DashboardPage() {
         <StatCard label="Receita do mês" value={formatBRL(receitaMes)} delta="+18,4% vs maio" deltaUp icon={TrendingUp} />
         <StatCard label="Lucro bruto" value={formatBRL(lucroBruto)} delta="+22,1% vs maio" deltaUp icon={TrendingUp} />
         <StatCard label="Encomendas abertas" value={String(encomendasAbertas.length)} delta="4 com entrega esta semana" deltaUp={false} icon={ShoppingBag} />
-        <StatCard label="Alertas de estoque" value={String(insumosEmAlerta.length)} icon={AlertTriangle} accent={insumosEmAlerta.length > 0 ? "error" : undefined} />
+        <StatCard label="Alertas de estoque" value={String(insumosAlerta.length)} icon={AlertTriangle} accent={insumosAlerta.length > 0 ? "error" : undefined} />
       </div>
 
       {/* Ações rápidas */}
@@ -263,7 +292,7 @@ export default function DashboardPage() {
           <Link href="/insumos" className="atlas-link" style={{ fontSize: 11 }}>Ver todos</Link>
         </div>
         <div className="atlas-card-body" style={{ padding: 0 }}>
-          {insumosEmAlerta.length === 0 ? (
+          {insumosAlerta.length === 0 ? (
             <div className="atlas-empty" style={{ padding: 24 }}>
               <div className="atlas-empty-title">Nenhum alerta</div>
               <div className="atlas-empty-desc">Todos os insumos estão acima do mínimo.</div>
@@ -272,7 +301,7 @@ export default function DashboardPage() {
             <table className="atlas-table" style={{ width: "100%", border: 0 }}>
               <thead><tr><th>Insumo</th><th>Categoria</th><th className="num">Estoque atual</th><th className="num">Mínimo</th><th className="num">Preço atual</th></tr></thead>
               <tbody>
-                {insumosEmAlerta.map((insumo) => (
+                {insumosAlerta.map((insumo) => (
                   <tr key={insumo.id}>
                     <td><div style={{ display: "flex", alignItems: "center", gap: 8 }}><Package size={13} strokeWidth={1.5} style={{ color: "var(--status-error)", flexShrink: 0 }} /><span style={{ fontWeight: 500 }}>{insumo.nome}</span></div></td>
                     <td style={{ color: "var(--text-tertiary)", fontSize: 11 }}>{categoriaLabel[insumo.categoria]}</td>
@@ -287,7 +316,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {produtosComProntoAlerta.length > 0 && (
+      {produtosAlerta.length > 0 && (
         <div className="atlas-card">
           <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -300,7 +329,7 @@ export default function DashboardPage() {
             <table className="atlas-table" style={{ width: "100%", border: 0 }}>
               <thead><tr><th>Produto</th><th>Categoria</th><th className="num">Em estoque</th><th className="num">Mínimo</th></tr></thead>
               <tbody>
-                {produtosComProntoAlerta.map((p) => (
+                {produtosAlerta.map((p) => (
                   <tr key={p.id}>
                     <td><div style={{ display: "flex", alignItems: "center", gap: 8 }}><PackageCheck size={13} strokeWidth={1.5} style={{ color: "var(--status-warning)", flexShrink: 0 }} /><span style={{ fontWeight: 500 }}>{p.nome}</span></div></td>
                     <td style={{ color: "var(--text-tertiary)", fontSize: 11 }}>{p.categoria}</td>
@@ -324,7 +353,7 @@ export default function DashboardPage() {
 
       {/* Modais */}
       <Modal open={modal === "encomenda"} onClose={() => setModal(null)} title="Nova encomenda" wide>
-        <NovaEncomendaForm onSave={(_enc: Omit<Encomenda, "id">) => setModal(null)} onClose={() => setModal(null)} />
+        <NovaEncomendaForm onSave={handleNovaDashboard} onClose={() => setModal(null)} produtos={produtosList} />
       </Modal>
       <Modal open={modal === "insumo"} onClose={() => setModal(null)} title="Novo insumo">
         <NovoInsumoForm onClose={() => setModal(null)} />

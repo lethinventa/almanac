@@ -25,7 +25,7 @@ import {
   formatDate,
   statusLabels,
   statusBadge,
-} from "@/lib/data";
+} from "@/lib/utils";
 import {
   buscarEncomenda,
   editarEncomenda,
