@@ -1416,8 +1416,8 @@ export default function ProdutosPage() {
       } else if (mode === "editar" && selected) {
         await editarProduto(selected.id, campos);
       }
-      await reloadProdutos();
       close();
+      await reloadProdutos();
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
     } finally {
@@ -1431,8 +1431,8 @@ export default function ProdutosPage() {
     setErro(null);
     try {
       await deletarProduto(selected.id);
-      await reloadProdutos();
       close();
+      await reloadProdutos();
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
     } finally {

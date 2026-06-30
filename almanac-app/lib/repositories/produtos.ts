@@ -61,7 +61,8 @@ export async function buscarProdutos(): Promise<Produto[]> {
     `)
     .order('nome')
 
-  if (error || !data) return []
+  if (error) throw new Error(error.message)
+  if (!data) return []
 
   return data.map(row => ({
     id: row.id,
