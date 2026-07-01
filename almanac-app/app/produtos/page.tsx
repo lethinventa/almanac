@@ -21,13 +21,8 @@ import {
   Printer,
 } from "lucide-react";
 import { formatBRL } from "@/lib/utils";
-import { loadCustos } from "@/lib/repositories/financeiro";
-
-interface Configuracoes {
-  horasTrabalhoMes: number;
-  multiplicadorPreco: number;
-  custoHoraBambu: number;
-}
+import { buscarTotalCustosIndiretos } from "@/lib/repositories/financeiro";
+import { buscarConfiguracoes, type Configuracoes } from "@/lib/repositories/configuracoes";
 
 const DEFAULT_CONFIGURACOES: Configuracoes = {
   horasTrabalhoMes: 160,
@@ -35,7 +30,6 @@ const DEFAULT_CONFIGURACOES: Configuracoes = {
   custoHoraBambu: 4.5,
 };
 
-const totalCustosDefault = 714.89; // fallback when no custos loaded yet
 import {
   buscarProdutos,
   criarProduto,
@@ -66,27 +60,14 @@ const CATEGORIAS_DEFAULT = [
   "Outro",
 ];
 
-function loadConfig(): Configuracoes {
-  if (typeof window === "undefined") return DEFAULT_CONFIGURACOES;
-  try {
-    const saved = localStorage.getItem("almanac_config");
-    if (saved) return { ...DEFAULT_CONFIGURACOES, ...JSON.parse(saved) };
-  } catch {}
-  return DEFAULT_CONFIGURACOES;
-}
-
-function getTotalCustos(): number {
-  const items = loadCustos();
-  return items.reduce((s, c) => s + c.valorMensal, 0);
-}
 
 function calcPrecoSugerido(
   materialCost: number,
   tempoMin: number,
-  config: Configuracoes
+  config: Configuracoes,
+  totalCustos: number
 ): number {
-  const total = getTotalCustos() || totalCustosDefault;
-  const hourlyRate = config.horasTrabalhoMes > 0 ? total / config.horasTrabalhoMes : 0;
+  const hourlyRate = config.horasTrabalhoMes > 0 ? totalCustos / config.horasTrabalhoMes : 0;
   const timeCost = (tempoMin / 60) * hourlyRate;
   return (materialCost + timeCost) * config.multiplicadorPreco;
 }
@@ -94,7 +75,8 @@ function calcPrecoSugerido(
 function calcPreco3D(
   materialCost: number,
   etapas: Etapas3D,
-  config: Configuracoes
+  config: Configuracoes,
+  totalCustos: number
 ): {
   custoImpressao: number;
   custoModelagem: number;
@@ -102,8 +84,7 @@ function calcPreco3D(
   custoTotal: number;
   precoSugerido: number;
 } {
-  const total = getTotalCustos() || totalCustosDefault;
-  const hourlyRate = config.horasTrabalhoMes > 0 ? total / config.horasTrabalhoMes : 0;
+  const hourlyRate = config.horasTrabalhoMes > 0 ? totalCustos / config.horasTrabalhoMes : 0;
   const custoImpressao = ((etapas.impressao ?? 0) / 60) * config.custoHoraBambu;
   const custoModelagem = ((etapas.modelagem ?? 0) / 60) * hourlyRate;
   const custoAcabamento = ((etapas.acabamento ?? 0) / 60) * hourlyRate;
@@ -188,13 +169,13 @@ function Modal({
 }
 
 // ── Photo upload ─────────────────────────────────────────────
-function FotoUpload() {
+function FotoUpload({ value, onChange }: { value?: string | null; onChange?: (url: string | null) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(value ?? null);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) setPreview(URL.createObjectURL(f));
+    if (f) { const url = URL.createObjectURL(f); setPreview(url); onChange?.(url); }
   };
 
   return (
@@ -461,10 +442,14 @@ function ProntoEstoqueSection({
 function DetalheContent({
   produto,
   insumos,
+  config,
+  totalCustos,
   onRegistrarLote,
 }: {
   produto: Produto;
   insumos: Insumo[];
+  config: Configuracoes;
+  totalCustos: number;
   onRegistrarLote: () => void;
 }) {
   const receitaComInsumo = produto.receita.map((r) => ({
@@ -472,14 +457,13 @@ function DetalheContent({
     insumo: insumos.find((i) => i.id === r.insumoId),
   }));
 
-  const config = loadConfig();
   const hourlyRate =
     config.horasTrabalhoMes > 0
-      ? getTotalCustos() / config.horasTrabalhoMes
+      ? totalCustos / config.horasTrabalhoMes
       : 0;
 
   const is3D = produto.categoria === "Impressão 3D" && !!produto.etapas3D;
-  const r3D = is3D ? calcPreco3D(produto.custo, produto.etapas3D!, config) : null;
+  const r3D = is3D ? calcPreco3D(produto.custo, produto.etapas3D!, config, totalCustos) : null;
   const timeCost = is3D ? 0 : (produto.tempoProducao / 60) * hourlyRate;
   const precoCalculado = is3D
     ? r3D!.precoSugerido
@@ -793,6 +777,8 @@ function ProdutoFormContent({
   initial,
   categorias,
   insumos,
+  config,
+  totalCustos,
   onSave,
   onClose,
   onAddCategoria,
@@ -800,6 +786,8 @@ function ProdutoFormContent({
   initial?: Produto;
   categorias: string[];
   insumos: Insumo[];
+  config: Configuracoes;
+  totalCustos: number;
   onSave: (data: {
     nome: string;
     categoria: string;
@@ -807,6 +795,7 @@ function ProdutoFormContent({
     receita: ReceitaRow[];
     multiplicador: number;
     etapas3D?: Etapas3D;
+    foto?: string;
   }) => void;
   onClose: () => void;
   onAddCategoria: (c: string) => void;
@@ -815,6 +804,7 @@ function ProdutoFormContent({
     (i) => i.categoria === "visivel" || i.categoria === "invisivel"
   );
 
+  const [foto, setFoto] = useState<string | undefined>(initial?.foto);
   const [nome, setNome] = useState(initial?.nome ?? "");
   const [categoria, setCategoria] = useState(
     initial?.categoria ?? categorias[0] ?? "Outro"
@@ -841,7 +831,6 @@ function ProdutoFormContent({
     initial?.etapas3D?.acabamento !== undefined ? String(initial.etapas3D.acabamento) : ""
   );
 
-  const config = loadConfig();
   const [multInput, setMultInput] = useState(String(config.multiplicadorPreco));
 
   const multNum = Math.max(1, parseFloat(multInput) || 1);
@@ -856,7 +845,7 @@ function ProdutoFormContent({
 
   const hourlyRate =
     config.horasTrabalhoMes > 0
-      ? getTotalCustos() / config.horasTrabalhoMes
+      ? totalCustos / config.horasTrabalhoMes
       : 0;
 
   const impressaoNum = parseInt(impressaoMin) || 0;
@@ -867,7 +856,7 @@ function ProdutoFormContent({
   const tempoNum = is3D ? tempoTotal3D : (parseInt(tempo) || 0);
 
   const r3D = is3D
-    ? calcPreco3D(materialCost, { impressao: impressaoNum, modelagem: modelagemNum, acabamento: acabamentoNum }, { ...config, multiplicadorPreco: multNum })
+    ? calcPreco3D(materialCost, { impressao: impressaoNum, modelagem: modelagemNum, acabamento: acabamentoNum }, { ...config, multiplicadorPreco: multNum }, totalCustos)
     : null;
 
   const timeCost = is3D ? 0 : (tempoNum / 60) * hourlyRate;
@@ -902,12 +891,13 @@ function ProdutoFormContent({
       etapas3D: is3D
         ? { impressao: impressaoNum, modelagem: modelagemNum, acabamento: acabamentoNum }
         : undefined,
+      foto,
     });
   };
 
   return (
     <>
-      <FotoUpload />
+      <FotoUpload value={foto} onChange={(url) => setFoto(url ?? undefined)} />
 
       <div className="alm-field">
         <label className="alm-label">Nome do produto</label>
@@ -1325,6 +1315,8 @@ function ProdutoFormContent({
 export default function ProdutosPage() {
   const [lista, setLista] = useState<Produto[]>([]);
   const [insumos, setInsumos] = useState<Insumo[]>([]);
+  const [config, setConfig] = useState<Configuracoes>(DEFAULT_CONFIGURACOES);
+  const [totalCustos, setTotalCustos] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -1339,10 +1331,12 @@ export default function ProdutosPage() {
 
   // Load initial data
   useEffect(() => {
-    Promise.all([buscarProdutos(), buscarInsumos()])
-      .then(([prods, inss]) => {
+    Promise.all([buscarProdutos(), buscarInsumos(), buscarConfiguracoes(), buscarTotalCustosIndiretos()])
+      .then(([prods, inss, cfg, custos]) => {
         setLista(prods);
         setInsumos(inss);
+        setConfig(cfg);
+        setTotalCustos(custos);
       })
       .catch((e) => setErro(String(e)))
       .finally(() => setLoading(false));
@@ -1388,8 +1382,8 @@ export default function ProdutosPage() {
     receita: ReceitaRow[];
     multiplicador: number;
     etapas3D?: Etapas3D;
+    foto?: string;
   }) => {
-    const config = loadConfig();
     const custo = data.receita.reduce((sum, r) => {
       const ins = insumos.find((i) => i.id === r.insumoId);
       const qtd = parseFloat(r.quantidade);
@@ -1398,8 +1392,8 @@ export default function ProdutosPage() {
     }, 0);
     const configComMult = { ...config, multiplicadorPreco: data.multiplicador };
     const precoSugerido = data.etapas3D
-      ? calcPreco3D(custo, data.etapas3D, configComMult).precoSugerido
-      : calcPrecoSugerido(custo, data.tempo, configComMult);
+      ? calcPreco3D(custo, data.etapas3D, configComMult, totalCustos).precoSugerido
+      : calcPrecoSugerido(custo, data.tempo, configComMult, totalCustos);
 
     const campos = {
       nome: data.nome,
@@ -1408,6 +1402,7 @@ export default function ProdutosPage() {
       precoSugerido,
       custo,
       margem: 0,
+      foto: data.foto,
       receita: data.receita
         .filter((r) => r.insumoId && parseFloat(r.quantidade) > 0)
         .map((r) => ({
@@ -1614,10 +1609,9 @@ export default function ProdutosPage() {
               </thead>
               <tbody>
                 {filtrados.map((p) => {
-                  const config = loadConfig();
                   const preco = p.categoria === "Impressão 3D" && p.etapas3D
-                    ? calcPreco3D(p.custo, p.etapas3D, config).precoSugerido
-                    : calcPrecoSugerido(p.custo, p.tempoProducao, config);
+                    ? calcPreco3D(p.custo, p.etapas3D, config, totalCustos).precoSugerido
+                    : calcPrecoSugerido(p.custo, p.tempoProducao, config, totalCustos);
                   const temProntos = p.prontoEstoque !== undefined;
                   const prontoAlerta =
                     temProntos &&
@@ -1733,10 +1727,9 @@ export default function ProdutosPage() {
             }}
           >
             {filtrados.map((p) => {
-              const config = loadConfig();
               const preco = p.categoria === "Impressão 3D" && p.etapas3D
-                ? calcPreco3D(p.custo, p.etapas3D, config).precoSugerido
-                : calcPrecoSugerido(p.custo, p.tempoProducao, config);
+                ? calcPreco3D(p.custo, p.etapas3D, config, totalCustos).precoSugerido
+                : calcPrecoSugerido(p.custo, p.tempoProducao, config, totalCustos);
               const temProntos = p.prontoEstoque !== undefined;
               const prontoAlerta =
                 temProntos &&
@@ -1944,6 +1937,8 @@ export default function ProdutosPage() {
             <DetalheContent
               produto={selected}
               insumos={insumos}
+              config={config}
+              totalCustos={totalCustos}
               onRegistrarLote={() => setShowLoteForm(true)}
             />
             {showLoteForm && (
@@ -1962,6 +1957,8 @@ export default function ProdutosPage() {
         <ProdutoFormContent
           categorias={categorias}
           insumos={insumos}
+          config={config}
+          totalCustos={totalCustos}
           onSave={handleSave}
           onClose={close}
           onAddCategoria={handleAddCategoria}
@@ -1980,6 +1977,8 @@ export default function ProdutosPage() {
             initial={selected}
             categorias={categorias}
             insumos={insumos}
+            config={config}
+            totalCustos={totalCustos}
             onSave={handleSave}
             onClose={close}
             onAddCategoria={handleAddCategoria}

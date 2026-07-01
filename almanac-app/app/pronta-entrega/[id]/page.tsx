@@ -25,17 +25,6 @@ function saveMovs(id: string, movs: MovPE[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(`almanac_pe_movs_${id}`, JSON.stringify(movs));
 }
-function loadEstoque(id: string, base: number): number {
-  if (typeof window === "undefined") return base;
-  try {
-    const v = localStorage.getItem(`almanac_pe_estoque_${id}`);
-    return v !== null ? parseInt(v) : base;
-  } catch { return base; }
-}
-function saveEstoque(id: string, q: number) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(`almanac_pe_estoque_${id}`, String(q));
-}
 
 function EntradaModal({ preco, onClose, onSave }: { preco: number; onClose: () => void; onSave: (qtd: number, obs: string) => void }) {
   const [qtd, setQtd] = useState("1");
@@ -138,7 +127,7 @@ export default function ProdutoPEPage() {
 
   useEffect(() => {
     if (!base) return;
-    setEstoque(loadEstoque(base.id, base.estoqueAtual));
+    setEstoque(base.estoqueAtual);
     setMovs(loadMovs(base.id));
   }, [base?.id]);
 
@@ -160,7 +149,7 @@ export default function ProdutoPEPage() {
     const novoEst = estoque + qtd;
     const mov: MovPE = { id: `mov-${Date.now()}`, tipo: "entrada", quantidade: qtd, data: new Date().toISOString().slice(0, 10), observacao: obs || undefined };
     const novasMovs = [mov, ...movs];
-    setEstoque(novoEst); saveEstoque(base!.id, novoEst);
+    setEstoque(novoEst);
     setMovs(novasMovs); saveMovs(base!.id, novasMovs);
     editarProdutoPE(base!.id, { estoqueAtual: novoEst });
   }
@@ -169,7 +158,7 @@ export default function ProdutoPEPage() {
     const novoEst = Math.max(estoque - qtd, 0);
     const mov: MovPE = { id: `mov-${Date.now()}`, tipo: "saida", quantidade: qtd, data: new Date().toISOString().slice(0, 10), cliente: cliente || undefined, observacao: obs || undefined, valorTotal: total || undefined };
     const novasMovs = [mov, ...movs];
-    setEstoque(novoEst); saveEstoque(base!.id, novoEst);
+    setEstoque(novoEst);
     setMovs(novasMovs); saveMovs(base!.id, novasMovs);
     editarProdutoPE(base!.id, { estoqueAtual: novoEst });
   }

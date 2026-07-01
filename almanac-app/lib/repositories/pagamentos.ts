@@ -15,6 +15,7 @@ export interface PagamentoInput {
   valor: number
   metodo: 'pix' | 'dinheiro' | 'cartao'
   data: string
+  observacao?: string
 }
 
 export async function buscarPagamentos(encomendaId: string): Promise<Pagamento[]> {
@@ -62,6 +63,29 @@ export async function registrarPagamento(dados: PagamentoInput): Promise<Pagamen
     data: data.data,
     tipo: 'recebimento',
   }
+}
+
+export async function buscarTodosPagamentos(): Promise<Record<string, Array<{ id: string; valor: number; data: string; forma: string; observacao?: string }>>> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('encomenda_pagamentos')
+    .select('*')
+    .order('created_at')
+
+  if (error || !data) return {}
+
+  const result: Record<string, Array<{ id: string; valor: number; data: string; forma: string; observacao?: string }>> = {}
+  for (const row of data) {
+    if (!result[row.encomenda_id]) result[row.encomenda_id] = []
+    result[row.encomenda_id].push({
+      id: row.id,
+      valor: row.valor,
+      data: row.data,
+      forma: row.metodo,
+      observacao: row.motivo_estorno ?? undefined,
+    })
+  }
+  return result
 }
 
 export async function estornarPagamento(pagamentoId: string, motivo: string): Promise<void> {

@@ -9,8 +9,8 @@ import {
 } from "lucide-react";
 import { KanbanWidget } from "@/components/kanban-widget";
 import { formatBRL, categoriaLabel } from "@/lib/utils";
-import { buscarInsumos, type Insumo, type InsumoCategoria } from "@/lib/repositories/insumos";
-import { buscarProdutos, type Produto } from "@/lib/repositories/produtos";
+import { buscarInsumos, criarInsumo, type Insumo, type InsumoCategoria } from "@/lib/repositories/insumos";
+import { buscarProdutos, criarProduto, type Produto } from "@/lib/repositories/produtos";
 import { buscarEncomendas, criarEncomenda, type Encomenda, type EncomendaInput } from "@/lib/repositories/encomendas";
 import { buscarTotalCustosIndiretos } from "@/lib/repositories/financeiro";
 import { NovaEncomendaForm } from "@/components/shared/nova-encomenda-form";
@@ -62,6 +62,12 @@ function Modal({ open, onClose, title, wide, children, footer }: {
 // ── Novo Insumo ───────────────────────────────────────────────
 function NovoInsumoForm({ onClose }: { onClose: () => void }) {
   const [categoria, setCategoria] = useState<InsumoCategoria>("visivel");
+  const [nome, setNome] = useState("");
+  const [unidade, setUnidade] = useState("unidade");
+  const [preco, setPreco] = useState("");
+  const [estoque, setEstoque] = useState("");
+  const [estoqueMin, setEstoqueMin] = useState("");
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const rotativo = categoria === "visivel" || categoria === "invisivel";
 
@@ -74,11 +80,29 @@ function NovoInsumoForm({ onClose }: { onClose: () => void }) {
     </div>
   );
 
+  const handleSubmit = async () => {
+    if (!nome.trim()) return;
+    setSaving(true);
+    try {
+      await criarInsumo({
+        nome: nome.trim(),
+        categoria,
+        unidade,
+        precoAtual: parseFloat(preco) || 0,
+        estoque: estoque ? parseFloat(estoque) : null,
+        estoqueMin: estoqueMin ? parseFloat(estoqueMin) : null,
+      });
+      setSaved(true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <>
       <div className="alm-field">
         <label className="alm-label">Nome *</label>
-        <input autoFocus className="atlas-input" type="text" placeholder="Ex: Papel A4 premium" />
+        <input autoFocus className="atlas-input" type="text" placeholder="Ex: Papel A4 premium" value={nome} onChange={(e) => setNome(e.target.value)} />
       </div>
 
       <div className="alm-field">
@@ -96,24 +120,24 @@ function NovoInsumoForm({ onClose }: { onClose: () => void }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <div className="alm-field">
               <label className="alm-label">Unidade</label>
-              <select className="alm-select">
+              <select className="alm-select" value={unidade} onChange={(e) => setUnidade(e.target.value)}>
                 <option>unidade</option><option>folha</option><option>metro</option>
                 <option>g</option><option>ml</option><option>cm²</option>
               </select>
             </div>
             <div className="alm-field">
               <label className="alm-label">Preço por unidade (R$)</label>
-              <input className="atlas-input" type="number" step="0.01" placeholder="0,00" />
+              <input className="atlas-input" type="number" step="0.01" placeholder="0,00" value={preco} onChange={(e) => setPreco(e.target.value)} />
             </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <div className="alm-field">
               <label className="alm-label">Estoque inicial</label>
-              <input className="atlas-input" type="number" placeholder="0" />
+              <input className="atlas-input" type="number" placeholder="0" value={estoque} onChange={(e) => setEstoque(e.target.value)} />
             </div>
             <div className="alm-field">
               <label className="alm-label">Estoque mínimo</label>
-              <input className="atlas-input" type="number" placeholder="0" />
+              <input className="atlas-input" type="number" placeholder="0" value={estoqueMin} onChange={(e) => setEstoqueMin(e.target.value)} />
             </div>
           </div>
         </>
@@ -122,13 +146,15 @@ function NovoInsumoForm({ onClose }: { onClose: () => void }) {
       {!rotativo && (
         <div className="alm-field">
           <label className="alm-label">Valor de aquisição (R$)</label>
-          <input className="atlas-input" type="number" step="0.01" placeholder="0,00" />
+          <input className="atlas-input" type="number" step="0.01" placeholder="0,00" value={preco} onChange={(e) => setPreco(e.target.value)} />
         </div>
       )}
 
       <div className="alm-modal-footer" style={{ margin: "0 -20px -16px", padding: "12px 20px" }}>
         <button className="atlas-btn atlas-btn-secondary" onClick={onClose}>Cancelar</button>
-        <button className="atlas-btn atlas-btn-primary" onClick={() => setSaved(true)}>Cadastrar insumo</button>
+        <button className="atlas-btn atlas-btn-primary" disabled={!nome.trim() || saving} onClick={handleSubmit}>
+          {saving ? "Cadastrando…" : "Cadastrar insumo"}
+        </button>
       </div>
     </>
   );
@@ -138,6 +164,12 @@ function NovoInsumoForm({ onClose }: { onClose: () => void }) {
 const CATEGORIAS = ["Chaveiro", "Adesivo", "Tag", "Cartão", "Planner", "Kit", "Outro"];
 
 function NovoProdutoForm({ onClose }: { onClose: () => void }) {
+  const [nome, setNome] = useState("");
+  const [categoria, setCategoria] = useState(CATEGORIAS[0]);
+  const [preco, setPreco] = useState("");
+  const [custo, setCusto] = useState("");
+  const [tempo, setTempo] = useState("");
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   if (saved) return (
@@ -149,16 +181,40 @@ function NovoProdutoForm({ onClose }: { onClose: () => void }) {
     </div>
   );
 
+  const precoNum = parseFloat(preco) || 0;
+  const custoNum = parseFloat(custo) || 0;
+  const tempoNum = parseInt(tempo) || 0;
+  const margem = precoNum > 0 ? ((precoNum - custoNum) / precoNum) * 100 : 0;
+
+  const handleSubmit = async () => {
+    if (!nome.trim()) return;
+    setSaving(true);
+    try {
+      await criarProduto({
+        nome: nome.trim(),
+        categoria,
+        receita: [],
+        tempoProducao: tempoNum,
+        custo: custoNum,
+        precoSugerido: precoNum,
+        margem,
+      });
+      setSaved(true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <>
       <div className="alm-field">
         <label className="alm-label">Nome *</label>
-        <input autoFocus className="atlas-input" placeholder="Ex: Kit festa personalizado" />
+        <input autoFocus className="atlas-input" placeholder="Ex: Kit festa personalizado" value={nome} onChange={(e) => setNome(e.target.value)} />
       </div>
 
       <div className="alm-field">
         <label className="alm-label">Categoria</label>
-        <select className="alm-select">
+        <select className="alm-select" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
           {CATEGORIAS.map((c) => <option key={c}>{c}</option>)}
         </select>
       </div>
@@ -166,21 +222,23 @@ function NovoProdutoForm({ onClose }: { onClose: () => void }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
         <div className="alm-field">
           <label className="alm-label">Preço de venda (R$)</label>
-          <input className="atlas-input" type="number" step="0.01" placeholder="0,00" />
+          <input className="atlas-input" type="number" step="0.01" placeholder="0,00" value={preco} onChange={(e) => setPreco(e.target.value)} />
         </div>
         <div className="alm-field">
           <label className="alm-label">Custo (R$)</label>
-          <input className="atlas-input" type="number" step="0.01" placeholder="0,00" />
+          <input className="atlas-input" type="number" step="0.01" placeholder="0,00" value={custo} onChange={(e) => setCusto(e.target.value)} />
         </div>
         <div className="alm-field">
           <label className="alm-label">Tempo (min)</label>
-          <input className="atlas-input" type="number" placeholder="30" />
+          <input className="atlas-input" type="number" placeholder="30" value={tempo} onChange={(e) => setTempo(e.target.value)} />
         </div>
       </div>
 
       <div className="alm-modal-footer" style={{ margin: "0 -20px -16px", padding: "12px 20px" }}>
         <button className="atlas-btn atlas-btn-secondary" onClick={onClose}>Cancelar</button>
-        <button className="atlas-btn atlas-btn-primary" onClick={() => setSaved(true)}>Cadastrar produto</button>
+        <button className="atlas-btn atlas-btn-primary" disabled={!nome.trim() || saving} onClick={handleSubmit}>
+          {saving ? "Cadastrando…" : "Cadastrar produto"}
+        </button>
       </div>
     </>
   );
@@ -231,7 +289,9 @@ export default function DashboardPage() {
       const abertas = encs.filter(e => e.status !== 'entregue' && e.status !== 'cancelado');
       setEncomendasAbertas(abertas);
       setProdutosList(prods);
-      const entregues = encs.filter(e => e.status === 'entregue');
+      const agora = new Date();
+      const anoMesAtual = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
+      const entregues = encs.filter(e => e.status === 'entregue' && e.dataEntrega?.startsWith(anoMesAtual));
       const receita = entregues.reduce((s, e) => s + e.totalCobrado, 0);
       const custo = entregues.reduce((s, e) => s + e.custoProducao, 0);
       setReceitaMes(receita);
@@ -251,7 +311,7 @@ export default function DashboardPage() {
       <div className="alm-page-header">
         <div>
           <h1 className="alm-page-title">Dashboard</h1>
-          <p className="alm-page-subtitle">Visão geral · Junho 2026</p>
+          <p className="alm-page-subtitle">{`Visão geral · ${new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}`}</p>
         </div>
         <div className="atlas-segmented">
           <button className="atlas-segmented-item">Semana</button>
@@ -261,9 +321,9 @@ export default function DashboardPage() {
       </div>
 
       <div className="alm-stats-grid">
-        <StatCard label="Receita do mês" value={formatBRL(receitaMes)} delta="+18,4% vs maio" deltaUp icon={TrendingUp} />
-        <StatCard label="Lucro bruto" value={formatBRL(lucroBruto)} delta="+22,1% vs maio" deltaUp icon={TrendingUp} />
-        <StatCard label="Encomendas abertas" value={String(encomendasAbertas.length)} delta="4 com entrega esta semana" deltaUp={false} icon={ShoppingBag} />
+        <StatCard label="Receita do mês" value={formatBRL(receitaMes)} icon={TrendingUp} />
+        <StatCard label="Lucro bruto" value={formatBRL(lucroBruto)} icon={TrendingUp} />
+        <StatCard label="Encomendas abertas" value={String(encomendasAbertas.length)} icon={ShoppingBag} />
         <StatCard label="Alertas de estoque" value={String(insumosAlerta.length)} icon={AlertTriangle} accent={insumosAlerta.length > 0 ? "error" : undefined} />
       </div>
 
@@ -345,7 +405,7 @@ export default function DashboardPage() {
 
       <div style={{ border: "1px solid var(--border-default)", borderRadius: 6, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: lucroLiquido >= 0 ? "rgba(77,77,77,0.06)" : "rgba(244,71,71,0.06)" }}>
         <div>
-          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: 2 }}>Lucro líquido estimado (junho)</div>
+          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: 2 }}>{`Lucro líquido estimado (${new Date().toLocaleDateString("pt-BR", { month: "long" })})`}</div>
           <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--font-mono)", color: lucroLiquido >= 0 ? "var(--status-success)" : "var(--status-error)" }}>{formatBRL(lucroLiquido)}</div>
         </div>
         <Link href="/financeiro" className="atlas-btn atlas-btn-secondary atlas-btn-sm">Ver financeiro</Link>
