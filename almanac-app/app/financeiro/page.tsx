@@ -47,15 +47,6 @@ function saveManuaisLS(items: Movimentacao[]) {
   localStorage.setItem("almanac_manuais", JSON.stringify(items));
 }
 
-// ── Histórico mock ────────────────────────────────────────────
-const HISTORICO = [
-  { mes: "Jan/26", receita: 1240.0, custoVar: 148.0 },
-  { mes: "Fev/26", receita: 1580.0, custoVar: 195.0 },
-  { mes: "Mar/26", receita: 2100.0, custoVar: 264.0 },
-  { mes: "Abr/26", receita: 1890.0, custoVar: 237.5 },
-  { mes: "Mai/26", receita: 2380.0, custoVar: 312.0 },
-];
-
 // ── Fluxo de caixa helpers ────────────────────────────────────
 const CAT_LABEL: Record<MovCategoria, string> = {
   pagamento_encomenda: "Encomenda",
@@ -80,14 +71,6 @@ type AllPagamentos = Record<
   string,
   Array<{ id: string; valor: number; data: string; forma: string; observacao?: string }>
 >;
-
-function loadAllPagamentos(): AllPagamentos {
-  if (typeof window === "undefined") return {};
-  try {
-    const s = localStorage.getItem("almanac_pagamentos");
-    return s ? JSON.parse(s) : {};
-  } catch { return {}; }
-}
 
 function gerarAutoMovimentacoes(
   custos: CustoIndireto[],
@@ -782,6 +765,18 @@ export default function FinanceiroPage() {
   const receitaMes = encEntregues.reduce((s, e) => s + e.totalCobrado, 0);
   const custoVarMes = encEntregues.reduce((s, e) => s + e.custoProducao, 0);
 
+  const historico = Array.from({ length: 5 }, (_, i) => {
+    const d = new Date(agora.getFullYear(), agora.getMonth() - 5 + i, 1);
+    const anoMes = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const mesLabel = `${MESES_CURTO[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`;
+    const enc = encomendasData.filter((e) => e.status === "entregue" && e.dataEntrega?.startsWith(anoMes));
+    return {
+      mes: mesLabel,
+      receita: enc.reduce((s, e) => s + e.totalCobrado, 0),
+      custoVar: enc.reduce((s, e) => s + e.custoProducao, 0),
+    };
+  });
+
   const totalFixo = custos.reduce((s, c) => s + c.valorMensal, 0);
   const lucroBruto = receitaMes - custoVarMes;
   const lucroLiquido = lucroBruto - totalFixo;
@@ -1185,7 +1180,7 @@ export default function FinanceiroPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {HISTORICO.map((h) => {
+                  {historico.map((h) => {
                     const ll = h.receita - h.custoVar - totalFixo;
                     return (
                       <tr key={h.mes} style={{ cursor: "default" }}>
