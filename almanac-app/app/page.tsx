@@ -289,7 +289,9 @@ export default function DashboardPage() {
       const abertas = encs.filter(e => e.status !== 'entregue' && e.status !== 'cancelado');
       setEncomendasAbertas(abertas);
       setProdutosList(prods);
-      const entregues = encs.filter(e => e.status === 'entregue');
+      const agora = new Date();
+      const anoMesAtual = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
+      const entregues = encs.filter(e => e.status === 'entregue' && e.dataEntrega?.startsWith(anoMesAtual));
       const receita = entregues.reduce((s, e) => s + e.totalCobrado, 0);
       const custo = entregues.reduce((s, e) => s + e.custoProducao, 0);
       setReceitaMes(receita);
