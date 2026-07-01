@@ -55,8 +55,7 @@ const NEXT_LABEL: Partial<Record<EncomendaStatus, string>> = {
 
 // ── Helpers ───────────────────────────────────────────────────
 function formatOrderNumber(id: string): string {
-  const match = id.match(/\d+$/);
-  return match ? `#${match[0].padStart(3, "0")}` : `#${id}`;
+  return `#${id.slice(-6).toUpperCase()}`;
 }
 
 function getDaysLabel(dateStr: string, status: EncomendaStatus): string | null {
@@ -1216,6 +1215,7 @@ export default function EncomendaDetalhePage() {
 
   const handleFotoChange = (src: string | null) => {
     setFoto(src);
+    if (enc) editarEncomenda(enc.id, { foto: src ?? undefined });
   };
 
   const handleStatusAdvance = (nextSt: EncomendaStatus) => {

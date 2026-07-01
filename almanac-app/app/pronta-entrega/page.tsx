@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Plus, Package, X, Check } from "lucide-react";
 import { formatBRL } from "@/lib/utils";
 import { buscarProdutosPE, criarProdutoPE, type ProdutoPE, type ProdutoPEInput } from "@/lib/repositories/pronta-entrega";
@@ -72,6 +73,7 @@ function CadastrarModal({ onClose, onSave }: {
 }
 
 export default function ProntaEntregaPage() {
+  const router = useRouter();
   const [produtos, setProdutos] = useState<ProdutoPE[]>([]);
   const [showModal, setShowModal] = useState(false);
 
@@ -120,7 +122,7 @@ export default function ProntaEntregaPage() {
                 const semEst = p.estoqueAtual === 0;
                 const baixo = !semEst && p.estoqueAtual <= p.estoqueMin;
                 return (
-                  <tr key={p.id} style={{ cursor: "pointer" }}>
+                  <tr key={p.id} style={{ cursor: "pointer" }} onClick={() => router.push(`/pronta-entrega/${p.id}`)}>
                     <td style={{ padding: "0 8px 0 12px" }}>
                       <div style={{ width: 36, height: 36, borderRadius: "var(--radius-sm)", background: "var(--bg-input)", border: "1px solid var(--border-default)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
                         {p.foto ? <img src={p.foto} alt={p.nome} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Package size={15} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />}

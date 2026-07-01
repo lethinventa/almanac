@@ -58,7 +58,7 @@ export function PainelPagamento({
   async function handleAdd() {
     const valor = parseFloat(fValor);
     if (!valor || valor <= 0) return;
-    await registrarPagamento({ encomendaId: recordId, valor, metodo: fMetodo, data: fData });
+    await registrarPagamento({ encomendaId: recordId, valor, metodo: fMetodo, data: fData, observacao: fObs || undefined });
     reload();
     setShowForm(false);
     setFValor("");

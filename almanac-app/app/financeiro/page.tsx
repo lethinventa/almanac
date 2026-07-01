@@ -11,6 +11,7 @@ import {
   type CustoIndireto,
 } from "@/lib/repositories/financeiro";
 import { buscarEncomendas, type Encomenda } from "@/lib/repositories/encomendas";
+import { buscarTodosPagamentos } from "@/lib/repositories/pagamentos";
 
 // ── Types ─────────────────────────────────────────────────────
 type MovCategoria =
@@ -307,7 +308,7 @@ function FluxoCaixaTab({ custos, encomendasData }: { custos: CustoIndireto[]; en
 
   useEffect(() => {
     setManuais(loadManuais());
-    setAllPagamentos(loadAllPagamentos());
+    buscarTodosPagamentos().then(setAllPagamentos);
   }, []);
 
   const autoMovs = useMemo(
@@ -766,12 +767,23 @@ export default function FinanceiroPage() {
     buscarEncomendas().then(setEncomendasData);
   }, []);
 
-  const encEntregues = encomendasData.filter((e) => e.status === "entregue");
-  const receitaJun = encEntregues.reduce((s, e) => s + e.totalCobrado, 0);
-  const custoVarJun = encEntregues.reduce((s, e) => s + e.custoProducao, 0);
+  const agora = new Date();
+  const anoMesAtual = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
+  const MESES_PT = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+  const MESES_CURTO = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  const mesNome = MESES_PT[agora.getMonth()];
+  const mesNomeCapitalized = mesNome.charAt(0).toUpperCase() + mesNome.slice(1);
+  const anoShort = String(agora.getFullYear()).slice(2);
+  const mesCurtoAtual = `${MESES_CURTO[agora.getMonth()]}/${anoShort}`;
+  const mesSubtitle = `${mesNomeCapitalized} ${agora.getFullYear()}`;
+  const mesDRE = `DRE — ${mesNomeCapitalized} ${agora.getFullYear()}`;
+
+  const encEntregues = encomendasData.filter((e) => e.status === "entregue" && e.dataEntrega.startsWith(anoMesAtual));
+  const receitaMes = encEntregues.reduce((s, e) => s + e.totalCobrado, 0);
+  const custoVarMes = encEntregues.reduce((s, e) => s + e.custoProducao, 0);
 
   const totalFixo = custos.reduce((s, c) => s + c.valorMensal, 0);
-  const lucroBruto = receitaJun - custoVarJun;
+  const lucroBruto = receitaMes - custoVarMes;
   const lucroLiquido = lucroBruto - totalFixo;
 
   function startEdit(item: CustoIndireto) {
@@ -817,7 +829,7 @@ export default function FinanceiroPage() {
       <div className="alm-page-header">
         <div>
           <h1 className="alm-page-title">Financeiro</h1>
-          <p className="alm-page-subtitle">Junho 2026</p>
+          <p className="alm-page-subtitle">{mesSubtitle}</p>
         </div>
       </div>
 
@@ -860,11 +872,11 @@ export default function FinanceiroPage() {
           {/* DRE do mês */}
           <div className="atlas-card">
             <div className="atlas-card-header">
-              <span className="atlas-panel-title">DRE — Junho 2026</span>
+              <span className="atlas-panel-title">{mesDRE}</span>
             </div>
             <div className="atlas-card-body">
-              <DRERow label="Receita bruta" value={receitaJun} bold />
-              <DRERow label="Custo de produção" value={custoVarJun} deduction />
+              <DRERow label="Receita bruta" value={receitaMes} bold />
+              <DRERow label="Custo de produção" value={custoVarMes} deduction />
               <DRERow
                 label="Lucro bruto"
                 value={lucroBruto}
@@ -1222,7 +1234,7 @@ export default function FinanceiroPage() {
 
                   <tr style={{ cursor: "default", background: "var(--bg-hover)" }}>
                     <td style={{ fontWeight: 600 }}>
-                      Jun/26{" "}
+                      {mesCurtoAtual}{" "}
                       <span
                         style={{
                           fontSize: 10,
@@ -1237,7 +1249,7 @@ export default function FinanceiroPage() {
                       className="num"
                       style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}
                     >
-                      {formatBRL(receitaJun)}
+                      {formatBRL(receitaMes)}
                     </td>
                     <td
                       className="num"
@@ -1246,7 +1258,7 @@ export default function FinanceiroPage() {
                         color: "var(--text-tertiary)",
                       }}
                     >
-                      {formatBRL(custoVarJun)}
+                      {formatBRL(custoVarMes)}
                     </td>
                     <td
                       className="num"
