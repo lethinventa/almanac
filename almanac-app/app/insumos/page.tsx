@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Package,
   Plus,
@@ -13,6 +14,8 @@ import {
   SlidersHorizontal,
   History,
   ImagePlus,
+  MoreVertical,
+  Trash2,
 } from "lucide-react";
 import {
   formatBRL,
@@ -23,6 +26,7 @@ import {
   buscarInsumos,
   criarInsumo,
   editarInsumo,
+  deletarInsumo,
   type Insumo,
   type InsumoCategoria,
 } from "@/lib/repositories/insumos";
@@ -420,6 +424,141 @@ function NovoInsumoContent({
   );
 }
 
+// ─── Menu de ações da linha ────────────────────────────────────
+function RowActionsMenu({
+  insumo,
+  onAction,
+}: {
+  insumo: Insumo;
+  onAction: (action: "detalhe" | "entrada" | "ajuste" | "preco" | "excluir") => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const rotativo = insumo.categoria === "visivel" || insumo.categoria === "invisivel";
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (
+        btnRef.current && !btnRef.current.contains(e.target as Node) &&
+        menuRef.current && !menuRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    function handleScroll() {
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    window.addEventListener("keydown", handleKey);
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      window.removeEventListener("keydown", handleKey);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [open]);
+
+  function toggle() {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setCoords({ top: rect.bottom + 4, left: rect.right - 180 });
+    }
+    setOpen((v) => !v);
+  }
+
+  function select(action: "detalhe" | "entrada" | "ajuste" | "preco" | "excluir") {
+    setOpen(false);
+    onAction(action);
+  }
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        className="atlas-btn atlas-btn-icon atlas-btn-sm"
+        title="Ações"
+        onClick={(e) => { e.stopPropagation(); toggle(); }}
+      >
+        <MoreVertical size={13} strokeWidth={1.5} />
+      </button>
+
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "fixed", top: coords.top, left: coords.left,
+            minWidth: 180,
+            background: "var(--bg-raised)",
+            border: "1px solid var(--border-default)",
+            borderRadius: "var(--radius-sm)",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
+            zIndex: 1000, overflow: "hidden",
+          }}
+        >
+          <MenuItem onClick={() => select("detalhe")} icon={<ChevronRight size={13} strokeWidth={1.5} />}>
+            Ver detalhe
+          </MenuItem>
+          {rotativo && (
+            <>
+              <MenuItem onClick={() => select("entrada")} icon={<ArrowDownToLine size={13} strokeWidth={1.5} />}>
+                Registrar entrada
+              </MenuItem>
+              <MenuItem onClick={() => select("ajuste")} icon={<SlidersHorizontal size={13} strokeWidth={1.5} />}>
+                Ajuste manual
+              </MenuItem>
+              <MenuItem onClick={() => select("preco")} icon={<TrendingUp size={13} strokeWidth={1.5} />}>
+                Atualizar preço
+              </MenuItem>
+            </>
+          )}
+          <hr className="atlas-divider" style={{ margin: 0 }} />
+          <MenuItem onClick={() => select("excluir")} icon={<Trash2 size={13} strokeWidth={1.5} />} danger>
+            Excluir insumo
+          </MenuItem>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+function MenuItem({
+  onClick,
+  icon,
+  danger,
+  children,
+}: {
+  onClick: () => void;
+  icon: React.ReactNode;
+  danger?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: "100%", display: "flex", alignItems: "center", gap: 8,
+        padding: "8px 12px",
+        background: "none", border: "none", cursor: "pointer",
+        fontSize: 12.5, textAlign: "left",
+        color: danger ? "var(--status-error)" : "var(--text-primary)",
+      }}
+      onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.background = danger ? "rgba(244,71,71,0.08)" : "var(--bg-hover)"}
+      onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.background = "none"}
+    >
+      {icon}
+      {children}
+    </button>
+  );
+}
+
 // ─── Página principal ─────────────────────────────────────────
 const filtros = ["Todos", "Rotativo visível", "Rotativo invisível", "Ferramenta", "Maquinário"] as const;
 type Filtro = (typeof filtros)[number];
@@ -440,6 +579,8 @@ export default function InsumosPage() {
   const [selected, setSelected] = useState<Insumo | null>(null);
   const [mode, setMode]         = useState<ModalMode>("detalhe");
   const [erroSalvar, setErroSalvar] = useState<string>("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
 
   // Refs para o modal "Novo insumo"
   const novoNomeRef       = useRef<HTMLInputElement>(null);
@@ -542,6 +683,19 @@ export default function InsumosPage() {
     }
   }
 
+  async function handleExcluir(id: string) {
+    setExcluindo(true);
+    try {
+      await deletarInsumo(id);
+      await refresh();
+      setConfirmDeleteId(null);
+    } catch (err) {
+      console.error("Erro ao excluir insumo:", err);
+    } finally {
+      setExcluindo(false);
+    }
+  }
+
   const alertaCount = insumos.filter(isAlerta).length;
   const isOpen = selected !== null || mode === "novo";
 
@@ -617,6 +771,36 @@ export default function InsumosPage() {
               <tbody>
                 {lista.map((insumo) => {
                   const alerta = isAlerta(insumo);
+
+                  if (confirmDeleteId === insumo.id) {
+                    return (
+                      <tr key={insumo.id} style={{ cursor: "default", background: "rgba(244,71,71,0.04)" }}>
+                        <td colSpan={5} style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                          Excluir <strong>{insumo.nome}</strong>?
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+                            <button
+                              className="atlas-btn atlas-btn-sm"
+                              style={{ background: "var(--status-error)", color: "#fff", border: "none", fontSize: 11 }}
+                              onClick={() => handleExcluir(insumo.id)}
+                              disabled={excluindo}
+                            >
+                              {excluindo ? "Excluindo…" : "Excluir"}
+                            </button>
+                            <button
+                              className="atlas-btn atlas-btn-ghost atlas-btn-sm"
+                              onClick={() => setConfirmDeleteId(null)}
+                              disabled={excluindo}
+                            >
+                              Não
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+
                   return (
                     <tr key={insumo.id} onClick={() => open(insumo, "detalhe")}>
                       <td>
@@ -640,27 +824,14 @@ export default function InsumosPage() {
                         {formatBRL(insumo.precoAtual)}/{insumo.unidade === "—" ? "un." : insumo.unidade}
                       </td>
                       <td>
-                        <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end" }}>
-                          {(insumo.categoria === "visivel" || insumo.categoria === "invisivel") && (
-                            <>
-                              <button className="atlas-btn atlas-btn-icon atlas-btn-sm" title="Registrar entrada"
-                                onClick={(e) => { e.stopPropagation(); open(insumo, "entrada"); }}>
-                                <ArrowDownToLine size={13} strokeWidth={1.5} />
-                              </button>
-                              <button className="atlas-btn atlas-btn-icon atlas-btn-sm" title="Ajuste manual"
-                                onClick={(e) => { e.stopPropagation(); open(insumo, "ajuste"); }}>
-                                <SlidersHorizontal size={13} strokeWidth={1.5} />
-                              </button>
-                              <button className="atlas-btn atlas-btn-icon atlas-btn-sm" title="Atualizar preço"
-                                onClick={(e) => { e.stopPropagation(); open(insumo, "preco"); }}>
-                                <TrendingUp size={13} strokeWidth={1.5} />
-                              </button>
-                            </>
-                          )}
-                          <button className="atlas-btn atlas-btn-icon atlas-btn-sm" title="Ver detalhe"
-                            onClick={(e) => { e.stopPropagation(); open(insumo, "detalhe"); }}>
-                            <ChevronRight size={13} strokeWidth={1.5} />
-                          </button>
+                        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                          <RowActionsMenu
+                            insumo={insumo}
+                            onAction={(action) => {
+                              if (action === "excluir") setConfirmDeleteId(insumo.id);
+                              else open(insumo, action);
+                            }}
+                          />
                         </div>
                       </td>
                     </tr>
