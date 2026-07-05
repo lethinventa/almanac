@@ -259,6 +259,13 @@ function EntradaContent({ insumo, qtdRef, precoRef }: {
   qtdRef: React.RefObject<HTMLInputElement | null>;
   precoRef: React.RefObject<HTMLInputElement | null>;
 }) {
+  const [qtd, setQtd] = useState("");
+  const [valorTotal, setValorTotal] = useState("");
+
+  const qtdNum = parseFloat(qtd);
+  const valorNum = parseFloat(valorTotal);
+  const precoUnitario = qtdNum > 0 && valorNum > 0 ? valorNum / qtdNum : null;
+
   return (
     <>
       <div className="atlas-alert atlas-alert-info">
@@ -267,14 +274,38 @@ function EntradaContent({ insumo, qtdRef, precoRef }: {
           Estoque atual de <strong>{insumo.nome}</strong>: <strong>{insumo.estoque} {insumo.unidade}</strong>.
         </div>
       </div>
-      <div className="alm-field">
-        <label className="alm-label">Quantidade adquirida ({insumo.unidade})</label>
-        <input ref={qtdRef} className="atlas-input" type="number" placeholder="0" min="0" autoFocus />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+        <div className="alm-field">
+          <label className="alm-label">Quantidade recebida</label>
+          <input
+            ref={qtdRef}
+            className="atlas-input"
+            type="number"
+            placeholder="0"
+            min="0"
+            autoFocus
+            onChange={(e) => setQtd(e.target.value)}
+          />
+        </div>
+        <div className="alm-field">
+          <label className="alm-label">Valor total pago (R$)</label>
+          <input
+            ref={precoRef}
+            className="atlas-input"
+            type="number"
+            placeholder="0,00"
+            step="0.01"
+            onChange={(e) => setValorTotal(e.target.value)}
+          />
+        </div>
       </div>
-      <div className="alm-field">
-        <label className="alm-label">Valor pago por {insumo.unidade} (R$) — atualiza preço</label>
-        <input ref={precoRef} className="atlas-input" type="number" placeholder={String(insumo.precoAtual)} step="0.01" />
-      </div>
+      {precoUnitario !== null && (
+        <div className="atlas-alert atlas-alert-info" style={{ padding: "8px 10px" }}>
+          <div className="atlas-alert-desc" style={{ fontSize: "12px" }}>
+            Preço atualizado: <strong>{formatBRL(precoUnitario)} / {insumo.unidade}</strong>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -349,7 +380,13 @@ function NovoInsumoContent({
 }) {
   const [categoria, setCategoria] = useState<InsumoCategoria>("visivel");
   const [foto, setFoto] = useState<string | null>(null);
+  const [estoqueInicial, setEstoqueInicial] = useState("");
+  const [valorTotal, setValorTotal] = useState("");
   const rotativo = categoria === "visivel" || categoria === "invisivel";
+
+  const estoqueNum = parseFloat(estoqueInicial);
+  const valorNum = parseFloat(valorTotal);
+  const precoUnitario = estoqueNum > 0 && valorNum > 0 ? valorNum / estoqueNum : null;
 
   function handleCategoriaChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const val = e.target.value as InsumoCategoria;
@@ -383,32 +420,57 @@ function NovoInsumoContent({
 
       {rotativo && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-            <div className="alm-field">
-              <label className="alm-label">Unidade</label>
-              <select ref={unidadeRef} className="alm-select">
-                <option>unidade</option>
-                <option>folha</option>
-                <option>metro</option>
-                <option>g</option>
-                <option>ml</option>
-                <option>cm²</option>
-              </select>
-            </div>
-            <div className="alm-field">
-              <label className="alm-label">Preço por unidade (R$)</label>
-              <input ref={precoRef} className="atlas-input" type="number" step="0.01" placeholder="0,00" />
-            </div>
+          <div className="alm-field">
+            <label className="alm-label">Unidade</label>
+            <select ref={unidadeRef} className="alm-select">
+              <option>unidade</option>
+              <option>folha</option>
+              <option>metro</option>
+              <option>g</option>
+              <option>ml</option>
+              <option>cm²</option>
+            </select>
+          </div>
+
+          <hr className="atlas-divider" />
+
+          <div style={{ fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>
+            Compra inicial
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
             <div className="alm-field">
-              <label className="alm-label">Estoque inicial</label>
-              <input ref={estoqueRef} className="atlas-input" type="number" placeholder="0" />
+              <label className="alm-label">Quantidade recebida</label>
+              <input
+                ref={estoqueRef}
+                className="atlas-input"
+                type="number"
+                placeholder="0"
+                onChange={(e) => setEstoqueInicial(e.target.value)}
+              />
             </div>
             <div className="alm-field">
-              <label className="alm-label">Estoque mínimo</label>
-              <input ref={estoqueMinRef} className="atlas-input" type="number" placeholder="0" />
+              <label className="alm-label">Valor total pago (R$)</label>
+              <input
+                ref={precoRef}
+                className="atlas-input"
+                type="number"
+                step="0.01"
+                placeholder="0,00"
+                onChange={(e) => setValorTotal(e.target.value)}
+              />
             </div>
+          </div>
+          {precoUnitario !== null && (
+            <div className="atlas-alert atlas-alert-info" style={{ padding: "8px 10px" }}>
+              <div className="atlas-alert-desc" style={{ fontSize: "12px" }}>
+                Preço calculado: <strong>{formatBRL(precoUnitario)} / {unidadeRef.current?.value ?? "unidade"}</strong>
+              </div>
+            </div>
+          )}
+
+          <div className="alm-field">
+            <label className="alm-label">Estoque mínimo</label>
+            <input ref={estoqueMinRef} className="atlas-input" type="number" placeholder="0" />
           </div>
         </>
       )}
@@ -632,11 +694,16 @@ export default function InsumosPage() {
         const nome      = novoNomeRef.current?.value.trim() ?? "";
         const categoria = (novoCategoriaRef.current?.value ?? "visivel") as InsumoCategoria;
         const unidade   = novoUnidadeRef.current?.value ?? "unidade";
-        const preco     = parseFloat(novoPrecoRef.current?.value ?? "0") || 0;
+        const rotativo  = categoria === "visivel" || categoria === "invisivel";
+        const valorTotal = parseFloat(novoPrecoRef.current?.value ?? "0") || 0;
         const estoque   = novoEstoqueRef.current?.value ? parseFloat(novoEstoqueRef.current.value) : null;
         const estoqueMin = novoEstoqueMinRef.current?.value ? parseFloat(novoEstoqueMinRef.current.value) : null;
 
         if (!nome) return;
+
+        // Para insumos rotativos, o valor informado é o total pago pelo lote —
+        // o preço por unidade é derivado dividindo pela quantidade recebida.
+        const preco = rotativo && estoque ? valorTotal / estoque : valorTotal;
 
         await criarInsumo({ nome, categoria, unidade, precoAtual: preco, estoque, estoqueMin });
         await refresh();
@@ -647,12 +714,12 @@ export default function InsumosPage() {
       if (!selected) return;
 
       if (mode === "entrada") {
-        const qtd   = parseFloat(entradaQtdRef.current?.value ?? "0") || 0;
-        const preco = parseFloat(entradaPrecoRef.current?.value ?? "0") || 0;
+        const qtd        = parseFloat(entradaQtdRef.current?.value ?? "0") || 0;
+        const valorTotal = parseFloat(entradaPrecoRef.current?.value ?? "0") || 0;
         const novoEstoque = (selected.estoque ?? 0) + qtd;
 
         const updates: Parameters<typeof editarInsumo>[1] = { estoque: novoEstoque };
-        if (preco > 0) updates.precoAtual = preco;
+        if (valorTotal > 0 && qtd > 0) updates.precoAtual = valorTotal / qtd;
 
         await editarInsumo(selected.id, updates);
         await refresh();
