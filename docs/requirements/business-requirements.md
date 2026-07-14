@@ -23,13 +23,39 @@ A SaaS platform that gives independent makers — regardless of craft type — a
 
 ## What's in v1?
 
-- Workshop setup (fixed costs, hourly rate, price multiplier)
-- Supply management (catalog, stock, purchase history, cost tracking)
-- Product catalog (costing + suggested pricing)
-- Custom order pipeline (pending → in production → delivered)
-- Financial overview dashboard
+### Authentication
+- Login
 
-**Not in v1:** ready-stock POS flow, multi-user workshops, accounting integrations.
+### Workshop setup
+- Set costs (one-time and periodic)
+- Set hourly labor rate
+- Set monthly working hours
+
+### Supply management
+
+Supplies are either **materials** or **tools**. For each:
+- Register a supply item
+- Register a purchase of a supply item
+- Edit a supply item or one of its purchases
+- Delete a supply item or its purchases
+
+### Product catalog
+- Register a product with a suggested price based on fixed and supply costs
+- Differentiate between simple and complex products (a complex product is made up of simpler ones)
+- Edit a product
+- Delete a product
+
+### Order management
+- Create order
+- Edit order
+- Delete order
+
+### Financial overview
+- See revenue, costs, and margin across all orders
+- See cash flow position (net result after fixed costs)
+- See payment history
+
+**Not in v1:** ready-stock POS flow, multi-user workshops, signup/password recovery, accounting integrations.
 
 ## Open questions
 
