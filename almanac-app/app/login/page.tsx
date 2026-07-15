@@ -2,16 +2,14 @@
 
 import { useState, FormEvent } from "react";
 import { BookMarked } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
-  const supabase = createClient();
+  const { login } = useAuth();
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -21,16 +19,7 @@ export default function LoginPage() {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password: senha,
-    });
-    if (error) {
-      setErro("E-mail ou senha incorretos.");
-      setLoading(false);
-    } else {
-      router.push("/");
-    }
+    login(email.trim());
   }
 
   return (

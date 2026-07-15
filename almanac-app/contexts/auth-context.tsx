@@ -2,12 +2,12 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import type { User } from "@supabase/supabase-js";
+import { getSession, saveSession, clearSession, type User } from "@/lib/auth";
 
 interface AuthCtx {
   user: User | null;
   ready: boolean;
+  login: (email: string) => void;
   logout: () => void;
 }
 
@@ -18,30 +18,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const supabase = createClient();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setReady(true);
-    });
+    const session = getSession();
+    setUser(session);
+    setReady(true);
+    if (!session && pathname !== "/login") router.replace("/login");
+    if (session && pathname === "/login") router.replace("/");
+  }, [pathname]);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (!session && pathname !== "/login") router.replace("/login");
-      if (session && pathname === "/login") router.replace("/");
-    });
+  function login(email: string) {
+    const session = { email };
+    saveSession(session);
+    setUser(session);
+    router.push("/");
+  }
 
-    return () => subscription.unsubscribe();
-  }, []);
-
-  async function logout() {
-    await supabase.auth.signOut();
+  function logout() {
+    clearSession();
+    setUser(null);
     router.push("/login");
   }
 
   return (
-    <AuthContext.Provider value={{ user, ready, logout }}>
+    <AuthContext.Provider value={{ user, ready, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

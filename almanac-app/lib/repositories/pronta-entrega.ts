@@ -1,100 +1,62 @@
-import { createClient } from '@/lib/supabase/client'
+import { createStore, newId } from "@/lib/mock-store";
+import { produtosPeSeed } from "@/lib/data";
 
 export interface ProdutoPE {
-  id: string
-  nome: string
-  descricao?: string
-  foto?: string
-  precoVenda: number
-  estoqueAtual: number
-  estoqueMin: number
+  id: string;
+  nome: string;
+  descricao?: string;
+  foto?: string;
+  precoVenda: number;
+  estoqueAtual: number;
+  estoqueMin: number;
 }
 
 export interface ProdutoPEInput {
-  nome: string
-  descricao?: string
-  foto?: string
-  precoVenda: number
-  estoqueAtual: number
-  estoqueMin: number
+  nome: string;
+  descricao?: string;
+  foto?: string;
+  precoVenda: number;
+  estoqueAtual: number;
+  estoqueMin: number;
 }
 
-function mapRow(row: {
-  id: string
-  nome: string
-  descricao: string | null
-  foto: string | null
-  preco_venda: number
-  estoque_atual: number
-  estoque_min: number
-}): ProdutoPE {
-  return {
-    id: row.id,
-    nome: row.nome,
-    descricao: row.descricao ?? undefined,
-    foto: row.foto ?? undefined,
-    precoVenda: row.preco_venda,
-    estoqueAtual: row.estoque_atual,
-    estoqueMin: row.estoque_min,
-  }
-}
+const store = createStore<ProdutoPE>("almanac_produtos_pe", produtosPeSeed);
 
 export async function buscarProdutosPE(): Promise<ProdutoPE[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from('produtos_pe').select('*').order('nome')
-  if (error || !data) return []
-  return data.map(mapRow)
+  return store.list().slice().sort((a, b) => a.nome.localeCompare(b.nome));
 }
 
 export async function buscarProdutoPE(id: string): Promise<ProdutoPE | null> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from('produtos_pe').select('*').eq('id', id).single()
-  if (error || !data) return null
-  return mapRow(data)
+  return store.find(id);
 }
 
 export async function criarProdutoPE(dados: ProdutoPEInput): Promise<ProdutoPE> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('produtos_pe')
-    .insert({
-      nome: dados.nome,
-      descricao: dados.descricao ?? null,
-      foto: dados.foto ?? null,
-      preco_venda: dados.precoVenda,
-      estoque_atual: dados.estoqueAtual,
-      estoque_min: dados.estoqueMin,
-    })
-    .select()
-    .single()
-
-  if (error || !data) throw new Error(error?.message ?? 'Erro ao criar produto PE')
-  return mapRow(data)
+  const produto: ProdutoPE = {
+    id: newId(),
+    nome: dados.nome,
+    descricao: dados.descricao,
+    foto: dados.foto,
+    precoVenda: dados.precoVenda,
+    estoqueAtual: dados.estoqueAtual,
+    estoqueMin: dados.estoqueMin,
+  };
+  return store.insert(produto);
 }
 
 export async function editarProdutoPE(id: string, dados: Partial<ProdutoPEInput>): Promise<ProdutoPE> {
-  const supabase = createClient()
-  const update: Record<string, unknown> = {}
-  if (dados.nome !== undefined) update.nome = dados.nome
-  if ('descricao' in dados) update.descricao = dados.descricao ?? null
-  if ('foto' in dados) update.foto = dados.foto ?? null
-  if (dados.precoVenda !== undefined) update.preco_venda = dados.precoVenda
-  if (dados.estoqueAtual !== undefined) update.estoque_atual = dados.estoqueAtual
-  if (dados.estoqueMin !== undefined) update.estoque_min = dados.estoqueMin
+  const patch: Partial<ProdutoPE> = {};
+  if (dados.nome !== undefined) patch.nome = dados.nome;
+  if ("descricao" in dados) patch.descricao = dados.descricao;
+  if ("foto" in dados) patch.foto = dados.foto;
+  if (dados.precoVenda !== undefined) patch.precoVenda = dados.precoVenda;
+  if (dados.estoqueAtual !== undefined) patch.estoqueAtual = dados.estoqueAtual;
+  if (dados.estoqueMin !== undefined) patch.estoqueMin = dados.estoqueMin;
 
-  const { data, error } = await supabase
-    .from('produtos_pe')
-    .update(update)
-    .eq('id', id)
-    .select()
-    .single()
-
-  if (error || !data) throw new Error(error?.message ?? 'Erro ao editar produto PE')
-  return mapRow(data)
+  const updated = store.update(id, patch);
+  if (!updated) throw new Error("Produto PE não encontrado");
+  return updated;
 }
 
 export async function deletarProdutoPE(id: string): Promise<void> {
-  const supabase = createClient()
-  const { error } = await supabase.from('produtos_pe').delete().eq('id', id)
-  if (error) throw new Error(error.message)
+  store.remove(id);
 }

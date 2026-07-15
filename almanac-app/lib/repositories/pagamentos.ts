@@ -1,109 +1,64 @@
-import { createClient } from '@/lib/supabase/client'
+import { createStore, newId } from "@/lib/mock-store";
+import { pagamentosSeed } from "@/lib/data";
 
 export interface Pagamento {
-  id: string
-  encomendaId: string
-  valor: number
-  metodo: 'pix' | 'dinheiro' | 'cartao'
-  data: string
-  tipo: 'recebimento' | 'estorno'
-  motivoEstorno?: string
+  id: string;
+  encomendaId: string;
+  valor: number;
+  metodo: "pix" | "dinheiro" | "cartao";
+  data: string;
+  tipo: "recebimento" | "estorno";
+  motivoEstorno?: string;
 }
 
 export interface PagamentoInput {
-  encomendaId: string
-  valor: number
-  metodo: 'pix' | 'dinheiro' | 'cartao'
-  data: string
-  observacao?: string
+  encomendaId: string;
+  valor: number;
+  metodo: "pix" | "dinheiro" | "cartao";
+  data: string;
+  observacao?: string;
 }
 
+const store = createStore<Pagamento>("almanac_pagamentos", pagamentosSeed);
+
 export async function buscarPagamentos(encomendaId: string): Promise<Pagamento[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('encomenda_pagamentos')
-    .select('*')
-    .eq('encomenda_id', encomendaId)
-    .order('created_at')
-
-  if (error || !data) return []
-
-  return data.map(row => ({
-    id: row.id,
-    encomendaId: row.encomenda_id,
-    valor: row.valor,
-    metodo: row.metodo as 'pix' | 'dinheiro' | 'cartao',
-    data: row.data,
-    tipo: row.tipo as 'recebimento' | 'estorno',
-    motivoEstorno: row.motivo_estorno ?? undefined,
-  }))
+  return store.list().filter((p) => p.encomendaId === encomendaId);
 }
 
 export async function registrarPagamento(dados: PagamentoInput): Promise<Pagamento> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('encomenda_pagamentos')
-    .insert({
-      encomenda_id: dados.encomendaId,
-      valor: dados.valor,
-      metodo: dados.metodo,
-      data: dados.data,
-      tipo: 'recebimento',
-    })
-    .select()
-    .single()
-
-  if (error || !data) throw new Error(error?.message ?? 'Erro ao registrar pagamento')
-
-  return {
-    id: data.id,
-    encomendaId: data.encomenda_id,
-    valor: data.valor,
-    metodo: data.metodo as 'pix' | 'dinheiro' | 'cartao',
-    data: data.data,
-    tipo: 'recebimento',
-  }
+  const pagamento: Pagamento = {
+    id: newId(),
+    encomendaId: dados.encomendaId,
+    valor: dados.valor,
+    metodo: dados.metodo,
+    data: dados.data,
+    tipo: "recebimento",
+  };
+  return store.insert(pagamento);
 }
 
-export async function buscarTodosPagamentos(): Promise<Record<string, Array<{ id: string; valor: number; data: string; forma: string; observacao?: string }>>> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('encomenda_pagamentos')
-    .select('*')
-    .order('created_at')
-
-  if (error || !data) return {}
-
-  const result: Record<string, Array<{ id: string; valor: number; data: string; forma: string; observacao?: string }>> = {}
-  for (const row of data) {
-    if (!result[row.encomenda_id]) result[row.encomenda_id] = []
-    result[row.encomenda_id].push({
-      id: row.id,
-      valor: row.valor,
-      data: row.data,
-      forma: row.metodo,
-      observacao: row.motivo_estorno ?? undefined,
-    })
+export async function buscarTodosPagamentos(): Promise<
+  Record<string, Array<{ id: string; valor: number; data: string; forma: string; observacao?: string }>>
+> {
+  const result: Record<string, Array<{ id: string; valor: number; data: string; forma: string; observacao?: string }>> = {};
+  for (const p of store.list()) {
+    if (!result[p.encomendaId]) result[p.encomendaId] = [];
+    result[p.encomendaId].push({ id: p.id, valor: p.valor, data: p.data, forma: p.metodo, observacao: p.motivoEstorno });
   }
-  return result
+  return result;
 }
 
 export async function estornarPagamento(pagamentoId: string, motivo: string): Promise<void> {
-  const supabase = createClient()
-  const { data: original } = await supabase
-    .from('encomenda_pagamentos')
-    .select('*')
-    .eq('id', pagamentoId)
-    .single()
+  const original = store.find(pagamentoId);
+  if (!original) throw new Error("Pagamento não encontrado");
 
-  if (!original) throw new Error('Pagamento não encontrado')
-
-  await supabase.from('encomenda_pagamentos').insert({
-    encomenda_id: original.encomenda_id,
+  store.insert({
+    id: newId(),
+    encomendaId: original.encomendaId,
     valor: -Math.abs(original.valor),
     metodo: original.metodo,
     data: new Date().toISOString().slice(0, 10),
-    tipo: 'estorno',
-    motivo_estorno: motivo,
-  })
+    tipo: "estorno",
+    motivoEstorno: motivo,
+  });
 }

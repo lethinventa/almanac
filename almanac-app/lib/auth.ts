@@ -1,7 +1,5 @@
 export interface User {
-  nome: string;
   email: string;
-  role: "proprietaria";
 }
 
 const KEY = "almanac_session";
@@ -20,12 +18,4 @@ export function saveSession(user: User): void {
 
 export function clearSession(): void {
   localStorage.removeItem(KEY);
-}
-
-export function getInitials(nome: string): string {
-  return nome
-    .split(" ")
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("");
 }
