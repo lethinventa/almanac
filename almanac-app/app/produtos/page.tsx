@@ -32,7 +32,6 @@ const DEFAULT_CONFIGURACOES: Configuracoes = {
 
 import {
   buscarProdutos,
-  criarProduto,
   editarProduto,
   deletarProduto,
   registrarLote,
@@ -41,8 +40,9 @@ import {
   type Etapas3D,
 } from "@/lib/repositories/produtos";
 import { buscarInsumos, type Insumo } from "@/lib/repositories/insumos";
+import { ProdutoWizardModal } from "@/components/produto-wizard/produto-wizard-modal";
 
-type ModalMode = "detalhe" | "novo" | "editar" | null;
+type ModalMode = "detalhe" | "editar" | null;
 
 interface ReceitaRow {
   insumoId: string;
@@ -1328,6 +1328,7 @@ export default function ProdutosPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [categorias, setCategorias] = useState<string[]>(CATEGORIAS_DEFAULT);
   const [showLoteForm, setShowLoteForm] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -1415,9 +1416,7 @@ export default function ProdutosPage() {
     setSaving(true);
     setErro(null);
     try {
-      if (mode === "novo") {
-        await criarProduto(campos);
-      } else if (mode === "editar" && selected) {
+      if (mode === "editar" && selected) {
         await editarProduto(selected.id, campos);
       }
       close();
@@ -1489,7 +1488,7 @@ export default function ProdutosPage() {
         <button
           className="atlas-btn atlas-btn-primary atlas-btn-sm"
           style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-          onClick={() => setMode("novo")}
+          onClick={() => setWizardOpen(true)}
           disabled={saving}
         >
           <Plus size={13} strokeWidth={1.5} />
@@ -1952,18 +1951,7 @@ export default function ProdutosPage() {
         )}
       </Modal>
 
-      {/* Modal novo produto */}
-      <Modal open={mode === "novo"} onClose={close} title="Novo produto" wide>
-        <ProdutoFormContent
-          categorias={categorias}
-          insumos={insumos}
-          config={config}
-          totalCustos={totalCustos}
-          onSave={handleSave}
-          onClose={close}
-          onAddCategoria={handleAddCategoria}
-        />
-      </Modal>
+      <ProdutoWizardModal open={wizardOpen} onClose={() => setWizardOpen(false)} />
 
       {/* Modal editar produto */}
       <Modal

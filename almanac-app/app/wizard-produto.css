@@ -1,0 +1,493 @@
+/* ==========================================================================
+   Wizard de cadastro de produto — mockup
+   Reaproveita tokens do Atlas (cores, espaçamento, easing). Layout próprio:
+   Typeform (uma pergunta por vez) + resumo estilo checkout.
+   ========================================================================== */
+
+.alm-wizard-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -48%) scale(0.97);
+  width: 94vw;
+  max-width: 1100px;
+  height: 88vh;
+  max-height: 760px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg, 6px);
+  box-shadow: var(--shadow-overlay);
+  z-index: calc(var(--z-overlay, 100) + 1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    opacity 260ms var(--ease-out-expo),
+    transform 340ms var(--ease-spring);
+}
+.alm-wizard-modal.is-open {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* ── Header: progresso + fechar ─────────────────────────── */
+.alm-wizard-header {
+  flex-shrink: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.alm-wizard-progress-track {
+  flex: 1;
+  max-width: 320px;
+}
+
+.alm-wizard-progress-label {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Corpo: pergunta + resumo lado a lado ───────────────── */
+.alm-wizard-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  min-height: 0;
+}
+
+.alm-wizard-question-pane {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 40px;
+  min-height: 0;
+}
+
+.alm-wizard-question-inner {
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.alm-wizard-question-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.alm-wizard-question-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: -12px;
+  line-height: 1.5;
+}
+
+/* Step transition — nova pergunta entra com fade + slide-up sutil */
+.alm-wizard-step {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 220ms var(--ease-standard), transform 260ms var(--ease-apple);
+}
+.alm-wizard-step.is-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Resumo lateral (desktop) ───────────────────────────── */
+.alm-wizard-resumo {
+  border-left: 1px solid var(--border-default);
+  background: var(--bg-input);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.alm-wizard-resumo-header {
+  flex-shrink: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border-default);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+}
+
+.alm-wizard-resumo-lines {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.alm-wizard-resumo-empty {
+  padding: 20px 4px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.6;
+}
+
+.alm-wizard-resumo-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 0;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 12px;
+  animation: wizardLineIn 320ms var(--ease-out-expo);
+}
+.alm-wizard-resumo-line:first-child { border-top: none; }
+
+.alm-wizard-resumo-line-label {
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.alm-wizard-resumo-line-value {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+@keyframes wizardLineIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.alm-wizard-resumo-total {
+  flex-shrink: 0;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border-default);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.alm-wizard-resumo-total-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+
+.alm-wizard-resumo-total-value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Resumo mobile (barra colapsável no rodapé) ─────────── */
+.alm-wizard-resumo-mobile { display: none; }
+
+/* ── Cards de bifurcação ─────────────────────────────────── */
+.alm-wizard-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.alm-wizard-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg, 6px);
+  background: var(--bg-input);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease, transform 140ms ease;
+}
+.alm-wizard-card:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+  transform: translateY(-1px);
+}
+.alm-wizard-card svg { color: var(--text-tertiary); }
+.alm-wizard-card-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.alm-wizard-card-desc { font-size: 11px; color: var(--text-tertiary); }
+.alm-wizard-card.is-selected {
+  border-color: var(--accent-highlight);
+  background: var(--accent-highlight-muted);
+}
+.alm-wizard-card.is-selected svg { color: var(--accent-highlight); }
+
+/* ── Botões sim/não grandes ──────────────────────────────── */
+.alm-wizard-simnao {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.alm-wizard-simnao-btn {
+  height: 56px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md, 4px);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+.alm-wizard-simnao-btn:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+.alm-wizard-simnao-btn.is-selected-yes {
+  border-color: var(--accent-highlight);
+  background: var(--accent-highlight-muted);
+  color: var(--accent-highlight);
+}
+.alm-wizard-simnao-btn.is-selected-no {
+  border-color: var(--border-strong);
+  background: var(--bg-active);
+}
+
+/* ── Busca de insumo (autocomplete) ──────────────────────── */
+.alm-wizard-suggest-list {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md, 4px);
+  background: var(--bg-input);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.alm-wizard-suggest-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  border-top: 1px solid var(--border-subtle);
+}
+.alm-wizard-suggest-item:first-child { border-top: none; }
+.alm-wizard-suggest-item:hover { background: var(--bg-hover); }
+.alm-wizard-suggest-item:hover .alm-wizard-suggest-item-add { color: var(--accent-highlight); }
+
+.alm-wizard-suggest-item-nome {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alm-wizard-suggest-item-price {
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.alm-wizard-suggest-item-add {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.alm-wizard-suggest-empty {
+  padding: 14px 12px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* ── Itens já adicionados (recap editável) ───────────────── */
+.alm-wizard-added-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md, 4px);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.alm-wizard-added-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg-tab-active);
+  border-left: 3px solid var(--accent-highlight);
+  border-top: 1px solid var(--border-subtle);
+  animation: wizardLineIn 260ms var(--ease-out-expo);
+}
+.alm-wizard-added-item:first-child { border-top: none; }
+
+.alm-wizard-added-item-check {
+  color: var(--accent-highlight);
+  flex-shrink: 0;
+}
+
+.alm-wizard-added-item-nome {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alm-wizard-added-item-qtd-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.alm-wizard-added-item-unidade {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.alm-wizard-added-item-subtotal {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  min-width: 56px;
+  text-align: right;
+}
+
+.alm-wizard-added-item-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  padding: 0;
+  display: flex;
+  flex-shrink: 0;
+}
+.alm-wizard-added-item-remove:hover { color: var(--status-error); }
+
+/* ── Input em foco / erro ────────────────────────────────── */
+.alm-wizard-field-error .atlas-input,
+.alm-wizard-field-error .alm-select {
+  border-color: var(--status-error);
+  animation: wizardShake 320ms var(--ease-standard);
+}
+
+.alm-wizard-error-msg {
+  font-size: 11px;
+  color: var(--status-error);
+  margin-top: -12px;
+}
+
+@keyframes wizardShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+/* ── Tela final ───────────────────────────────────────────── */
+.alm-wizard-final-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.alm-wizard-final-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg, 6px);
+}
+
+.alm-wizard-final-breakdown-divider {
+  height: 1px;
+  background: var(--border-default);
+  margin: 2px 0;
+}
+
+/* ── Confirmação de saída (banner, não-bloqueante) ───────── */
+.alm-wizard-exit-banner {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  right: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--bg-overlay);
+  border-bottom: 1px solid var(--border-default);
+  box-shadow: var(--shadow-md);
+  font-size: 13px;
+  color: var(--text-primary);
+  animation: wizardBannerIn 220ms var(--ease-out-expo);
+}
+
+@keyframes wizardBannerIn {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ── Responsivo ───────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .alm-wizard-modal {
+    width: 100vw;
+    height: 100vh;
+    max-height: none;
+    max-width: none;
+    top: 0;
+    left: 0;
+    transform: translateY(8px);
+    border-radius: 0;
+    border: none;
+  }
+  .alm-wizard-modal.is-open { transform: translateY(0); }
+
+  .alm-wizard-body { grid-template-columns: 1fr; }
+  .alm-wizard-resumo { display: none; }
+  .alm-wizard-resumo-mobile {
+    display: block;
+    flex-shrink: 0;
+    border-top: 1px solid var(--border-default);
+    background: var(--bg-input);
+  }
+  .alm-wizard-resumo-mobile-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 44px;
+    padding: 0 16px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .alm-wizard-resumo-mobile-panel {
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 0 16px 12px;
+  }
+  .alm-wizard-cards { grid-template-columns: 1fr; }
+  .alm-wizard-question-pane { padding: 24px 20px; }
+}

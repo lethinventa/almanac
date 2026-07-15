@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import './atlas.css';
+import './wizard-produto.css';
 import { AuthProvider } from '@/contexts/auth-context';
 import { AppShell } from '@/components/shell/app-shell';
 
