@@ -110,6 +110,9 @@ export function ProdutoWizardModal({ open, onClose }: { open: boolean; onClose: 
       if (exitBannerRef.current && !exitBannerRef.current.contains(e.target as Node)) {
         suppressCloseAttemptRef.current = true;
         setShowExitBanner(false);
+        setTimeout(() => {
+          suppressCloseAttemptRef.current = false;
+        }, 0);
       }
     }
     document.addEventListener("mousedown", onPointerDown);

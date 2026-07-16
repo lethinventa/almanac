@@ -515,6 +515,46 @@ code, .code, pre, kbd {
 .atlas-menu-item:hover { background: var(--bg-tab-active); color: var(--text-primary); }
 .atlas-menu-separator { height: 1px; background: var(--border-default); margin: var(--space-1) 0; }
 
+/* ---------- Combobox (select customizado, sempre abre pra baixo) ---------- */
+.atlas-combobox { position: relative; }
+.atlas-combobox-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+}
+.atlas-combobox-trigger:focus-visible { outline: 1px solid var(--border-focus); outline-offset: 1px; }
+.atlas-combobox-chevron { color: var(--text-tertiary); flex-shrink: 0; transition: transform 120ms ease-out; }
+.atlas-combobox-chevron.is-open { transform: rotate(180deg); }
+.atlas-combobox-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: var(--space-1);
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-1) 0;
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: var(--z-dropdown, 50);
+}
+.atlas-combobox-item {
+  padding: var(--space-1h) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.atlas-combobox-item:hover { background: var(--bg-tab-active); color: var(--text-primary); }
+.atlas-combobox-item.is-selected { background: var(--bg-selected); color: var(--text-primary); }
+
 /* ---------- Checkbox / Radio ---------- */
 .atlas-check { accent-color: var(--accent-primary); }
 

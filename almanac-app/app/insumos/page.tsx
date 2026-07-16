@@ -30,6 +30,7 @@ import {
   type Insumo,
   type InsumoCategoria,
 } from "@/lib/repositories/insumos";
+import { Combobox } from "@/components/shared/combobox";
 
 // ─── helpers ─────────────────────────────────────────────────
 const categoriaBadge: Record<InsumoCategoria, string> = {
@@ -379,6 +380,7 @@ function NovoInsumoContent({
   estoqueMinRef: React.RefObject<HTMLInputElement | null>;
 }) {
   const [categoria, setCategoria] = useState<InsumoCategoria>("visivel");
+  const [unidade, setUnidade] = useState("unidade");
   const [foto, setFoto] = useState<string | null>(null);
   const [estoqueInicial, setEstoqueInicial] = useState("");
   const [valorTotal, setValorTotal] = useState("");
@@ -422,14 +424,12 @@ function NovoInsumoContent({
         <>
           <div className="alm-field">
             <label className="alm-label">Unidade</label>
-            <select ref={unidadeRef} className="alm-select">
-              <option>unidade</option>
-              <option>folha</option>
-              <option>metro</option>
-              <option>g</option>
-              <option>ml</option>
-              <option>cm²</option>
-            </select>
+            <Combobox
+              ref={unidadeRef}
+              value={unidade}
+              onChange={setUnidade}
+              options={["unidade", "folha", "metro", "g", "ml", "cm²"]}
+            />
           </div>
 
           <hr className="atlas-divider" />
@@ -463,7 +463,7 @@ function NovoInsumoContent({
           {precoUnitario !== null && (
             <div className="atlas-alert atlas-alert-info" style={{ padding: "8px 10px" }}>
               <div className="atlas-alert-desc" style={{ fontSize: "12px" }}>
-                Preço calculado: <strong>{formatBRL(precoUnitario)} / {unidadeRef.current?.value ?? "unidade"}</strong>
+                Preço calculado: <strong>{formatBRL(precoUnitario)} / {unidade}</strong>
               </div>
             </div>
           )}

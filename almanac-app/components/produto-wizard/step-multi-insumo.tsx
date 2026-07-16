@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Plus, Search, Trash2 } from "lucide-react";
+import { CheckCircle2, ChevronDown, Plus, Search, Trash2 } from "lucide-react";
 import { StepLayout } from "./step-layout";
 import type { OpcaoInsumo } from "@/lib/produto-wizard/mock-data";
 import type { LinhaQtd } from "@/lib/produto-wizard/types";
@@ -25,9 +25,22 @@ export function StepMultiInsumo({
   error?: string | null;
 }) {
   const [busca, setBusca] = useState("");
+  const [open, setOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const searchWrapRef = useRef<HTMLDivElement>(null);
   const lastQtdRef = useRef<HTMLInputElement | null>(null);
   const prevLenRef = useRef(rows.length);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: MouseEvent) {
+      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [open]);
 
   useEffect(() => {
     if (rows.length > prevLenRef.current) {
@@ -44,6 +57,7 @@ export function StepMultiInsumo({
   function addInsumo(id: string) {
     onChange([...rows, { insumoId: id, quantidade: "" }]);
     setBusca("");
+    setOpen(false);
   }
 
   function updateQtd(idx: number, v: string) {
@@ -62,7 +76,7 @@ export function StepMultiInsumo({
 
   return (
     <StepLayout title={title} hint={hint} onContinue={podeContinuar ? onContinue : undefined} error={error}>
-      <div style={{ position: "relative" }}>
+      <div ref={searchWrapRef} style={{ position: "relative" }}>
         <Search
           size={14}
           strokeWidth={1.5}
@@ -72,28 +86,42 @@ export function StepMultiInsumo({
           ref={searchRef}
           autoFocus
           className="atlas-input"
-          style={{ height: 40, fontSize: 15, paddingLeft: 34 }}
+          style={{ height: 40, fontSize: 15, paddingLeft: 34, paddingRight: 34 }}
           placeholder="Buscar insumo…"
           value={busca}
-          onChange={(e) => setBusca(e.target.value)}
+          onFocus={() => setOpen(true)}
+          onChange={(e) => {
+            setBusca(e.target.value);
+            setOpen(true);
+          }}
         />
-      </div>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen((v) => !v);
+            searchRef.current?.focus();
+          }}
+          style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", color: "var(--text-tertiary)" }}
+        >
+          <ChevronDown size={14} strokeWidth={1.5} style={{ transform: open ? "rotate(180deg)" : undefined, transition: "transform 120ms ease" }} />
+        </button>
 
-      {busca.trim() !== "" && (
-        <div className="alm-wizard-suggest-list">
-          {disponiveis.length === 0 ? (
-            <div className="alm-wizard-suggest-empty">Nenhum insumo encontrado.</div>
-          ) : (
-            disponiveis.map((o) => (
-              <div key={o.id} className="alm-wizard-suggest-item" onClick={() => addInsumo(o.id)}>
-                <span className="alm-wizard-suggest-item-nome">{o.nome}</span>
-                <span className="alm-wizard-suggest-item-price">{formatBRL(o.precoUnitario)}/{o.unidade}</span>
-                <Plus size={14} strokeWidth={2} className="alm-wizard-suggest-item-add" />
-              </div>
-            ))
-          )}
-        </div>
-      )}
+        {open && (
+          <div className="alm-wizard-suggest-list">
+            {disponiveis.length === 0 ? (
+              <div className="alm-wizard-suggest-empty">Nenhum insumo encontrado.</div>
+            ) : (
+              disponiveis.map((o) => (
+                <div key={o.id} className="alm-wizard-suggest-item" onClick={() => addInsumo(o.id)}>
+                  <span className="alm-wizard-suggest-item-nome">{o.nome}</span>
+                  <span className="alm-wizard-suggest-item-price">{formatBRL(o.precoUnitario)}/{o.unidade}</span>
+                  <Plus size={14} strokeWidth={2} className="alm-wizard-suggest-item-add" />
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
 
       {rows.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

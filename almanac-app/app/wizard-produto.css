@@ -67,8 +67,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 32px 40px;
+  justify-content: flex-start;
+  padding: 96px 40px 32px;
   min-height: 0;
 }
 
@@ -267,9 +267,15 @@
 
 /* ── Busca de insumo (autocomplete) ──────────────────────── */
 .alm-wizard-suggest-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 5;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md, 4px);
-  background: var(--bg-input);
+  background: var(--bg-overlay);
+  box-shadow: var(--shadow-lg);
   max-height: 200px;
   overflow-y: auto;
 }
@@ -323,7 +329,8 @@
 }
 
 .alm-wizard-added-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 16px 1fr 104px 68px 20px;
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
@@ -336,11 +343,9 @@
 
 .alm-wizard-added-item-check {
   color: var(--accent-highlight);
-  flex-shrink: 0;
 }
 
 .alm-wizard-added-item-nome {
-  flex: 1;
   font-size: 13px;
   color: var(--text-primary);
   overflow: hidden;
@@ -352,13 +357,15 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  flex-shrink: 0;
+  width: 100%;
 }
 
 .alm-wizard-added-item-unidade {
   font-size: 11px;
   color: var(--text-tertiary);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .alm-wizard-added-item-subtotal {
