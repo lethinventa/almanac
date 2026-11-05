@@ -19,7 +19,7 @@ import {
   statusBadge,
 } from "@/lib/utils";
 import { buscarEncomendas, criarEncomenda, atualizarStatus, type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
-import { buscarProdutos, type Produto } from "@/lib/repositories/produtos";
+import { buscarProdutos, type ProdutoCalculado } from "@/lib/repositories/produtos";
 import { KanbanBoard } from "@/components/kanban-board";
 import { NovaEncomendaForm } from "@/components/shared/nova-encomenda-form";
 
@@ -97,7 +97,7 @@ function Modal({
 export default function EncomendasPage() {
   const router = useRouter();
   const [lista, setLista] = useState<Encomenda[]>([]);
-  const [produtosList, setProdutosList] = useState<Produto[]>([]);
+  const [produtosList, setProdutosList] = useState<ProdutoCalculado[]>([]);
   const [busca, setBusca] = useState("");
   const [view, setView] = useState<"kanban" | "lista">("kanban");
   const [mode, setMode] = useState<ModalMode>(null);

@@ -1,116 +1,73 @@
-import { createStore, newId } from "@/lib/mock-store";
-import { produtosSeed } from "@/lib/data";
+import { buscarInsumos, type Insumo } from "@/lib/repositories/insumos";
+import { buscarConfiguracoes, type Configuracoes } from "@/lib/repositories/configuracoes";
+import { buscarTotalCustosIndiretos } from "@/lib/repositories/financeiro";
+import { buscarEncomendas } from "@/lib/repositories/encomendas";
+import * as registro from "@/lib/repositories/produtos-registro";
+import { calcPrecoSugerido, calcPreco3D } from "@/lib/produto-calculos";
 
-export interface InsumoReceita {
-  insumoId: string;
-  quantidade: number;
-}
+export type { Produto, ProdutoInput, InsumoReceita, Etapas3D } from "@/lib/repositories/produtos-registro";
+import type { Produto } from "@/lib/repositories/produtos-registro";
 
-export interface Etapas3D {
-  impressao?: number;
-  modelagem?: number;
-  acabamento?: number;
-}
-
-export interface LoteProducao {
-  id: string;
-  produtoId: string;
-  quantidade: number;
-  data: string;
-  observacao?: string;
-}
-
-export interface Produto {
-  id: string;
-  nome: string;
-  categoria: string;
-  receita: InsumoReceita[];
-  tempoProducao: number;
+// Produto com valores derivados: custo = soma dos insumos da receita aos preços atuais;
+// preço sugerido e margem seguem a configuração atual (multiplicador do produto ou global).
+export interface ProdutoCalculado extends Produto {
   custo: number;
   precoSugerido: number;
   margem: number;
-  foto?: string;
-  prontoEstoque?: number;
-  prontoEstoqueMin?: number;
-  etapas3D?: Etapas3D;
-  historicoLotes?: LoteProducao[];
+  multiplicador: number;
 }
 
-export interface ProdutoInput {
-  nome: string;
-  categoria: string;
-  receita: InsumoReceita[];
-  tempoProducao: number;
-  custo: number;
-  precoSugerido: number;
-  margem: number;
-  foto?: string;
-  prontoEstoque?: number | null;
-  prontoEstoqueMin?: number | null;
-  etapas3D?: Etapas3D | null;
+function calcularProduto(
+  produto: Produto,
+  insumos: Map<string, Insumo>,
+  config: Configuracoes,
+  totalCustos: number
+): ProdutoCalculado {
+  const custo = produto.receita.reduce((soma, r) => {
+    const insumo = insumos.get(r.insumoId);
+    return insumo ? soma + insumo.precoAtual * r.quantidade : soma;
+  }, 0);
+
+  const multiplicador = produto.multiplicador ?? config.multiplicadorPreco;
+  const configProduto = { ...config, multiplicadorPreco: multiplicador };
+
+  const precoSugerido =
+    produto.categoria === "Impressão 3D" && produto.etapas3D
+      ? calcPreco3D(custo, produto.etapas3D, configProduto, totalCustos).precoSugerido
+      : calcPrecoSugerido(custo, produto.tempoProducao, configProduto, totalCustos);
+
+  const margem = precoSugerido > 0 ? ((precoSugerido - custo) / precoSugerido) * 100 : 0;
+
+  return { ...produto, custo, precoSugerido, margem, multiplicador };
 }
 
-const store = createStore<Produto>("almanac_produtos", produtosSeed);
-
-function withSortedLotes(produto: Produto): Produto {
-  return {
-    ...produto,
-    historicoLotes: (produto.historicoLotes ?? []).slice().sort((a, b) => b.data.localeCompare(a.data)),
-  };
+export async function buscarProdutos(): Promise<ProdutoCalculado[]> {
+  const [produtos, insumos, config, totalCustos] = await Promise.all([
+    registro.listarProdutos(),
+    buscarInsumos(),
+    buscarConfiguracoes(),
+    buscarTotalCustosIndiretos(),
+  ]);
+  const mapaInsumos = new Map(insumos.map((i) => [i.id, i]));
+  return produtos
+    .slice()
+    .sort((a, b) => a.nome.localeCompare(b.nome))
+    .map((p) => calcularProduto(p, mapaInsumos, config, totalCustos));
 }
 
-export async function buscarProdutos(): Promise<Produto[]> {
-  return store.list().slice().sort((a, b) => a.nome.localeCompare(b.nome)).map(withSortedLotes);
+export async function criarProduto(dados: registro.ProdutoInput): Promise<Produto> {
+  return registro.criarProduto(dados);
 }
 
-export async function criarProduto(dados: ProdutoInput): Promise<Produto> {
-  const produto: Produto = {
-    id: newId(),
-    nome: dados.nome,
-    categoria: dados.categoria,
-    receita: dados.receita,
-    tempoProducao: dados.tempoProducao,
-    custo: dados.custo,
-    precoSugerido: dados.precoSugerido,
-    margem: dados.margem,
-    foto: dados.foto,
-    prontoEstoque: dados.prontoEstoque ?? undefined,
-    prontoEstoqueMin: dados.prontoEstoqueMin ?? undefined,
-    etapas3D: dados.etapas3D ?? undefined,
-    historicoLotes: [],
-  };
-  return store.insert(produto);
-}
-
-export async function editarProduto(id: string, dados: Partial<ProdutoInput>): Promise<Produto> {
-  const patch: Partial<Produto> = {};
-  if (dados.nome !== undefined) patch.nome = dados.nome;
-  if (dados.categoria !== undefined) patch.categoria = dados.categoria;
-  if (dados.receita !== undefined) patch.receita = dados.receita;
-  if (dados.tempoProducao !== undefined) patch.tempoProducao = dados.tempoProducao;
-  if (dados.custo !== undefined) patch.custo = dados.custo;
-  if (dados.precoSugerido !== undefined) patch.precoSugerido = dados.precoSugerido;
-  if (dados.margem !== undefined) patch.margem = dados.margem;
-  if ("foto" in dados) patch.foto = dados.foto ?? undefined;
-  if ("prontoEstoque" in dados) patch.prontoEstoque = dados.prontoEstoque ?? undefined;
-  if ("prontoEstoqueMin" in dados) patch.prontoEstoqueMin = dados.prontoEstoqueMin ?? undefined;
-  if ("etapas3D" in dados) patch.etapas3D = dados.etapas3D ?? undefined;
-
-  const updated = store.update(id, patch);
-  if (!updated) throw new Error("Produto não encontrado");
-  return withSortedLotes(updated);
+export async function editarProduto(id: string, dados: Partial<registro.ProdutoInput>): Promise<Produto> {
+  return registro.editarProduto(id, dados);
 }
 
 export async function deletarProduto(id: string): Promise<void> {
-  store.remove(id);
-}
-
-export async function registrarLote(
-  produtoId: string,
-  lote: { quantidade: number; data: string; observacao?: string }
-): Promise<void> {
-  const atual = store.find(produtoId);
-  if (!atual) throw new Error("Produto não encontrado");
-  const novoLote: LoteProducao = { id: newId(), produtoId, quantidade: lote.quantidade, data: lote.data, observacao: lote.observacao };
-  store.update(produtoId, { historicoLotes: [...(atual.historicoLotes ?? []), novoLote] });
+  const encomendas = await buscarEncomendas();
+  const emEncomenda = encomendas.some((e) => e.itens.some((i) => i.produtoId === id));
+  if (emEncomenda) {
+    throw new Error("Este produto já está em encomendas e não pode ser excluído.");
+  }
+  await registro.removerProduto(id);
 }

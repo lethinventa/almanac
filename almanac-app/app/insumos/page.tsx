@@ -22,6 +22,7 @@ import {
   formatDate,
   categoriaLabel,
 } from "@/lib/utils";
+import { lerImagem } from "@/lib/imagem";
 import {
   buscarInsumos,
   criarInsumo,
@@ -110,8 +111,7 @@ function FotoUpload({ preview, onChange }: { preview: string | null; onChange: (
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    onChange(url);
+    lerImagem(file).then(onChange).catch((err) => console.error("Erro ao ler imagem:", err));
   }
 
   return (
@@ -560,7 +560,7 @@ function RowActionsMenu({
             background: "var(--bg-raised)",
             border: "1px solid var(--border-default)",
             borderRadius: "var(--radius-sm)",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
+
             zIndex: 1000, overflow: "hidden",
           }}
         >
@@ -643,6 +643,7 @@ export default function InsumosPage() {
   const [erroSalvar, setErroSalvar] = useState<string>("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [excluindo, setExcluindo] = useState(false);
+  const [erroExcluir, setErroExcluir] = useState<string>("");
 
   // Refs para o modal "Novo insumo"
   const novoNomeRef       = useRef<HTMLInputElement>(null);
@@ -752,12 +753,13 @@ export default function InsumosPage() {
 
   async function handleExcluir(id: string) {
     setExcluindo(true);
+    setErroExcluir("");
     try {
       await deletarInsumo(id);
       await refresh();
       setConfirmDeleteId(null);
     } catch (err) {
-      console.error("Erro ao excluir insumo:", err);
+      setErroExcluir(err instanceof Error ? err.message : "Erro ao excluir insumo.");
     } finally {
       setExcluindo(false);
     }
@@ -820,8 +822,14 @@ export default function InsumosPage() {
           ) : lista.length === 0 ? (
             <div className="atlas-empty" style={{ padding: "40px" }}>
               <div className="atlas-empty-icon"><Package size={24} strokeWidth={1.5} /></div>
-              <div className="atlas-empty-title">Nenhum insumo encontrado</div>
-              <div className="atlas-empty-desc">Tente outro filtro ou busca.</div>
+              <div className="atlas-empty-title">Nenhum insumo cadastrado</div>
+              <div className="atlas-empty-desc" style={{ marginBottom: "16px" }}>
+                Comece pelos materiais que você usa nas receitas: papel, filamento, cola e ferramentas.
+              </div>
+              <button className="atlas-btn atlas-btn-primary atlas-btn-sm" onClick={() => open(null, "novo")}>
+                <Plus size={13} strokeWidth={1.5} />
+                Cadastrar primeiro insumo
+              </button>
             </div>
           ) : (
             <table className="atlas-table" style={{ width: "100%", border: 0 }}>
@@ -844,6 +852,9 @@ export default function InsumosPage() {
                       <tr key={insumo.id} style={{ cursor: "default", background: "rgba(244,71,71,0.04)" }}>
                         <td colSpan={5} style={{ fontSize: 12, color: "var(--text-secondary)" }}>
                           Excluir <strong>{insumo.nome}</strong>?
+                          {erroExcluir && (
+                            <div style={{ marginTop: 4, color: "var(--status-error)" }}>{erroExcluir}</div>
+                          )}
                         </td>
                         <td>
                           <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
@@ -857,7 +868,7 @@ export default function InsumosPage() {
                             </button>
                             <button
                               className="atlas-btn atlas-btn-ghost atlas-btn-sm"
-                              onClick={() => setConfirmDeleteId(null)}
+                              onClick={() => { setConfirmDeleteId(null); setErroExcluir(""); }}
                               disabled={excluindo}
                             >
                               Não

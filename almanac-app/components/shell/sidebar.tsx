@@ -57,8 +57,14 @@ export function Sidebar() {
   }
 
   return (
+    <>
+      <div className="alm-brand">
+        <span className="alm-brand-name">ginga.web</span>
+      </div>
+
     <nav className="alm-nav">
-      <div style={{ padding: "8px 0 0" }}>
+      <div className="alm-nav-section">Geral</div>
+      <div>
         {mainNav.map((item) => (
           <Link
             key={item.href}
@@ -88,5 +94,6 @@ export function Sidebar() {
         </Link>
       </div>
     </nav>
+    </>
   );
 }

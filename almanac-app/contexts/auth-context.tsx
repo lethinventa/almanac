@@ -2,16 +2,25 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { getSession, saveSession, clearSession, type User } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
+
+export interface User {
+  email: string;
+}
 
 interface AuthCtx {
   user: User | null;
   ready: boolean;
-  login: (email: string) => void;
-  logout: () => void;
+  // Retorna a mensagem de erro, ou null se entrou.
+  login: (email: string, senha: string) => Promise<string | null>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthCtx>({} as AuthCtx);
+
+function paraUsuario(email: string | null | undefined): User | null {
+  return email ? { email } : null;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -20,22 +29,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    const session = getSession();
-    setUser(session);
-    setReady(true);
-    if (!session && pathname !== "/login") router.replace("/login");
-    if (session && pathname === "/login") router.replace("/");
+    let ativo = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!ativo) return;
+      const usuario = paraUsuario(data.session?.user.email);
+      setUser(usuario);
+      setReady(true);
+      if (!usuario && pathname !== "/login") router.replace("/login");
+      if (usuario && pathname === "/login") router.replace("/");
+    });
+    const { data: escuta } = supabase.auth.onAuthStateChange((_evento, session) => {
+      setUser(paraUsuario(session?.user.email));
+    });
+    return () => {
+      ativo = false;
+      escuta.subscription.unsubscribe();
+    };
   }, [pathname]);
 
-  function login(email: string) {
-    const session = { email };
-    saveSession(session);
-    setUser(session);
+  async function login(email: string, senha: string): Promise<string | null> {
+    const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
+    if (error) return "E-mail ou senha incorretos.";
     router.push("/");
+    return null;
   }
 
-  function logout() {
-    clearSession();
+  async function logout() {
+    await supabase.auth.signOut();
     setUser(null);
     router.push("/login");
   }

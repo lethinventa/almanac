@@ -15,14 +15,14 @@ import {
   Pencil,
   AlertTriangle,
   Calculator,
-  PackageCheck,
-  History,
   Layers,
   Printer,
 } from "lucide-react";
 import { formatBRL } from "@/lib/utils";
+import { lerImagem } from "@/lib/imagem";
 import { buscarTotalCustosIndiretos } from "@/lib/repositories/financeiro";
 import { buscarConfiguracoes, type Configuracoes } from "@/lib/repositories/configuracoes";
+import { calcPrecoSugerido, calcPreco3D, taxaHoraria } from "@/lib/produto-calculos";
 
 const DEFAULT_CONFIGURACOES: Configuracoes = {
   horasTrabalhoMes: 160,
@@ -32,17 +32,15 @@ const DEFAULT_CONFIGURACOES: Configuracoes = {
 
 import {
   buscarProdutos,
+  criarProduto,
   editarProduto,
   deletarProduto,
-  registrarLote,
-  type Produto,
-  type LoteProducao,
+  type ProdutoCalculado,
   type Etapas3D,
 } from "@/lib/repositories/produtos";
 import { buscarInsumos, type Insumo } from "@/lib/repositories/insumos";
-import { ProdutoWizardModal } from "@/components/produto-wizard/produto-wizard-modal";
 
-type ModalMode = "detalhe" | "editar" | null;
+type ModalMode = "detalhe" | "editar" | "novo" | null;
 
 interface ReceitaRow {
   insumoId: string;
@@ -60,43 +58,6 @@ const CATEGORIAS_DEFAULT = [
   "Outro",
 ];
 
-
-function calcPrecoSugerido(
-  materialCost: number,
-  tempoMin: number,
-  config: Configuracoes,
-  totalCustos: number
-): number {
-  const hourlyRate = config.horasTrabalhoMes > 0 ? totalCustos / config.horasTrabalhoMes : 0;
-  const timeCost = (tempoMin / 60) * hourlyRate;
-  return (materialCost + timeCost) * config.multiplicadorPreco;
-}
-
-function calcPreco3D(
-  materialCost: number,
-  etapas: Etapas3D,
-  config: Configuracoes,
-  totalCustos: number
-): {
-  custoImpressao: number;
-  custoModelagem: number;
-  custoAcabamento: number;
-  custoTotal: number;
-  precoSugerido: number;
-} {
-  const hourlyRate = config.horasTrabalhoMes > 0 ? totalCustos / config.horasTrabalhoMes : 0;
-  const custoImpressao = ((etapas.impressao ?? 0) / 60) * config.custoHoraBambu;
-  const custoModelagem = ((etapas.modelagem ?? 0) / 60) * hourlyRate;
-  const custoAcabamento = ((etapas.acabamento ?? 0) / 60) * hourlyRate;
-  const custoTotal = materialCost + custoImpressao + custoModelagem + custoAcabamento;
-  return {
-    custoImpressao,
-    custoModelagem,
-    custoAcabamento,
-    custoTotal,
-    precoSugerido: custoTotal * config.multiplicadorPreco,
-  };
-}
 
 // ── Modal wrapper ────────────────────────────────────────────
 function Modal({
@@ -175,7 +136,7 @@ function FotoUpload({ value, onChange }: { value?: string | null; onChange?: (ur
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) { const url = URL.createObjectURL(f); setPreview(url); onChange?.(url); }
+    if (f) lerImagem(f).then((url) => { setPreview(url); onChange?.(url); }).catch((err) => console.error("Erro ao ler imagem:", err));
   };
 
   return (
@@ -202,272 +163,29 @@ function FotoUpload({ value, onChange }: { value?: string | null; onChange?: (ur
   );
 }
 
-// ── Registrar lote form ───────────────────────────────────────
-function RegistrarLoteForm({
-  produto,
-  onSave,
-  onClose,
-}: {
-  produto: Produto;
-  onSave: (qtd: number, data: string, obs: string) => void;
-  onClose: () => void;
-}) {
-  const hoje = new Date().toISOString().slice(0, 10);
-  const [qtd, setQtd] = useState("");
-  const [data, setData] = useState(hoje);
-  const [obs, setObs] = useState("");
-
-  const qtdNum = parseInt(qtd) || 0;
-  const custoTotal = qtdNum * produto.custo;
-  const canSave = qtdNum > 0;
-
-  return (
-    <div
-      style={{
-        background: "var(--bg-input)",
-        border: "1px solid var(--border-default)",
-        borderRadius: "var(--radius-md, 4px)",
-        padding: "12px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-      }}
-    >
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <div className="alm-field" style={{ margin: 0 }}>
-          <label className="alm-label">Quantidade produzida</label>
-          <input
-            autoFocus
-            className="atlas-input"
-            type="number"
-            min="1"
-            placeholder="Ex: 20"
-            value={qtd}
-            onChange={(e) => setQtd(e.target.value)}
-          />
-        </div>
-        <div className="alm-field" style={{ margin: 0 }}>
-          <label className="alm-label">Data de produção</label>
-          <input
-            className="atlas-input"
-            type="date"
-            value={data}
-            onChange={(e) => setData(e.target.value)}
-          />
-        </div>
-      </div>
-      <div className="alm-field" style={{ margin: 0 }}>
-        <label className="alm-label">Observação (opcional)</label>
-        <input
-          className="atlas-input"
-          placeholder='Ex: "lote feira de junho"'
-          value={obs}
-          onChange={(e) => setObs(e.target.value)}
-        />
-      </div>
-      {qtdNum > 0 && (
-        <div
-          style={{
-            fontSize: 11,
-            color: "var(--text-tertiary)",
-            display: "flex",
-            gap: 12,
-          }}
-        >
-          <span>
-            Custo total estimado:{" "}
-            <strong style={{ color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>
-              {formatBRL(custoTotal)}
-            </strong>
-          </span>
-          <span style={{ color: "var(--status-warning)" }}>
-            Deduz insumos conforme receita
-          </span>
-        </div>
-      )}
-      <div style={{ display: "flex", gap: 6 }}>
-        <button
-          className="atlas-btn atlas-btn-primary atlas-btn-sm"
-          disabled={!canSave}
-          style={{ opacity: canSave ? 1 : 0.4, flex: 1 }}
-          onClick={() => onSave(qtdNum, data, obs.trim())}
-        >
-          Registrar lote
-        </button>
-        <button
-          className="atlas-btn atlas-btn-ghost atlas-btn-sm"
-          onClick={onClose}
-        >
-          Cancelar
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ── Pronto estoque section ────────────────────────────────────
-function ProntoEstoqueSection({
-  produto,
-  onRegistrarLote,
-}: {
-  produto: Produto;
-  onRegistrarLote: () => void;
-}) {
-  const [showHistorico, setShowHistorico] = useState(false);
-  const prontos = produto.prontoEstoque ?? 0;
-  const min = produto.prontoEstoqueMin;
-  const emAlerta = min !== undefined && prontos <= min;
-  const lotes = produto.historicoLotes ?? [];
-
-  return (
-    <div
-      style={{
-        border: `1px solid ${emAlerta ? "rgba(244,71,71,0.3)" : "var(--border-default)"}`,
-        borderRadius: "var(--radius-md, 4px)",
-        background: emAlerta ? "rgba(244,71,71,0.04)" : "var(--bg-input)",
-        padding: "10px 12px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <PackageCheck
-            size={13}
-            strokeWidth={1.5}
-            style={{ color: emAlerta ? "var(--status-error)" : "var(--text-tertiary)" }}
-          />
-          <span className="alm-label">Pronta entrega</span>
-          {emAlerta && (
-            <AlertTriangle size={11} strokeWidth={1.5} style={{ color: "var(--status-error)" }} />
-          )}
-        </div>
-        <button
-          className="atlas-btn atlas-btn-secondary atlas-btn-sm"
-          style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
-          onClick={onRegistrarLote}
-        >
-          <Plus size={11} strokeWidth={1.5} />
-          Registrar lote
-        </button>
-      </div>
-
-      <div style={{ display: "flex", gap: 20 }}>
-        <div>
-          <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>
-            Em estoque
-          </div>
-          <div
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontWeight: 700,
-              fontSize: 20,
-              color: emAlerta ? "var(--status-error)" : "var(--text-primary)",
-            }}
-          >
-            {prontos}
-          </div>
-        </div>
-        {min !== undefined && (
-          <div>
-            <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>
-              Mínimo
-            </div>
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: 14, color: "var(--text-secondary)" }}>
-              {min}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {lotes.length > 0 && (
-        <button
-          className="atlas-btn atlas-btn-ghost atlas-btn-sm"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 4,
-            fontSize: 11,
-            alignSelf: "flex-start",
-            color: "var(--text-tertiary)",
-          }}
-          onClick={() => setShowHistorico((v) => !v)}
-        >
-          <History size={11} strokeWidth={1.5} />
-          {showHistorico ? "Ocultar" : `Ver histórico (${lotes.length} lote${lotes.length !== 1 ? "s" : ""})`}
-        </button>
-      )}
-
-      {showHistorico && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-          {[...lotes].reverse().map((l) => (
-            <div
-              key={l.id}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                padding: "5px 0",
-                borderTop: "1px solid var(--border-subtle)",
-                fontSize: 12,
-              }}
-            >
-              <div>
-                <div style={{ color: "var(--text-secondary)", fontWeight: 500 }}>
-                  {l.data.split("-").reverse().join("/")}
-                </div>
-                {l.observacao && (
-                  <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{l.observacao}</div>
-                )}
-              </div>
-              <span
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontWeight: 600,
-                  color: "var(--status-success)",
-                }}
-              >
-                +{l.quantidade}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Detalhe content ──────────────────────────────────────────
 function DetalheContent({
   produto,
   insumos,
   config,
   totalCustos,
-  onRegistrarLote,
 }: {
-  produto: Produto;
+  produto: ProdutoCalculado;
   insumos: Insumo[];
   config: Configuracoes;
   totalCustos: number;
-  onRegistrarLote: () => void;
 }) {
   const receitaComInsumo = produto.receita.map((r) => ({
     ...r,
     insumo: insumos.find((i) => i.id === r.insumoId),
   }));
 
-  const hourlyRate =
-    config.horasTrabalhoMes > 0
-      ? totalCustos / config.horasTrabalhoMes
-      : 0;
+  const hourlyRate = taxaHoraria(config, totalCustos);
 
   const is3D = produto.categoria === "Impressão 3D" && !!produto.etapas3D;
   const r3D = is3D ? calcPreco3D(produto.custo, produto.etapas3D!, config, totalCustos) : null;
   const timeCost = is3D ? 0 : (produto.tempoProducao / 60) * hourlyRate;
-  const precoCalculado = is3D
-    ? r3D!.precoSugerido
-    : (produto.custo + timeCost) * config.multiplicadorPreco;
+  const precoCalculado = produto.precoSugerido;
 
   return (
     <>
@@ -482,9 +200,11 @@ function DetalheContent({
             justifyContent: "center",
           }}
         >
-          {is3D
-            ? <Layers size={28} strokeWidth={1} style={{ color: "var(--text-tertiary)" }} />
-            : <Box size={28} strokeWidth={1} style={{ color: "var(--text-tertiary)" }} />
+          {produto.foto
+            ? <img src={produto.foto} alt={produto.nome} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            : is3D
+              ? <Layers size={28} strokeWidth={1} style={{ color: "var(--text-tertiary)" }} />
+              : <Box size={28} strokeWidth={1} style={{ color: "var(--text-tertiary)" }} />
           }
         </div>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -610,7 +330,7 @@ function DetalheContent({
           }}
         >
           <span style={{ color: "var(--text-secondary)" }}>
-            × {config.multiplicadorPreco}× (multiplicador)
+            × {produto.multiplicador}× (multiplicador)
           </span>
           <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>
             {formatBRL(precoCalculado)}
@@ -680,9 +400,6 @@ function DetalheContent({
         </span>
       </div>
 
-      {produto.prontoEstoque !== undefined && (
-        <ProntoEstoqueSection produto={produto} onRegistrarLote={onRegistrarLote} />
-      )}
     </>
   );
 }
@@ -783,7 +500,7 @@ function ProdutoFormContent({
   onClose,
   onAddCategoria,
 }: {
-  initial?: Produto;
+  initial?: ProdutoCalculado;
   categorias: string[];
   insumos: Insumo[];
   config: Configuracoes;
@@ -831,7 +548,7 @@ function ProdutoFormContent({
     initial?.etapas3D?.acabamento !== undefined ? String(initial.etapas3D.acabamento) : ""
   );
 
-  const [multInput, setMultInput] = useState(String(config.multiplicadorPreco));
+  const [multInput, setMultInput] = useState(String(initial?.multiplicador ?? config.multiplicadorPreco));
 
   const multNum = Math.max(1, parseFloat(multInput) || 1);
   const is3D = categoria === "Impressão 3D";
@@ -1226,6 +943,12 @@ function ProdutoFormContent({
           )}
         </div>
 
+        {totalCustos === 0 && (
+          <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+            Taxa horária zerada: nenhum custo fixo cadastrado. Cadastre em Financeiro para incluir a mão de obra no preço.
+          </span>
+        )}
+
         {/* Multiplicador */}
         <div
           style={{
@@ -1311,9 +1034,34 @@ function ProdutoFormContent({
   );
 }
 
+// ── Estado vazio da listagem ─────────────────────────────────
+function EstadoVazio({ temProdutos, onNovo }: { temProdutos: boolean; onNovo: () => void }) {
+  if (temProdutos) {
+    return (
+      <div className="atlas-empty" style={{ padding: "32px" }}>
+        <div className="atlas-empty-title">Nenhum produto encontrado</div>
+        <div className="atlas-empty-desc">Tente um termo diferente.</div>
+      </div>
+    );
+  }
+  return (
+    <div className="atlas-empty" style={{ padding: "40px" }}>
+      <div className="atlas-empty-icon"><Box size={24} strokeWidth={1.5} /></div>
+      <div className="atlas-empty-title">Nenhum produto cadastrado</div>
+      <div className="atlas-empty-desc" style={{ marginBottom: "16px" }}>
+        Monte a receita com seus insumos para calcular o custo e o preço sugerido automaticamente.
+      </div>
+      <button className="atlas-btn atlas-btn-primary atlas-btn-sm" onClick={onNovo}>
+        <Plus size={13} strokeWidth={1.5} />
+        Cadastrar primeiro produto
+      </button>
+    </div>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────
 export default function ProdutosPage() {
-  const [lista, setLista] = useState<Produto[]>([]);
+  const [lista, setLista] = useState<ProdutoCalculado[]>([]);
   const [insumos, setInsumos] = useState<Insumo[]>([]);
   const [config, setConfig] = useState<Configuracoes>(DEFAULT_CONFIGURACOES);
   const [totalCustos, setTotalCustos] = useState(0);
@@ -1323,12 +1071,10 @@ export default function ProdutosPage() {
 
   const [busca, setBusca] = useState("");
   const [view, setView] = useState<"tabela" | "galeria">("tabela");
-  const [selected, setSelected] = useState<Produto | null>(null);
+  const [selected, setSelected] = useState<ProdutoCalculado | null>(null);
   const [mode, setMode] = useState<ModalMode>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [categorias, setCategorias] = useState<string[]>(CATEGORIAS_DEFAULT);
-  const [showLoteForm, setShowLoteForm] = useState(false);
-  const [wizardOpen, setWizardOpen] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -1338,6 +1084,8 @@ export default function ProdutosPage() {
         setInsumos(inss);
         setConfig(cfg);
         setTotalCustos(custos);
+        // Atalho vindo do Dashboard: /produtos?novo=1 abre o cadastro direto
+        if (new URLSearchParams(window.location.search).get("novo") === "1") setMode("novo");
       })
       .catch((e) => setErro(String(e)))
       .finally(() => setLoading(false));
@@ -1358,7 +1106,7 @@ export default function ProdutosPage() {
       p.categoria.toLowerCase().includes(busca.toLowerCase())
   );
 
-  const openDetalhe = (p: Produto) => {
+  const openDetalhe = (p: ProdutoCalculado) => {
     setConfirmDelete(false);
     setSelected(p);
     setMode("detalhe");
@@ -1368,6 +1116,12 @@ export default function ProdutosPage() {
     setMode(null);
     setConfirmDelete(false);
     setTimeout(() => setSelected(null), 340);
+  };
+
+  const abrirNovo = () => {
+    setConfirmDelete(false);
+    setSelected(null);
+    setMode("novo");
   };
 
   const handleAddCategoria = (cat: string) => {
@@ -1385,24 +1139,13 @@ export default function ProdutosPage() {
     etapas3D?: Etapas3D;
     foto?: string;
   }) => {
-    const custo = data.receita.reduce((sum, r) => {
-      const ins = insumos.find((i) => i.id === r.insumoId);
-      const qtd = parseFloat(r.quantidade);
-      if (ins && !isNaN(qtd) && qtd > 0) return sum + ins.precoAtual * qtd;
-      return sum;
-    }, 0);
-    const configComMult = { ...config, multiplicadorPreco: data.multiplicador };
-    const precoSugerido = data.etapas3D
-      ? calcPreco3D(custo, data.etapas3D, configComMult, totalCustos).precoSugerido
-      : calcPrecoSugerido(custo, data.tempo, configComMult, totalCustos);
+    // Só grava multiplicador próprio se for diferente do global; senão acompanha as Configurações
+    const multiplicador = data.multiplicador === config.multiplicadorPreco ? null : data.multiplicador;
 
     const campos = {
       nome: data.nome,
       categoria: data.categoria,
       tempoProducao: data.tempo,
-      precoSugerido,
-      custo,
-      margem: 0,
       foto: data.foto,
       receita: data.receita
         .filter((r) => r.insumoId && parseFloat(r.quantidade) > 0)
@@ -1411,12 +1154,15 @@ export default function ProdutosPage() {
           quantidade: parseFloat(r.quantidade) || 0,
         })),
       etapas3D: data.etapas3D ?? null,
+      multiplicador,
     };
 
     setSaving(true);
     setErro(null);
     try {
-      if (mode === "editar" && selected) {
+      if (mode === "novo") {
+        await criarProduto(campos);
+      } else if (mode === "editar" && selected) {
         await editarProduto(selected.id, campos);
       }
       close();
@@ -1436,24 +1182,6 @@ export default function ProdutosPage() {
       await deletarProduto(selected.id);
       close();
       await reloadProdutos();
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleRegistrarLote = async (qtd: number, data: string, obs: string) => {
-    if (!selected) return;
-    setSaving(true);
-    setErro(null);
-    try {
-      await registrarLote(selected.id, { quantidade: qtd, data, observacao: obs || undefined });
-      const prods = await buscarProdutos();
-      setLista(prods);
-      const updated = prods.find((p) => p.id === selected.id);
-      if (updated) setSelected(updated);
-      setShowLoteForm(false);
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
     } finally {
@@ -1488,8 +1216,7 @@ export default function ProdutosPage() {
         <button
           className="atlas-btn atlas-btn-primary atlas-btn-sm"
           style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-          onClick={() => setWizardOpen(true)}
-          disabled={saving}
+          onClick={abrirNovo}
         >
           <Plus size={13} strokeWidth={1.5} />
           Novo produto
@@ -1588,12 +1315,7 @@ export default function ProdutosPage() {
       {view === "tabela" && (
         <div className="atlas-card" style={{ padding: 0 }}>
           {filtrados.length === 0 ? (
-            <div className="atlas-empty" style={{ padding: "32px" }}>
-              <div className="atlas-empty-title">Nenhum produto encontrado</div>
-              <div className="atlas-empty-desc">
-                Tente um termo diferente ou adicione um novo produto.
-              </div>
-            </div>
+            <EstadoVazio temProdutos={lista.length > 0} onNovo={abrirNovo} />
           ) : (
             <table className="atlas-table" style={{ width: "100%" }}>
               <thead>
@@ -1603,103 +1325,68 @@ export default function ProdutosPage() {
                   <th className="num">Custo produção</th>
                   <th className="num">Preço sugerido</th>
                   <th className="num">Tempo</th>
-                  <th className="num">Prontos</th>
                 </tr>
               </thead>
               <tbody>
-                {filtrados.map((p) => {
-                  const preco = p.categoria === "Impressão 3D" && p.etapas3D
-                    ? calcPreco3D(p.custo, p.etapas3D, config, totalCustos).precoSugerido
-                    : calcPrecoSugerido(p.custo, p.tempoProducao, config, totalCustos);
-                  const temProntos = p.prontoEstoque !== undefined;
-                  const prontoAlerta =
-                    temProntos &&
-                    p.prontoEstoqueMin !== undefined &&
-                    (p.prontoEstoque ?? 0) <= p.prontoEstoqueMin;
-                  return (
-                    <tr key={p.id} onClick={() => openDetalhe(p)}>
-                      <td>
+                {filtrados.map((p) => (
+                  <tr key={p.id} onClick={() => openDetalhe(p)}>
+                    <td>
+                      <div
+                        style={{ display: "flex", alignItems: "center", gap: 8 }}
+                      >
                         <div
-                          style={{ display: "flex", alignItems: "center", gap: 8 }}
-                        >
-                          <div
-                            style={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: 4,
-                              background: "var(--bg-input)",
-                              border: "1px solid var(--border-default)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Box
-                              size={13}
-                              strokeWidth={1.5}
-                              style={{ color: "var(--text-tertiary)" }}
-                            />
-                          </div>
-                          <span style={{ fontWeight: 500 }}>{p.nome}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="atlas-badge">{p.categoria}</span>
-                      </td>
-                      <td
-                        className="num"
-                        style={{ fontFamily: "var(--font-mono)" }}
-                      >
-                        {formatBRL(p.custo)}
-                      </td>
-                      <td
-                        className="num"
-                        style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}
-                      >
-                        {formatBRL(preco)}
-                      </td>
-                      <td
-                        className="num"
-                        style={{ color: "var(--text-tertiary)", fontSize: 12 }}
-                      >
-                        <span
                           style={{
-                            display: "inline-flex",
+                            width: 28,
+                            height: 28,
+                            borderRadius: 4,
+                            background: "var(--bg-input)",
+                            border: "1px solid var(--border-default)",
+                            display: "flex",
                             alignItems: "center",
-                            gap: 3,
+                            justifyContent: "center",
+                            flexShrink: 0,
                           }}
                         >
-                          <Clock size={11} strokeWidth={1.5} />
-                          {p.tempoProducao} min
-                        </span>
-                      </td>
-                      <td className="num">
-                        {temProntos ? (
-                          <span
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 4,
-                              fontFamily: "var(--font-mono)",
-                              fontWeight: 600,
-                              color: prontoAlerta
-                                ? "var(--status-error)"
-                                : "var(--text-primary)",
-                            }}
-                          >
-                            {prontoAlerta && (
-                              <AlertTriangle size={10} strokeWidth={1.5} />
-                            )}
-                            {p.prontoEstoque}
-                          </span>
-                        ) : (
-                          <span style={{ color: "var(--text-tertiary)", fontSize: 11 }}>—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                          {p.foto
+                            ? <img src={p.foto} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} />
+                            : <Box size={13} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
+                          }
+                        </div>
+                        <span style={{ fontWeight: 500 }}>{p.nome}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="atlas-badge">{p.categoria}</span>
+                    </td>
+                    <td
+                      className="num"
+                      style={{ fontFamily: "var(--font-mono)" }}
+                    >
+                      {formatBRL(p.custo)}
+                    </td>
+                    <td
+                      className="num"
+                      style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}
+                    >
+                      {formatBRL(p.precoSugerido)}
+                    </td>
+                    <td
+                      className="num"
+                      style={{ color: "var(--text-tertiary)", fontSize: 12 }}
+                    >
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 3,
+                        }}
+                      >
+                        <Clock size={11} strokeWidth={1.5} />
+                        {p.tempoProducao} min
+                      </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
@@ -1710,12 +1397,7 @@ export default function ProdutosPage() {
       {view === "galeria" &&
         (filtrados.length === 0 ? (
           <div className="atlas-card">
-            <div className="atlas-empty" style={{ padding: "32px" }}>
-              <div className="atlas-empty-title">Nenhum produto encontrado</div>
-              <div className="atlas-empty-desc">
-                Tente um termo diferente ou adicione um novo produto.
-              </div>
-            </div>
+            <EstadoVazio temProdutos={lista.length > 0} onNovo={abrirNovo} />
           </div>
         ) : (
           <div
@@ -1725,127 +1407,92 @@ export default function ProdutosPage() {
               gap: 10,
             }}
           >
-            {filtrados.map((p) => {
-              const preco = p.categoria === "Impressão 3D" && p.etapas3D
-                ? calcPreco3D(p.custo, p.etapas3D, config, totalCustos).precoSugerido
-                : calcPrecoSugerido(p.custo, p.tempoProducao, config, totalCustos);
-              const temProntos = p.prontoEstoque !== undefined;
-              const prontoAlerta =
-                temProntos &&
-                p.prontoEstoqueMin !== undefined &&
-                (p.prontoEstoque ?? 0) <= p.prontoEstoqueMin;
-              return (
+            {filtrados.map((p) => (
+              <div
+                key={p.id}
+                onClick={() => openDetalhe(p)}
+                style={{
+                  background: "var(--bg-raised)",
+                  border: "1px solid var(--border-default)",
+                  borderRadius: "var(--radius-lg, 6px)",
+                  overflow: "hidden",
+                  cursor: "pointer",
+                  transition:
+                    "border-color 120ms ease, background-color 120ms ease",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLDivElement).style.borderColor =
+                    "var(--border-strong)";
+                  (e.currentTarget as HTMLDivElement).style.background =
+                    "var(--bg-elevated, #0f0f0f)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLDivElement).style.borderColor =
+                    "var(--border-default)";
+                  (e.currentTarget as HTMLDivElement).style.background =
+                    "var(--bg-raised)";
+                }}
+              >
                 <div
-                  key={p.id}
-                  onClick={() => openDetalhe(p)}
                   style={{
-                    background: "var(--bg-raised)",
-                    border: `1px solid ${prontoAlerta ? "rgba(244,71,71,0.35)" : "var(--border-default)"}`,
-                    borderRadius: "var(--radius-lg, 6px)",
-                    overflow: "hidden",
-                    cursor: "pointer",
-                    transition:
-                      "border-color 120ms ease, background-color 120ms ease",
+                    height: 120,
+                    background: "var(--bg-input)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderBottom: "1px solid var(--border-default)",
+                  }}
+                >
+                  {p.foto
+                    ? <img src={p.foto} alt={p.nome} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : <Box size={32} strokeWidth={1} style={{ color: "var(--text-tertiary)", opacity: 0.4 }} />
+                  }
+                </div>
+                <div
+                  style={{
+                    padding: "10px 10px 12px",
                     display: "flex",
                     flexDirection: "column",
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.borderColor =
-                      "var(--border-strong)";
-                    (e.currentTarget as HTMLDivElement).style.background =
-                      "var(--bg-elevated, #0f0f0f)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.borderColor =
-                      "var(--border-default)";
-                    (e.currentTarget as HTMLDivElement).style.background =
-                      "var(--bg-raised)";
+                    gap: 6,
+                    flex: 1,
                   }}
                 >
                   <div
-                    style={{
-                      height: 120,
-                      background: "var(--bg-input)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      borderBottom: "1px solid var(--border-default)",
-                    }}
+                    style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3 }}
                   >
-                    <Box
-                      size={32}
-                      strokeWidth={1}
-                      style={{ color: "var(--text-tertiary)", opacity: 0.4 }}
-                    />
+                    {p.nome}
                   </div>
-                  <div
-                    style={{
-                      padding: "10px 10px 12px",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 6,
-                      flex: 1,
-                    }}
-                  >
-                    <div
-                      style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3 }}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    <span
+                      className="atlas-badge"
+                      style={{ alignSelf: "flex-start", fontSize: 10 }}
                     >
-                      {p.nome}
-                    </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                      <span
-                        className="atlas-badge"
-                        style={{ alignSelf: "flex-start", fontSize: 10 }}
-                      >
-                        {p.categoria}
-                      </span>
-                      {temProntos && (
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 3,
-                            fontSize: 10,
-                            fontWeight: 600,
-                            padding: "1px 6px",
-                            borderRadius: "var(--radius-full)",
-                            background: prontoAlerta
-                              ? "rgba(244,71,71,0.12)"
-                              : "rgba(72,199,142,0.1)",
-                            color: prontoAlerta
-                              ? "var(--status-error)"
-                              : "var(--status-success)",
-                            border: `1px solid ${prontoAlerta ? "rgba(244,71,71,0.25)" : "rgba(72,199,142,0.25)"}`,
-                          }}
-                        >
-                          {prontoAlerta && <AlertTriangle size={9} strokeWidth={1.5} />}
-                          <PackageCheck size={9} strokeWidth={1.5} />
-                          {p.prontoEstoque}
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ marginTop: "auto" }}>
-                      <div
-                        style={{
-                          fontFamily: "var(--font-mono)",
-                          fontWeight: 700,
-                          fontSize: 14,
-                        }}
-                      >
-                        {formatBRL(preco)}
-                      </div>
+                      {p.categoria}
+                    </span>
+                  </div>
+                  <div style={{ marginTop: "auto" }}>
+                    <div
+                      style={{
+                        fontFamily: "var(--font-mono)",
+                        fontWeight: 700,
+                        fontSize: 14,
+                      }}
+                    >
+                      {formatBRL(p.precoSugerido)}
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         ))}
 
       {/* Modal detalhe */}
       <Modal
         open={mode === "detalhe"}
-        onClose={() => { setShowLoteForm(false); close(); }}
+        onClose={() => { close(); }}
         title={selected?.nome ?? "Produto"}
         wide
         footer={
@@ -1938,20 +1585,28 @@ export default function ProdutosPage() {
               insumos={insumos}
               config={config}
               totalCustos={totalCustos}
-              onRegistrarLote={() => setShowLoteForm(true)}
             />
-            {showLoteForm && (
-              <RegistrarLoteForm
-                produto={selected}
-                onSave={handleRegistrarLote}
-                onClose={() => setShowLoteForm(false)}
-              />
-            )}
           </>
         )}
       </Modal>
 
-      <ProdutoWizardModal open={wizardOpen} onClose={() => setWizardOpen(false)} />
+      {/* Modal novo produto */}
+      <Modal
+        open={mode === "novo"}
+        onClose={close}
+        title="Novo produto"
+        wide
+      >
+        <ProdutoFormContent
+          categorias={categorias}
+          insumos={insumos}
+          config={config}
+          totalCustos={totalCustos}
+          onSave={handleSave}
+          onClose={close}
+          onAddCategoria={handleAddCategoria}
+        />
+      </Modal>
 
       {/* Modal editar produto */}
       <Modal

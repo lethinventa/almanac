@@ -1,5 +1,5 @@
-import { createStore, newId } from "@/lib/mock-store";
-import { insumosSeed } from "@/lib/data";
+import { createRemoteStore, newId } from "@/lib/remote-store";
+import { listarProdutos } from "@/lib/repositories/produtos-registro";
 
 export type InsumoCategoria = "visivel" | "invisivel" | "ferramenta" | "maquinario";
 
@@ -25,14 +25,14 @@ export interface InsumoInput {
   fornecedor?: string;
 }
 
-const store = createStore<Insumo>("almanac_insumos", insumosSeed);
+const store = createRemoteStore<Insumo>("insumos");
 
 function sortedHistorico(historico: Insumo["historico"]) {
   return [...historico].sort((a, b) => a.data.localeCompare(b.data));
 }
 
 export async function buscarInsumos(): Promise<Insumo[]> {
-  return [...store.list()]
+  return (await store.list())
     .sort((a, b) => a.nome.localeCompare(b.nome))
     .map((i) => ({ ...i, historico: sortedHistorico(i.historico) }));
 }
@@ -54,7 +54,7 @@ export async function criarInsumo(dados: InsumoInput): Promise<Insumo> {
 }
 
 export async function editarInsumo(id: string, dados: Partial<InsumoInput>): Promise<Insumo> {
-  const atual = store.find(id);
+  const atual = await store.find(id);
   if (!atual) throw new Error("Insumo não encontrado");
 
   const patch: Partial<Insumo> = {};
@@ -73,17 +73,21 @@ export async function editarInsumo(id: string, dados: Partial<InsumoInput>): Pro
     ];
   }
 
-  const updated = store.update(id, patch);
+  const updated = await store.update(id, patch);
   if (!updated) throw new Error("Erro ao editar insumo");
   return { ...updated, historico: sortedHistorico(updated.historico) };
 }
 
 export async function deletarInsumo(id: string): Promise<void> {
-  store.remove(id);
+  const emUso = (await listarProdutos()).filter((p) => p.receita.some((r) => r.insumoId === id));
+  if (emUso.length > 0) {
+    throw new Error(`Este insumo está na receita de: ${emUso.map((p) => p.nome).join(", ")}.`);
+  }
+  await store.remove(id);
 }
 
 export async function registrarPreco(insumoId: string, preco: number, data: string): Promise<void> {
-  const atual = store.find(insumoId);
+  const atual = await store.find(insumoId);
   if (!atual) throw new Error("Insumo não encontrado");
-  store.update(insumoId, { historico: [...atual.historico, { data, preco }] });
+  await store.update(insumoId, { historico: [...atual.historico, { data, preco }] });
 }

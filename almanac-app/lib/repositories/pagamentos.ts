@@ -1,5 +1,4 @@
-import { createStore, newId } from "@/lib/mock-store";
-import { pagamentosSeed } from "@/lib/data";
+import { createRemoteStore, newId } from "@/lib/remote-store";
 
 export interface Pagamento {
   id: string;
@@ -8,7 +7,10 @@ export interface Pagamento {
   metodo: "pix" | "dinheiro" | "cartao";
   data: string;
   tipo: "recebimento" | "estorno";
+  observacao?: string;
   motivoEstorno?: string;
+  // Preenchido apenas em estornos: id do recebimento que foi estornado
+  estornoDeId?: string;
 }
 
 export interface PagamentoInput {
@@ -19,10 +21,10 @@ export interface PagamentoInput {
   observacao?: string;
 }
 
-const store = createStore<Pagamento>("almanac_pagamentos", pagamentosSeed);
+const store = createRemoteStore<Pagamento>("pagamentos");
 
 export async function buscarPagamentos(encomendaId: string): Promise<Pagamento[]> {
-  return store.list().filter((p) => p.encomendaId === encomendaId);
+  return (await store.list()).filter((p) => p.encomendaId === encomendaId);
 }
 
 export async function registrarPagamento(dados: PagamentoInput): Promise<Pagamento> {
@@ -33,6 +35,7 @@ export async function registrarPagamento(dados: PagamentoInput): Promise<Pagamen
     metodo: dados.metodo,
     data: dados.data,
     tipo: "recebimento",
+    observacao: dados.observacao,
   };
   return store.insert(pagamento);
 }
@@ -41,18 +44,22 @@ export async function buscarTodosPagamentos(): Promise<
   Record<string, Array<{ id: string; valor: number; data: string; forma: string; observacao?: string }>>
 > {
   const result: Record<string, Array<{ id: string; valor: number; data: string; forma: string; observacao?: string }>> = {};
-  for (const p of store.list()) {
+  for (const p of await store.list()) {
     if (!result[p.encomendaId]) result[p.encomendaId] = [];
-    result[p.encomendaId].push({ id: p.id, valor: p.valor, data: p.data, forma: p.metodo, observacao: p.motivoEstorno });
+    result[p.encomendaId].push({ id: p.id, valor: p.valor, data: p.data, forma: p.metodo, observacao: p.observacao ?? p.motivoEstorno });
   }
   return result;
 }
 
 export async function estornarPagamento(pagamentoId: string, motivo: string): Promise<void> {
-  const original = store.find(pagamentoId);
+  const original = await store.find(pagamentoId);
   if (!original) throw new Error("Pagamento não encontrado");
+  if (original.tipo !== "recebimento") throw new Error("Só é possível estornar um recebimento.");
 
-  store.insert({
+  const jaEstornado = (await store.list()).some((p) => p.estornoDeId === pagamentoId);
+  if (jaEstornado) throw new Error("Este pagamento já foi estornado.");
+
+  await store.insert({
     id: newId(),
     encomendaId: original.encomendaId,
     valor: -Math.abs(original.valor),
@@ -60,5 +67,6 @@ export async function estornarPagamento(pagamentoId: string, motivo: string): Pr
     data: new Date().toISOString().slice(0, 10),
     tipo: "estorno",
     motivoEstorno: motivo,
+    estornoDeId: pagamentoId,
   });
 }

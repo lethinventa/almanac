@@ -1,30 +1,28 @@
 "use client";
 
-import { StepLayout } from "./step-layout";
+import { CampoFormulario } from "./campo-formulario";
 
-export function StepSimNao({
-  title,
+export function CampoSimNaoNumero({
+  label,
   hint,
   selected,
   onSelect,
   numeroLabel,
   numeroValue,
   onNumeroChange,
-  onContinue,
   error,
 }: {
-  title: string;
+  label: string;
   hint?: string;
   selected: boolean | null;
   onSelect: (v: boolean) => void;
   numeroLabel: string;
   numeroValue: string;
   onNumeroChange: (v: string) => void;
-  onContinue: () => void;
   error?: string | null;
 }) {
   return (
-    <StepLayout title={title} hint={hint} onContinue={selected === true ? onContinue : undefined} error={error}>
+    <CampoFormulario label={label} hint={hint} error={error}>
       <div className="alm-wizard-simnao">
         <button
           type="button"
@@ -43,16 +41,14 @@ export function StepSimNao({
       </div>
       {selected === true && (
         <input
-          autoFocus
           className="atlas-input"
           type="number"
           min="0"
           placeholder={numeroLabel}
           value={numeroValue}
           onChange={(e) => onNumeroChange(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && onContinue()}
         />
       )}
-    </StepLayout>
+    </CampoFormulario>
   );
 }

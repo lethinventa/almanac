@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { BookMarked, Sun, Moon, LogOut, ChevronDown } from "lucide-react";
+import { Sun, Moon, LogOut, ChevronDown } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 
 function getInitials(nome: string): string {
@@ -9,7 +9,7 @@ function getInitials(nome: string): string {
 }
 
 export function Titlebar() {
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme, setTheme] = useState<"dark" | "light">("light");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
   const { user, logout } = useAuth();
@@ -38,14 +38,6 @@ export function Titlebar() {
 
   return (
     <>
-      {/* Logo */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <BookMarked size={16} strokeWidth={1.5} style={{ color: "var(--accent-primary)" }} />
-        <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--text-primary)" }}>
-          Almanac
-        </span>
-      </div>
-
       {/* Right side */}
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         {/* Theme toggle */}
@@ -105,7 +97,7 @@ export function Titlebar() {
                 background: "var(--bg-raised)",
                 border: "1px solid var(--border-default)",
                 borderRadius: "var(--radius-sm)",
-                boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
+
                 zIndex: 100, overflow: "hidden",
               }}>
                 <div style={{ padding: "8px 12px 7px", borderBottom: "1px solid var(--border-subtle)" }}>

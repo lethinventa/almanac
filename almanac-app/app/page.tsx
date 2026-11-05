@@ -10,7 +10,8 @@ import {
 import { KanbanWidget } from "@/components/kanban-widget";
 import { formatBRL, categoriaLabel } from "@/lib/utils";
 import { buscarInsumos, criarInsumo, type Insumo, type InsumoCategoria } from "@/lib/repositories/insumos";
-import { buscarProdutos, criarProduto, type Produto } from "@/lib/repositories/produtos";
+import { buscarProdutos, type ProdutoCalculado } from "@/lib/repositories/produtos";
+import { buscarProdutosPE, type ProdutoPE } from "@/lib/repositories/pronta-entrega";
 import { buscarEncomendas, criarEncomenda, type Encomenda, type EncomendaInput } from "@/lib/repositories/encomendas";
 import { buscarTotalCustosIndiretos } from "@/lib/repositories/financeiro";
 import { NovaEncomendaForm } from "@/components/shared/nova-encomenda-form";
@@ -160,97 +161,12 @@ function NovoInsumoForm({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ── Novo Produto ──────────────────────────────────────────────
-const CATEGORIAS = ["Chaveiro", "Adesivo", "Tag", "Cartão", "Planner", "Kit", "Outro"];
-
-function NovoProdutoForm({ onClose }: { onClose: () => void }) {
-  const [nome, setNome] = useState("");
-  const [categoria, setCategoria] = useState(CATEGORIAS[0]);
-  const [preco, setPreco] = useState("");
-  const [custo, setCusto] = useState("");
-  const [tempo, setTempo] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  if (saved) return (
-    <div style={{ padding: "32px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-      <div style={{ fontSize: 32 }}>✓</div>
-      <div style={{ fontWeight: 600 }}>Produto cadastrado!</div>
-      <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Acesse o módulo Produtos para gerenciar.</div>
-      <button className="atlas-btn atlas-btn-secondary atlas-btn-sm" style={{ marginTop: 8 }} onClick={onClose}>Fechar</button>
-    </div>
-  );
-
-  const precoNum = parseFloat(preco) || 0;
-  const custoNum = parseFloat(custo) || 0;
-  const tempoNum = parseInt(tempo) || 0;
-  const margem = precoNum > 0 ? ((precoNum - custoNum) / precoNum) * 100 : 0;
-
-  const handleSubmit = async () => {
-    if (!nome.trim()) return;
-    setSaving(true);
-    try {
-      await criarProduto({
-        nome: nome.trim(),
-        categoria,
-        receita: [],
-        tempoProducao: tempoNum,
-        custo: custoNum,
-        precoSugerido: precoNum,
-        margem,
-      });
-      setSaved(true);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <>
-      <div className="alm-field">
-        <label className="alm-label">Nome *</label>
-        <input autoFocus className="atlas-input" placeholder="Ex: Kit festa personalizado" value={nome} onChange={(e) => setNome(e.target.value)} />
-      </div>
-
-      <div className="alm-field">
-        <label className="alm-label">Categoria</label>
-        <select className="alm-select" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-          {CATEGORIAS.map((c) => <option key={c}>{c}</option>)}
-        </select>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-        <div className="alm-field">
-          <label className="alm-label">Preço de venda (R$)</label>
-          <input className="atlas-input" type="number" step="0.01" placeholder="0,00" value={preco} onChange={(e) => setPreco(e.target.value)} />
-        </div>
-        <div className="alm-field">
-          <label className="alm-label">Custo (R$)</label>
-          <input className="atlas-input" type="number" step="0.01" placeholder="0,00" value={custo} onChange={(e) => setCusto(e.target.value)} />
-        </div>
-        <div className="alm-field">
-          <label className="alm-label">Tempo (min)</label>
-          <input className="atlas-input" type="number" placeholder="30" value={tempo} onChange={(e) => setTempo(e.target.value)} />
-        </div>
-      </div>
-
-      <div className="alm-modal-footer" style={{ margin: "0 -20px -16px", padding: "12px 20px" }}>
-        <button className="atlas-btn atlas-btn-secondary" onClick={onClose}>Cancelar</button>
-        <button className="atlas-btn atlas-btn-primary" disabled={!nome.trim() || saving} onClick={handleSubmit}>
-          {saving ? "Cadastrando…" : "Cadastrar produto"}
-        </button>
-      </div>
-    </>
-  );
-}
-
-// ── StatCard ──────────────────────────────────────────────────
-function StatCard({ label, value, delta, deltaUp, icon: Icon, accent }: {
+function StatCard({ label, value, delta, deltaUp, icon: Icon, accent, highlight }: {
   label: string; value: string; delta?: string; deltaUp?: boolean;
-  icon: React.ElementType; accent?: "error" | "warning";
+  icon: React.ElementType; accent?: "error" | "warning"; highlight?: boolean;
 }) {
   return (
-    <div className="atlas-card" style={{ padding: 0, display: "flex", flexDirection: "column" }}>
+    <div className={`atlas-card${highlight ? " is-highlight" : ""}`} style={{ padding: 0, display: "flex", flexDirection: "column" }}>
       <div className="atlas-card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
           <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-tertiary)" }}>{label}</span>
@@ -264,18 +180,18 @@ function StatCard({ label, value, delta, deltaUp, icon: Icon, accent }: {
 }
 
 // ── Page ──────────────────────────────────────────────────────
-type ModalType = "encomenda" | "insumo" | "produto" | null;
+type ModalType = "encomenda" | "insumo" | null;
 
 export default function DashboardPage() {
   const router = useRouter();
   const [modal, setModal] = useState<ModalType>(null);
   const [insumosAlerta, setInsumosAlerta] = useState<Insumo[]>([]);
-  const [produtosAlerta, setProdutosAlerta] = useState<Produto[]>([]);
+  const [produtosAlerta, setProdutosAlerta] = useState<ProdutoPE[]>([]);
   const [encomendasAbertas, setEncomendasAbertas] = useState<Encomenda[]>([]);
   const [receitaMes, setReceitaMes] = useState(0);
   const [lucroBruto, setLucroBruto] = useState(0);
   const [lucroLiquido, setLucroLiquido] = useState(0);
-  const [produtosList, setProdutosList] = useState<Produto[]>([]);
+  const [produtosList, setProdutosList] = useState<ProdutoCalculado[]>([]);
 
   useEffect(() => {
     Promise.all([
@@ -283,9 +199,10 @@ export default function DashboardPage() {
       buscarProdutos(),
       buscarEncomendas(),
       buscarTotalCustosIndiretos(),
-    ]).then(([ins, prods, encs, totalCustos]) => {
+      buscarProdutosPE(),
+    ]).then(([ins, prods, encs, totalCustos, prontaEntrega]) => {
       setInsumosAlerta(ins.filter(i => i.estoque !== null && i.estoqueMin !== null && (i.estoque ?? 0) <= (i.estoqueMin ?? 0)));
-      setProdutosAlerta(prods.filter(p => p.prontoEstoqueMin !== undefined && (p.prontoEstoque ?? 0) <= p.prontoEstoqueMin));
+      setProdutosAlerta(prontaEntrega.filter(p => p.estoqueAtual <= p.estoqueMin));
       const abertas = encs.filter(e => e.status !== 'entregue' && e.status !== 'cancelado');
       setEncomendasAbertas(abertas);
       setProdutosList(prods);
@@ -308,15 +225,17 @@ export default function DashboardPage() {
 
   return (
     <div className="alm-page">
-      <div className="alm-page-header">
-        <div>
-          <h1 className="alm-page-title">Dashboard</h1>
-          <p className="alm-page-subtitle">{`Visão geral · ${new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}`}</p>
-        </div>
-        <div className="atlas-segmented">
-          <button className="atlas-segmented-item">Semana</button>
-          <button className="atlas-segmented-item is-active">Mês</button>
-          <button className="atlas-segmented-item">Ano</button>
+      <div className="alm-page-header" style={{ justifyContent: "flex-end" }}>
+        <div className="alm-header-actions">
+          <button className="atlas-btn atlas-btn-secondary" onClick={() => setModal("insumo")}>
+            <Plus size={15} strokeWidth={2} />Novo insumo
+          </button>
+          <button className="atlas-btn atlas-btn-secondary" onClick={() => router.push("/produtos?novo=1")}>
+            <Plus size={15} strokeWidth={2} />Novo produto
+          </button>
+          <button className="atlas-btn atlas-btn-primary" onClick={() => setModal("encomenda")}>
+            <Plus size={15} strokeWidth={2} />Nova encomenda
+          </button>
         </div>
       </div>
 
@@ -324,91 +243,78 @@ export default function DashboardPage() {
         <StatCard label="Receita do mês" value={formatBRL(receitaMes)} icon={TrendingUp} />
         <StatCard label="Lucro bruto" value={formatBRL(lucroBruto)} icon={TrendingUp} />
         <StatCard label="Encomendas abertas" value={String(encomendasAbertas.length)} icon={ShoppingBag} />
-        <StatCard label="Alertas de estoque" value={String(insumosAlerta.length)} icon={AlertTriangle} accent={insumosAlerta.length > 0 ? "error" : undefined} />
-      </div>
-
-      {/* Ações rápidas */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button className="atlas-btn atlas-btn-secondary" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setModal("encomenda")}>
-          <Plus size={13} strokeWidth={1.5} /><ClipboardList size={13} strokeWidth={1.5} />Nova encomenda
-        </button>
-        <button className="atlas-btn atlas-btn-secondary" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setModal("insumo")}>
-          <Plus size={13} strokeWidth={1.5} /><Package size={13} strokeWidth={1.5} />Novo insumo
-        </button>
-        <button className="atlas-btn atlas-btn-secondary" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setModal("produto")}>
-          <Plus size={13} strokeWidth={1.5} /><Box size={13} strokeWidth={1.5} />Novo produto
-        </button>
+        <StatCard label="Lucro líquido estimado" value={formatBRL(lucroLiquido)} icon={TrendingUp} highlight />
       </div>
 
       <KanbanWidget />
 
-      {/* Estoque em alerta */}
-      <div className="atlas-card">
-        <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span className="atlas-dot atlas-dot-error is-pulse" />
-            <span className="atlas-panel-title">Estoque em alerta</span>
-          </span>
-          <Link href="/insumos" className="atlas-link" style={{ fontSize: 11 }}>Ver todos</Link>
-        </div>
-        <div className="atlas-card-body" style={{ padding: 0 }}>
-          {insumosAlerta.length === 0 ? (
-            <div className="atlas-empty" style={{ padding: 24 }}>
-              <div className="atlas-empty-title">Nenhum alerta</div>
-              <div className="atlas-empty-desc">Todos os insumos estão acima do mínimo.</div>
+      <div className="alm-bento">
+        {/* Estoque em alerta */}
+          <div className="atlas-card">
+            <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className={`atlas-dot ${insumosAlerta.length > 0 ? "atlas-dot-error is-pulse" : ""}`} />
+                <span className="atlas-panel-title">Estoque em alerta</span>
+                {insumosAlerta.length > 0 && <span className="atlas-badge atlas-badge-error">{insumosAlerta.length}</span>}
+              </span>
+              <Link href="/insumos" className="atlas-link" style={{ fontSize: 13 }}>Ver todos</Link>
             </div>
-          ) : (
-            <table className="atlas-table" style={{ width: "100%", border: 0 }}>
-              <thead><tr><th>Insumo</th><th>Categoria</th><th className="num">Estoque atual</th><th className="num">Mínimo</th><th className="num">Preço atual</th></tr></thead>
-              <tbody>
-                {insumosAlerta.map((insumo) => (
-                  <tr key={insumo.id}>
-                    <td><div style={{ display: "flex", alignItems: "center", gap: 8 }}><Package size={13} strokeWidth={1.5} style={{ color: "var(--status-error)", flexShrink: 0 }} /><span style={{ fontWeight: 500 }}>{insumo.nome}</span></div></td>
-                    <td style={{ color: "var(--text-tertiary)", fontSize: 11 }}>{categoriaLabel[insumo.categoria]}</td>
-                    <td className="num"><span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--status-error)" }}>{insumo.estoque} {insumo.unidade}</span></td>
-                    <td className="num" style={{ fontFamily: "var(--font-mono)", color: "var(--text-tertiary)" }}>{insumo.estoqueMin} {insumo.unidade}</td>
-                    <td className="num" style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(insumo.precoAtual)}/{insumo.unidade}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="atlas-card-body" style={{ padding: insumosAlerta.length === 0 ? undefined : 0 }}>
+              {insumosAlerta.length === 0 ? (
+                <div className="atlas-empty" style={{ padding: 24 }}>
+                  <div className="atlas-empty-title">Nenhum alerta</div>
+                  <div className="atlas-empty-desc">Todos os insumos estão acima do mínimo.</div>
+                </div>
+              ) : (
+                <table className="atlas-table" style={{ width: "100%", border: 0 }}>
+                  <thead><tr><th>Insumo</th><th className="num">Atual</th><th className="num">Mínimo</th></tr></thead>
+                  <tbody>
+                    {insumosAlerta.map((insumo) => (
+                      <tr key={insumo.id}>
+                        <td>
+                          <div style={{ fontWeight: 500 }}>{insumo.nome}</div>
+                          <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{categoriaLabel[insumo.categoria]}</div>
+                        </td>
+                        <td className="num"><span style={{ fontWeight: 600, color: "var(--status-error)" }}>{insumo.estoque} {insumo.unidade}</span></td>
+                        <td className="num" style={{ color: "var(--text-tertiary)" }}>{insumo.estoqueMin} {insumo.unidade}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          {/* Pronta entrega em alerta */}
+          {produtosAlerta.length > 0 && (
+            <div className="atlas-card">
+              <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span className="atlas-dot atlas-dot-warning is-pulse" />
+                  <span className="atlas-panel-title">Pronta entrega em alerta</span>
+                  <span className="atlas-badge atlas-badge-warning">{produtosAlerta.length}</span>
+                </span>
+                <Link href="/pronta-entrega" className="atlas-link" style={{ fontSize: 13 }}>Ver produtos</Link>
+              </div>
+              <div className="atlas-card-body" style={{ padding: 0 }}>
+                <table className="atlas-table" style={{ width: "100%", border: 0 }}>
+                  <thead><tr><th>Produto</th><th className="num">Em estoque</th><th className="num">Mínimo</th></tr></thead>
+                  <tbody>
+                    {produtosAlerta.map((p) => (
+                      <tr key={p.id}>
+                        <td>
+                          <div style={{ fontWeight: 500 }}>{p.nome}</div>
+                          <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{p.descricao ?? "—"}</div>
+                        </td>
+                        <td className="num"><span style={{ fontWeight: 600, color: p.estoqueAtual === 0 ? "var(--status-error)" : "var(--status-warning)" }}>{p.estoqueAtual}</span></td>
+                        <td className="num" style={{ color: "var(--text-tertiary)" }}>{p.estoqueMin}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
-        </div>
-      </div>
-
-      {produtosAlerta.length > 0 && (
-        <div className="atlas-card">
-          <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span className="atlas-dot atlas-dot-warning is-pulse" />
-              <span className="atlas-panel-title">Pronta entrega em alerta</span>
-            </span>
-            <Link href="/produtos" className="atlas-link" style={{ fontSize: 11 }}>Ver produtos</Link>
-          </div>
-          <div className="atlas-card-body" style={{ padding: 0 }}>
-            <table className="atlas-table" style={{ width: "100%", border: 0 }}>
-              <thead><tr><th>Produto</th><th>Categoria</th><th className="num">Em estoque</th><th className="num">Mínimo</th></tr></thead>
-              <tbody>
-                {produtosAlerta.map((p) => (
-                  <tr key={p.id}>
-                    <td><div style={{ display: "flex", alignItems: "center", gap: 8 }}><PackageCheck size={13} strokeWidth={1.5} style={{ color: "var(--status-warning)", flexShrink: 0 }} /><span style={{ fontWeight: 500 }}>{p.nome}</span></div></td>
-                    <td style={{ color: "var(--text-tertiary)", fontSize: 11 }}>{p.categoria}</td>
-                    <td className="num"><span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: (p.prontoEstoque ?? 0) === 0 ? "var(--status-error)" : "var(--status-warning)" }}>{p.prontoEstoque ?? 0}</span></td>
-                    <td className="num" style={{ fontFamily: "var(--font-mono)", color: "var(--text-tertiary)" }}>{p.prontoEstoqueMin}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      <div style={{ border: "1px solid var(--border-default)", borderRadius: 6, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: lucroLiquido >= 0 ? "rgba(77,77,77,0.06)" : "rgba(244,71,71,0.06)" }}>
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: 2 }}>{`Lucro líquido estimado (${new Date().toLocaleDateString("pt-BR", { month: "long" })})`}</div>
-          <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--font-mono)", color: lucroLiquido >= 0 ? "var(--status-success)" : "var(--status-error)" }}>{formatBRL(lucroLiquido)}</div>
-        </div>
-        <Link href="/financeiro" className="atlas-btn atlas-btn-secondary atlas-btn-sm">Ver financeiro</Link>
       </div>
 
       {/* Modais */}
@@ -417,9 +323,6 @@ export default function DashboardPage() {
       </Modal>
       <Modal open={modal === "insumo"} onClose={() => setModal(null)} title="Novo insumo">
         <NovoInsumoForm onClose={() => setModal(null)} />
-      </Modal>
-      <Modal open={modal === "produto"} onClose={() => setModal(null)} title="Novo produto">
-        <NovoProdutoForm onClose={() => setModal(null)} />
       </Modal>
     </div>
   );

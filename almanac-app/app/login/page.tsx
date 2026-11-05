@@ -19,7 +19,11 @@ export default function LoginPage() {
       return;
     }
     setLoading(true);
-    login(email.trim());
+    const erroLogin = await login(email.trim(), senha);
+    if (erroLogin) {
+      setErro(erroLogin);
+      setLoading(false);
+    }
   }
 
   return (
@@ -58,7 +62,7 @@ export default function LoginPage() {
             <BookMarked size={22} strokeWidth={1.5} style={{ color: "var(--text-primary)" }} />
           </div>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>Almanac</div>
+            <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>ginga.web</div>
             <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>Papelaria criativa</div>
           </div>
         </div>

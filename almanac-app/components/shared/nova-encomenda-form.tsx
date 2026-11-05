@@ -5,7 +5,9 @@ import {
   Plus, Trash2, Package, ImagePlus, Link2, FileText,
 } from "lucide-react";
 import { formatBRL } from "@/lib/utils";
-import type { Produto } from "@/lib/repositories/produtos";
+import { lerImagem } from "@/lib/imagem";
+import { Combobox } from "@/components/shared/combobox";
+import type { ProdutoCalculado } from "@/lib/repositories/produtos";
 import type { EncomendaInput } from "@/lib/repositories/encomendas";
 
 interface ItemRow {
@@ -23,7 +25,7 @@ function FotoUploadSmall({ value, onChange }: { value: string | null; onChange: 
   const inputRef = useRef<HTMLInputElement>(null);
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) onChange(URL.createObjectURL(f));
+    if (f) lerImagem(f).then(onChange).catch((err) => console.error("Erro ao ler imagem:", err));
   };
   return (
     <div className="alm-upload" onClick={() => inputRef.current?.click()}>
@@ -48,7 +50,7 @@ export function NovaEncomendaForm({
 }: {
   onSave: (enc: EncomendaInput) => void;
   onClose: () => void;
-  produtos: Produto[];
+  produtos: ProdutoCalculado[];
 }) {
   const hoje = new Date().toISOString().slice(0, 10);
 
@@ -105,7 +107,12 @@ export function NovaEncomendaForm({
     setNovoLinkUrl("");
   };
 
-  const canSave = cliente.trim().length > 0 && dataEntrega && itens.length > 0;
+  const camposFaltando = [
+    cliente.trim().length === 0 && "cliente",
+    !dataEntrega && "data de entrega",
+    itens.length === 0 && "ao menos um item",
+  ].filter(Boolean) as string[];
+  const canSave = camposFaltando.length === 0;
 
   const handleSave = () => {
     if (!canSave) return;
@@ -140,10 +147,14 @@ export function NovaEncomendaForm({
         </div>
         <div className="alm-field">
           <label className="alm-label">Canal</label>
-          <select className="alm-select" style={{ height: 32 }} value={canal} onChange={(e) => setCanal(e.target.value as "whatsapp" | "presencial")}>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="presencial">Presencial</option>
-          </select>
+          <Combobox
+            value={canal}
+            onChange={(v) => setCanal(v as "whatsapp" | "presencial")}
+            options={[
+              { value: "whatsapp", label: "WhatsApp" },
+              { value: "presencial", label: "Presencial" },
+            ]}
+          />
         </div>
       </div>
 
@@ -170,6 +181,7 @@ export function NovaEncomendaForm({
             return (
               <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 64px 88px 72px 24px", gap: 6, alignItems: "center" }}>
                 <select className="alm-select" style={{ height: 32, fontSize: 12 }} value={row.produtoId} onChange={(e) => updateItem(idx, "produtoId", e.target.value)}>
+                  {produtos.length === 0 && <option value="" disabled>Nenhum produto cadastrado</option>}
                   {produtos.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
                 </select>
                 <input className="atlas-input" type="number" min="1" placeholder="Qtd" style={{ fontSize: 12 }} value={row.quantidade} onChange={(e) => updateItem(idx, "quantidade", e.target.value)} />
@@ -238,7 +250,12 @@ export function NovaEncomendaForm({
         <textarea className="atlas-input" rows={2} placeholder="Instruções especiais, referências, etc." style={{ resize: "vertical", padding: "6px 8px", lineHeight: 1.5 }} value={obs} onChange={(e) => setObs(e.target.value)} />
       </div>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, paddingTop: 4, borderTop: "1px solid var(--border-default)", marginTop: 4 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, paddingTop: 4, borderTop: "1px solid var(--border-default)", marginTop: 4 }}>
+        {!canSave && (
+          <span style={{ marginRight: "auto", fontSize: 11, color: "var(--text-tertiary)" }}>
+            Falta preencher: {camposFaltando.join(", ")}
+          </span>
+        )}
         <button type="button" className="atlas-btn atlas-btn-secondary atlas-btn-sm" onClick={onClose}>Cancelar</button>
         <button type="button" className="atlas-btn atlas-btn-primary atlas-btn-sm" disabled={!canSave} style={{ opacity: canSave ? 1 : 0.4 }} onClick={handleSave}>
           Criar encomenda

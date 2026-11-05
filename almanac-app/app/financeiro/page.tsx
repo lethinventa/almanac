@@ -79,9 +79,9 @@ function gerarAutoMovimentacoes(
 ): Movimentacao[] {
   const result: Movimentacao[] = [];
 
-  // Entradas: usa pagamentos reais quando existem, senão totalCobrado (só entregues)
+  // Entradas: usa pagamentos reais quando existem, senão totalCobrado (só entregues).
+  // Pagamentos de encomendas canceladas continuam contando: o dinheiro foi recebido.
   encomendasData
-    .filter((e) => e.status !== "cancelado")
     .forEach((e) => {
       const pags = allPagamentos[e.id] ?? [];
       if (pags.length > 0) {

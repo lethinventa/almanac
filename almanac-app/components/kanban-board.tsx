@@ -8,7 +8,7 @@ import {
   statusLabels,
 } from "@/lib/utils";
 import { type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
-import { buscarProdutos, type Produto } from "@/lib/repositories/produtos";
+import { buscarProdutos, type ProdutoCalculado } from "@/lib/repositories/produtos";
 
 const STATUS_ORDER: EncomendaStatus[] = [
   "aguardando",
@@ -41,7 +41,7 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<EncomendaStatus | null>(null);
-  const [produtosList, setProdutosList] = useState<Produto[]>([]);
+  const [produtosList, setProdutosList] = useState<ProdutoCalculado[]>([]);
 
   useEffect(() => {
     buscarProdutos().then(setProdutosList);
@@ -85,20 +85,33 @@ export function KanbanBoard({
           >
             {/* Column header */}
             <div
-              className="alm-kanban-col-header"
               style={{
-                borderLeft: `2px solid ${STATUS_COLOR[status]}`,
-                background: isOver ? "var(--bg-hover)" : undefined,
-                transition: "background-color 120ms ease",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                padding: "4px 2px",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "var(--text-primary)",
               }}
             >
-              <span style={{ color: STATUS_COLOR[status] }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: STATUS_COLOR[status],
+                    flexShrink: 0,
+                  }}
+                />
                 {statusLabels[status]}
               </span>
               <span
                 style={{
-                  fontSize: 10,
-                  fontFamily: "var(--font-mono)",
+                  fontSize: 12,
+                  fontWeight: 500,
                   color: "var(--text-tertiary)",
                 }}
               >

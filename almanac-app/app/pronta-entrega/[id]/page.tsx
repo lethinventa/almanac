@@ -32,7 +32,7 @@ function EntradaModal({ preco, onClose, onSave }: { preco: number; onClose: () =
   const ok = parseInt(qtd) > 0;
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--bg-raised)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", width: 360, maxWidth: "calc(100vw - 32px)", overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.28)" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--bg-raised)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", width: 360, maxWidth: "calc(100vw - 32px)", overflow: "hidden" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--border-default)" }}>
           <span style={{ fontWeight: 600, fontSize: 14 }}>Adicionar ao estoque</span>
           <button className="atlas-btn atlas-btn-ghost atlas-btn-icon atlas-btn-sm" onClick={onClose}><X size={14} strokeWidth={1.5} /></button>
@@ -68,7 +68,7 @@ function VendaModal({ precoVenda, estoqueAtual, onClose, onSave }: { precoVenda:
   const ok = qtdN > 0 && qtdN <= estoqueAtual;
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--bg-raised)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", width: 400, maxWidth: "calc(100vw - 32px)", overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.28)" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--bg-raised)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", width: 400, maxWidth: "calc(100vw - 32px)", overflow: "hidden" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--border-default)" }}>
           <span style={{ fontWeight: 600, fontSize: 14 }}>Registrar venda</span>
           <button className="atlas-btn atlas-btn-ghost atlas-btn-icon atlas-btn-sm" onClick={onClose}><X size={14} strokeWidth={1.5} /></button>

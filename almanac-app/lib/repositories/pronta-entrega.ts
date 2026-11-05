@@ -1,5 +1,4 @@
-import { createStore, newId } from "@/lib/mock-store";
-import { produtosPeSeed } from "@/lib/data";
+import { createRemoteStore, newId } from "@/lib/remote-store";
 
 export interface ProdutoPE {
   id: string;
@@ -20,10 +19,10 @@ export interface ProdutoPEInput {
   estoqueMin: number;
 }
 
-const store = createStore<ProdutoPE>("almanac_produtos_pe", produtosPeSeed);
+const store = createRemoteStore<ProdutoPE>("produtos_pe");
 
 export async function buscarProdutosPE(): Promise<ProdutoPE[]> {
-  return store.list().slice().sort((a, b) => a.nome.localeCompare(b.nome));
+  return (await store.list()).sort((a, b) => a.nome.localeCompare(b.nome));
 }
 
 export async function buscarProdutoPE(id: string): Promise<ProdutoPE | null> {
@@ -52,11 +51,11 @@ export async function editarProdutoPE(id: string, dados: Partial<ProdutoPEInput>
   if (dados.estoqueAtual !== undefined) patch.estoqueAtual = dados.estoqueAtual;
   if (dados.estoqueMin !== undefined) patch.estoqueMin = dados.estoqueMin;
 
-  const updated = store.update(id, patch);
+  const updated = await store.update(id, patch);
   if (!updated) throw new Error("Produto PE não encontrado");
   return updated;
 }
 
 export async function deletarProdutoPE(id: string): Promise<void> {
-  store.remove(id);
+  await store.remove(id);
 }

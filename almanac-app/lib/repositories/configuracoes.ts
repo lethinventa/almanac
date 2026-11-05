@@ -1,4 +1,4 @@
-import { createSingletonStore } from "@/lib/mock-store";
+import { createRemoteSingleton } from "@/lib/remote-store";
 import { configuracoesSeed } from "@/lib/data";
 
 export interface Configuracoes {
@@ -7,12 +7,12 @@ export interface Configuracoes {
   custoHoraBambu: number;
 }
 
-const store = createSingletonStore<Configuracoes>("almanac_configuracoes", configuracoesSeed);
+const store = createRemoteSingleton<Configuracoes>("configuracoes", configuracoesSeed);
 
 export async function buscarConfiguracoes(): Promise<Configuracoes> {
   return store.get();
 }
 
 export async function salvarConfiguracoes(config: Partial<Configuracoes>): Promise<void> {
-  store.set(config);
+  await store.set(config);
 }

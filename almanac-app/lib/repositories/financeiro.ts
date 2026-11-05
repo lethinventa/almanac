@@ -1,5 +1,4 @@
-import { createStore, newId } from "@/lib/mock-store";
-import { custosIndiretosSeed } from "@/lib/data";
+import { createRemoteStore, newId } from "@/lib/remote-store";
 
 export interface CustoIndireto {
   id: string;
@@ -7,10 +6,10 @@ export interface CustoIndireto {
   valorMensal: number;
 }
 
-const store = createStore<CustoIndireto>("almanac_custos_indiretos", custosIndiretosSeed);
+const store = createRemoteStore<CustoIndireto>("custos_indiretos");
 
 export async function buscarCustosIndiretos(): Promise<CustoIndireto[]> {
-  return store.list().slice().sort((a, b) => a.nome.localeCompare(b.nome));
+  return (await store.list()).sort((a, b) => a.nome.localeCompare(b.nome));
 }
 
 export async function buscarTotalCustosIndiretos(): Promise<number> {
@@ -30,11 +29,11 @@ export async function editarCustoIndireto(
   if (dados.nome !== undefined) patch.nome = dados.nome;
   if (dados.valorMensal !== undefined) patch.valorMensal = dados.valorMensal;
 
-  const updated = store.update(id, patch);
+  const updated = await store.update(id, patch);
   if (!updated) throw new Error("Custo indireto não encontrado");
   return updated;
 }
 
 export async function deletarCustoIndireto(id: string): Promise<void> {
-  store.remove(id);
+  await store.remove(id);
 }

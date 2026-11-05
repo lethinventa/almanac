@@ -5,6 +5,7 @@ import { Settings, Calculator, Clock, Save, Printer } from "lucide-react";
 import { buscarConfiguracoes, salvarConfiguracoes, type Configuracoes } from "@/lib/repositories/configuracoes";
 import { buscarTotalCustosIndiretos } from "@/lib/repositories/financeiro";
 import { formatBRL } from "@/lib/utils";
+import { importarDoNavegador } from "@/lib/importar-local";
 
 const DEFAULT_CONFIGURACOES: Configuracoes = {
   horasTrabalhoMes: 160,
@@ -16,6 +17,8 @@ export default function ConfiguracoesPage() {
   const [config, setConfig] = useState<Configuracoes>(DEFAULT_CONFIGURACOES);
   const [totalCustos, setTotalCustos] = useState(0);
   const [saved, setSaved] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const [msgImport, setMsgImport] = useState("");
 
   useEffect(() => {
     buscarConfiguracoes().then(setConfig);
@@ -38,6 +41,19 @@ export default function ConfiguracoesPage() {
     setTimeout(() => setSaved(false), 2000);
   }
 
+  async function handleImportar() {
+    setImportando(true);
+    setMsgImport("");
+    try {
+      const total = await importarDoNavegador();
+      setMsgImport(total > 0 ? `${total} registros enviados para o banco.` : "Nada para importar neste navegador.");
+    } catch (err) {
+      setMsgImport(err instanceof Error ? err.message : "Erro ao importar.");
+    } finally {
+      setImportando(false);
+    }
+  }
+
   return (
     <div className="alm-page">
       <div className="alm-page-header">
@@ -45,6 +61,11 @@ export default function ConfiguracoesPage() {
           <h1 className="alm-page-title">Configurações</h1>
           <p className="alm-page-subtitle">Ajuste os parâmetros do negócio</p>
         </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {msgImport && <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{msgImport}</span>}
+          <button className="atlas-btn atlas-btn-secondary atlas-btn-sm" onClick={handleImportar} disabled={importando}>
+            {importando ? "Importando…" : "Importar dados deste navegador"}
+          </button>
         <button
           className={`atlas-btn atlas-btn-sm ${saved ? "atlas-btn-secondary" : "atlas-btn-primary"}`}
           style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
@@ -53,6 +74,7 @@ export default function ConfiguracoesPage() {
           <Save size={13} strokeWidth={1.5} />
           {saved ? "Salvo!" : "Salvar configurações"}
         </button>
+        </div>
       </div>
 
       {/* Precificação */}

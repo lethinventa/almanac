@@ -1,5 +1,4 @@
-import { createStore, newId } from "@/lib/mock-store";
-import { encomendasSeed } from "@/lib/data";
+import { createRemoteStore, newId } from "@/lib/remote-store";
 
 export type EncomendaStatus = "aguardando" | "em_producao" | "pronto" | "entregue" | "cancelado";
 
@@ -49,10 +48,10 @@ export interface EncomendaInput {
   foto?: string;
 }
 
-const store = createStore<Encomenda>("almanac_encomendas", encomendasSeed);
+const store = createRemoteStore<Encomenda>("encomendas");
 
 export async function buscarEncomendas(): Promise<Encomenda[]> {
-  return store.list().slice().reverse();
+  return (await store.list()).reverse();
 }
 
 export async function buscarEncomenda(id: string): Promise<Encomenda | null> {
@@ -96,24 +95,24 @@ export async function editarEncomenda(id: string, dados: Partial<EncomendaInput>
   if ("observacoesInternas" in dados) patch.observacoesInternas = dados.observacoesInternas;
   if ("foto" in dados) patch.foto = dados.foto;
 
-  const updated = store.update(id, patch);
+  const updated = await store.update(id, patch);
   if (!updated) throw new Error("Encomenda não encontrada");
   return updated;
 }
 
 export async function atualizarStatus(id: string, status: EncomendaStatus): Promise<void> {
-  store.update(id, { status });
+  await store.update(id, { status });
 }
 
 export async function adicionarLink(encomendaId: string, link: { label: string; url: string }): Promise<void> {
-  const atual = store.find(encomendaId);
+  const atual = await store.find(encomendaId);
   if (!atual) throw new Error("Encomenda não encontrada");
   const novoLink: LinkUtil = { id: newId(), label: link.label, url: link.url };
-  store.update(encomendaId, { linksUteis: [...atual.linksUteis, novoLink] });
+  await store.update(encomendaId, { linksUteis: [...atual.linksUteis, novoLink] });
 }
 
 export async function removerLink(linkId: string): Promise<void> {
-  const encomenda = store.list().find((e) => e.linksUteis.some((l) => l.id === linkId));
+  const encomenda = (await store.list()).find((e) => e.linksUteis.some((l) => l.id === linkId));
   if (!encomenda) return;
-  store.update(encomenda.id, { linksUteis: encomenda.linksUteis.filter((l) => l.id !== linkId) });
+  await store.update(encomenda.id, { linksUteis: encomenda.linksUteis.filter((l) => l.id !== linkId) });
 }

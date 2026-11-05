@@ -32,9 +32,11 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
 export function PainelPagamento({
   recordId,
   totalCobrado,
+  cancelada = false,
 }: {
   recordId: string;
   totalCobrado: number;
+  cancelada?: boolean;
 }) {
   const hoje = new Date().toISOString().slice(0, 10);
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
@@ -74,6 +76,7 @@ export function PainelPagamento({
     setEstornoMotivo("");
   }
 
+  const estornados = new Set(pagamentos.map((p) => p.estornoDeId).filter(Boolean));
   const totalRecebido = pagamentos.reduce((s, p) => s + p.valor, 0);
   const saldo = totalCobrado - totalRecebido;
 
@@ -90,7 +93,7 @@ export function PainelPagamento({
     sem_pagamento: { label: "Sem pagamento", bg: "var(--bg-raised)", color: "var(--text-tertiary)" },
     sinal:         { label: "Sinal recebido", bg: "rgba(255,193,7,0.1)", color: "var(--status-warning)" },
     paga:          { label: "Paga", bg: "rgba(72,199,142,0.1)", color: "var(--status-success)" },
-    paga_maior:    { label: "Paga a maior", bg: "rgba(124,111,239,0.12)", color: "var(--accent-primary, #7c6fef)" },
+    paga_maior:    { label: "Paga a maior", bg: "var(--accent-primary-muted)", color: "var(--accent-primary, var(--accent-primary))" },
   };
   const sc = statusConfig[statusPag];
 
@@ -138,7 +141,7 @@ export function PainelPagamento({
               style={{
                 fontFamily: "var(--font-mono)",
                 fontWeight: 600,
-                color: saldo > 0 ? "var(--status-warning)" : "var(--accent-primary, #7c6fef)",
+                color: saldo > 0 ? "var(--status-warning)" : "var(--accent-primary, var(--accent-primary))",
               }}
             >
               {formatBRL(Math.abs(saldo))}
@@ -204,6 +207,11 @@ export function PainelPagamento({
                     <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
                       {formatDate(p.data)} · {METODO_LABEL[p.metodo]}
                     </div>
+                    {p.observacao && (
+                      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>
+                        {p.observacao}
+                      </div>
+                    )}
                     {p.motivoEstorno && (
                       <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>
                         {p.motivoEstorno}
@@ -221,7 +229,7 @@ export function PainelPagamento({
                     >
                       {isNeg ? "−" : "+"} {formatBRL(Math.abs(p.valor))}
                     </span>
-                    {!isNeg && (
+                    {!isNeg && !estornados.has(p.id) && (
                       <button
                         style={{
                           background: "none",
@@ -244,7 +252,7 @@ export function PainelPagamento({
           </div>
         )}
 
-        {showForm ? (
+        {cancelada ? null : showForm ? (
           <div
             style={{
               marginTop: 10,

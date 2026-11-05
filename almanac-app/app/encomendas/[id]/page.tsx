@@ -37,7 +37,8 @@ import {
   type LinkUtil,
   type EncomendaItem,
 } from "@/lib/repositories/encomendas";
-import { buscarProdutos, type Produto } from "@/lib/repositories/produtos";
+import { buscarProdutos, type ProdutoCalculado } from "@/lib/repositories/produtos";
+import { lerImagem } from "@/lib/imagem";
 import { buscarInsumos, type Insumo } from "@/lib/repositories/insumos";
 import { PainelPagamento } from "@/components/shared/painel-pagamento";
 
@@ -136,12 +137,12 @@ function VisualGaleria({
   onFotoChange: (url: string) => void;
   itens: EncomendaItem[];
   onPreview: (src: string, alt: string) => void;
-  produtos: Produto[];
+  produtos: ProdutoCalculado[];
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) onFotoChange(URL.createObjectURL(f));
+    if (f) lerImagem(f).then(onFotoChange).catch((err) => console.error("Erro ao ler imagem:", err));
   };
 
   const TILE = 88;
@@ -329,8 +330,8 @@ function TabelaProdutos({
   itens: EncomendaItem[];
   onChange: (itens: EncomendaItem[]) => void;
   onPreview?: (src: string, alt: string) => void;
-  onProdutoClick?: (prod: Produto) => void;
-  produtos: Produto[];
+  onProdutoClick?: (prod: ProdutoCalculado) => void;
+  produtos: ProdutoCalculado[];
 }) {
   const [editCell, setEditCell] = useState<{
     row: number;
@@ -799,7 +800,7 @@ function ProdutoDetalheModal({
   onClose,
   insumos,
 }: {
-  produto: Produto;
+  produto: ProdutoCalculado;
   onClose: () => void;
   insumos: Insumo[];
 }) {
@@ -837,7 +838,7 @@ function ProdutoDetalheModal({
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.28)",
+
         }}
       >
         <div
@@ -1128,7 +1129,7 @@ export default function EncomendaDetalhePage() {
 
   const [enc, setEnc] = useState<Encomenda | null>(null);
   const [loading, setLoading] = useState(true);
-  const [produtosList, setProdutosList] = useState<Produto[]>([]);
+  const [produtosList, setProdutosList] = useState<ProdutoCalculado[]>([]);
   const [insumosList, setInsumosList] = useState<Insumo[]>([]);
 
   const [status, setStatus] = useState<EncomendaStatus>("aguardando");
@@ -1139,7 +1140,7 @@ export default function EncomendaDetalhePage() {
   const [observacoesInternas, setObservacoesInternas] = useState("");
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
-  const [produtoModal, setProdutoModal] = useState<Produto | null>(null);
+  const [produtoModal, setProdutoModal] = useState<ProdutoCalculado | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -1388,7 +1389,7 @@ export default function EncomendaDetalhePage() {
             produtos={produtosList}
           />
 
-          <PainelPagamento recordId={enc.id} totalCobrado={totalCobrado} />
+          <PainelPagamento recordId={enc.id} totalCobrado={totalCobrado} cancelada={enc.status === "cancelado"} />
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <ObservacoesCard

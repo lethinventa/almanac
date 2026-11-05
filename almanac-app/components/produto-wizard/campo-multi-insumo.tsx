@@ -2,26 +2,24 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, ChevronDown, Plus, Search, Trash2 } from "lucide-react";
-import { StepLayout } from "./step-layout";
+import { CampoFormulario } from "./campo-formulario";
 import type { OpcaoInsumo } from "@/lib/produto-wizard/mock-data";
 import type { LinhaQtd } from "@/lib/produto-wizard/types";
 import { formatBRL } from "@/lib/utils";
 
-export function StepMultiInsumo({
-  title,
+export function CampoMultiInsumo({
+  label,
   hint,
   options,
   rows,
   onChange,
-  onContinue,
   error,
 }: {
-  title: string;
+  label: string;
   hint?: string;
   options: OpcaoInsumo[];
   rows: LinhaQtd[];
   onChange: (rows: LinhaQtd[]) => void;
-  onContinue: () => void;
   error?: string | null;
 }) {
   const [busca, setBusca] = useState("");
@@ -45,7 +43,6 @@ export function StepMultiInsumo({
   useEffect(() => {
     if (rows.length > prevLenRef.current) {
       lastQtdRef.current?.focus();
-      lastQtdRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
     prevLenRef.current = rows.length;
   }, [rows.length]);
@@ -72,10 +69,8 @@ export function StepMultiInsumo({
     searchRef.current?.focus();
   }
 
-  const podeContinuar = rows.length > 0 && rows.every((r) => r.quantidade.trim() !== "" && parseFloat(r.quantidade) > 0);
-
   return (
-    <StepLayout title={title} hint={hint} onContinue={podeContinuar ? onContinue : undefined} error={error}>
+    <CampoFormulario label={label} hint={hint} error={error}>
       <div ref={searchWrapRef} style={{ position: "relative" }}>
         <Search
           size={14}
@@ -84,7 +79,6 @@ export function StepMultiInsumo({
         />
         <input
           ref={searchRef}
-          autoFocus
           className="atlas-input"
           style={{ height: 40, fontSize: 15, paddingLeft: 34, paddingRight: 34 }}
           placeholder="Buscar insumo…"
@@ -162,6 +156,6 @@ export function StepMultiInsumo({
           </div>
         </div>
       )}
-    </StepLayout>
+    </CampoFormulario>
   );
 }
