@@ -1063,3 +1063,8 @@ body {
 /* Menu nativo acompanha o tema (evita faixa escura no popup do select no tema claro) */
 :root { color-scheme: light; }
 [data-theme="dark"] { color-scheme: dark; }
+
+/* Cabeçalho de tabela neutro (cinza), sem o creme da marca */
+.atlas-table.is-neutral th {
+  background: rgba(128, 128, 128, 0.12);
+}

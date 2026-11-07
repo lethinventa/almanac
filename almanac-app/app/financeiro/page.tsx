@@ -911,7 +911,7 @@ export default function FinanceiroPage() {
               )}
             </div>
             <div className="atlas-card-body" style={{ padding: 0 }}>
-              <table className="atlas-table" style={{ width: "100%" }}>
+              <table className="atlas-table is-neutral" style={{ width: "100%" }}>
                 <thead>
                   <tr>
                     <th>Nome</th>
