@@ -10,6 +10,7 @@ import {
   PackageCheck,
   BarChart2,
   Settings,
+  Calculator,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -31,6 +32,7 @@ const mainNav: NavItem[] = [
     badgeType: "error",
   },
   { href: "/produtos", label: "Produtos", icon: Box },
+  { href: "/orcamento", label: "Orçamento", icon: Calculator },
   {
     href: "/encomendas",
     label: "Encomendas",
