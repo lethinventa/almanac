@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Trash2, Copy, Check, RotateCcw, Package, Download, Share2, ImageIcon } from "lucide-react";
+import { Plus, Trash2, Copy, Check, RotateCcw, Package, Download, Share2, ImageIcon, Send } from "lucide-react";
+import { registrarOrcamentoEnviado } from "@/lib/repositories/orcamentos";
+import { OrcamentosEnviados } from "./orcamentos-enviados";
 import { formatBRL } from "@/lib/utils";
 import { buscarInsumos, type Insumo } from "@/lib/repositories/insumos";
 import { buscarConfiguracoes, type Configuracoes } from "@/lib/repositories/configuracoes";
@@ -367,6 +369,9 @@ export default function OrcamentoPage() {
   const [desconto, setDesconto] = useState<number | null>(null);
   const [itens, setItens] = useState<ItemOrcamento[]>([]);
   const [copiado, setCopiado] = useState(false);
+  const [salvandoEnvio, setSalvandoEnvio] = useState(false);
+  const [envioRegistrado, setEnvioRegistrado] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     Promise.all([buscarConfiguracoes(), buscarTotalCustosIndiretos(), buscarInsumos()]).then(
@@ -397,15 +402,47 @@ export default function OrcamentoPage() {
   const margemCor =
     resumo.margem >= 60 ? "var(--status-success)" : resumo.margem >= 30 ? "var(--status-warning)" : "var(--status-error)";
 
-  // Dados da imagem: só itens com descrição ou valor, sem custo nem margem.
-  const linhasImagem = calculados
+  // Itens enviados: só os que têm descrição ou valor. Inclui custo para o registro interno.
+  const itensSalvos = calculados
     .filter(({ item, calc }) => item.descricao.trim() || calc.subtotal > 0)
     .map(({ item, calc }, idx) => ({
       descricao: item.descricao.trim() || `Item ${idx + 1}`,
       quantidade: item.quantidade,
       precoUnitario: calc.precoUnitario,
       subtotal: calc.subtotal,
+      custoUnitario: calc.custoUnitario,
     }));
+  const custoEnviado = itensSalvos.reduce((s, i) => s + i.custoUnitario * i.quantidade, 0);
+  const margemEnviada = resumo.total > 0 ? ((resumo.total - custoEnviado) / resumo.total) * 100 : 0;
+
+  const registrarEnvio = async () => {
+    if (itensSalvos.length === 0) return;
+    setSalvandoEnvio(true);
+    try {
+      await registrarOrcamentoEnviado({
+        cliente: cliente.trim(),
+        prazo: prazo.trim(),
+        enviadoEm: new Date().toISOString(),
+        itens: itensSalvos,
+        subtotal: resumo.subtotal,
+        desconto: resumo.desconto,
+        total: resumo.total,
+        custoTotal: custoEnviado,
+        margem: margemEnviada,
+      });
+      setRefreshKey((k) => k + 1);
+      setEnvioRegistrado(true);
+      setTimeout(() => setEnvioRegistrado(false), 2500);
+    } catch (err) {
+      console.error("Erro ao registrar orçamento:", err);
+      alert("Não foi possível registrar o orçamento. Tente de novo.");
+    } finally {
+      setSalvandoEnvio(false);
+    }
+  };
+
+  // Dados da imagem: mesmos itens, sem custo nem margem.
+  const linhasImagem = itensSalvos;
   const dadosImagem: DadosImagem | null =
     linhasImagem.length > 0
       ? {
@@ -416,6 +453,11 @@ export default function OrcamentoPage() {
           desconto: resumo.desconto,
           total: resumo.total,
           data: new Date().toISOString().slice(0, 10),
+          nomeLoja: config.nomeLoja,
+          instagram: config.instagram,
+          telefone: config.telefone,
+          endereco: config.endereco,
+          validadeDias: config.validadeDias,
         }
       : null;
 
@@ -527,9 +569,23 @@ export default function OrcamentoPage() {
               {copiado ? <Check size={14} strokeWidth={1.5} /> : <Copy size={14} strokeWidth={1.5} />}
               {copiado ? "Copiado!" : "Copiar texto"}
             </button>
+
+            <button
+              type="button"
+              className="atlas-btn atlas-btn-primary"
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%" }}
+              onClick={registrarEnvio}
+              disabled={itensSalvos.length === 0 || salvandoEnvio}
+            >
+              {envioRegistrado ? <Check size={14} strokeWidth={1.5} /> : <Send size={14} strokeWidth={1.5} />}
+              {envioRegistrado ? "Orçamento registrado!" : salvandoEnvio ? "Registrando…" : "Registrar como enviado"}
+            </button>
+            <span className="orc-ajuda">Salva o orçamento na lista abaixo para acompanhar a aprovação.</span>
           </div>
         </aside>
       </div>
+
+      <OrcamentosEnviados refreshKey={refreshKey} />
     </div>
   );
 }

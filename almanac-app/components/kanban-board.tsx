@@ -156,7 +156,7 @@ export function KanbanBoard({
                 const resumo = enc.itens
                   .map((item) => {
                     const prod = produtosList.find((p) => p.id === item.produtoId);
-                    return `${item.quantidade}× ${prod?.nome ?? "?"}`;
+                    return `${item.quantidade}× ${prod?.nome ?? item.descricao ?? "?"}`;
                   })
                   .join(", ");
 

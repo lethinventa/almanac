@@ -28,6 +28,11 @@ const DEFAULT_CONFIGURACOES: Configuracoes = {
   horasTrabalhoMes: 160,
   multiplicadorPreco: 3,
   custoHoraBambu: 4.5,
+  nomeLoja: "Ginga",
+  telefone: "",
+  instagram: "",
+  endereco: "",
+  validadeDias: 7,
 };
 
 import {

@@ -11,6 +11,11 @@ const DEFAULT_CONFIGURACOES: Configuracoes = {
   horasTrabalhoMes: 160,
   multiplicadorPreco: 3,
   custoHoraBambu: 4.5,
+  nomeLoja: "Ginga",
+  telefone: "",
+  instagram: "",
+  endereco: "",
+  validadeDias: 7,
 };
 
 export default function ConfiguracoesPage() {
@@ -74,6 +79,45 @@ export default function ConfiguracoesPage() {
           <Save size={13} strokeWidth={1.5} />
           {saved ? "Salvo!" : "Salvar configurações"}
         </button>
+        </div>
+      </div>
+
+      {/* Dados do orçamento */}
+      <div className="atlas-card">
+        <div className="atlas-card-header">
+          <span className="atlas-panel-title">Dados do orçamento</span>
+          <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: "4px 0 0" }}>
+            Aparecem na imagem enviada ao cliente. Campos vazios são omitidos.
+          </p>
+        </div>
+        <div className="atlas-card-body" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div className="alm-field">
+            <label className="alm-label">Nome da loja</label>
+            <input className="atlas-input" value={config.nomeLoja} onChange={(e) => setConfig((p) => ({ ...p, nomeLoja: e.target.value }))} />
+          </div>
+          <div className="alm-field">
+            <label className="alm-label">Instagram</label>
+            <input className="atlas-input" placeholder="@seuperfil" value={config.instagram} onChange={(e) => setConfig((p) => ({ ...p, instagram: e.target.value }))} />
+          </div>
+          <div className="alm-field">
+            <label className="alm-label">Telefone / WhatsApp</label>
+            <input className="atlas-input" placeholder="(11) 90000-0000" value={config.telefone} onChange={(e) => setConfig((p) => ({ ...p, telefone: e.target.value }))} />
+          </div>
+          <div className="alm-field">
+            <label className="alm-label">Validade do orçamento (dias)</label>
+            <input
+              className="atlas-input"
+              type="number"
+              min="0"
+              step="1"
+              value={config.validadeDias}
+              onChange={(e) => setConfig((p) => ({ ...p, validadeDias: Math.max(0, parseInt(e.target.value) || 0) }))}
+            />
+          </div>
+          <div className="alm-field" style={{ gridColumn: "1 / -1" }}>
+            <label className="alm-label">Endereço</label>
+            <input className="atlas-input" placeholder="Rua, número – Cidade/UF" value={config.endereco} onChange={(e) => setConfig((p) => ({ ...p, endereco: e.target.value }))} />
+          </div>
         </div>
       </div>
 

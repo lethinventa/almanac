@@ -159,7 +159,7 @@ function VisualGaleria({
       const prod = produtos.find((p) => p.id === item.produtoId);
       return {
         key: `item-${i}`,
-        label: prod?.nome ?? item.produtoId,
+        label: prod?.nome ?? item.descricao ?? item.produtoId,
         src: prod?.foto ?? null,
         qty: item.quantidade,
       };
@@ -472,7 +472,7 @@ function TabelaProdutos({
                       (e.currentTarget as HTMLElement).style.color = "";
                     }}
                   >
-                    {prod?.nome ?? item.produtoId}
+                    {prod?.nome ?? item.descricao ?? item.produtoId}
                     {prod && onProdutoClick && (
                       <Info size={11} strokeWidth={1.5} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
                     )}
@@ -1191,7 +1191,7 @@ export default function EncomendaDetalhePage() {
   const totalCobrado = Math.max(subtotal - desconto, 0);
   const custoProducao = itens.reduce((s, i) => {
     const prod = produtosList.find((p) => p.id === i.produtoId);
-    return s + (prod?.custo ?? 0) * i.quantidade;
+    return s + (prod ? prod.custo : (i.custoUnitario ?? 0)) * i.quantidade;
   }, 0);
   const margem = totalCobrado > 0 ? ((totalCobrado - custoProducao) / totalCobrado) * 100 : 0;
   const margemColor =
@@ -1236,7 +1236,7 @@ export default function EncomendaDetalhePage() {
     const newTotal = Math.max(sub - desconto, 0);
     const newCusto = newItens.reduce((s, i) => {
       const prod = produtosList.find((p) => p.id === i.produtoId);
-      return s + (prod?.custo ?? 0) * i.quantidade;
+      return s + (prod ? prod.custo : (i.custoUnitario ?? 0)) * i.quantidade;
     }, 0);
     const newMargem = newTotal > 0 ? ((newTotal - newCusto) / newTotal) * 100 : 0;
     editarEncomenda(enc.id, {

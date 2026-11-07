@@ -3,9 +3,13 @@ import { createRemoteStore, newId } from "@/lib/remote-store";
 export type EncomendaStatus = "aguardando" | "em_producao" | "pronto" | "entregue" | "cancelado";
 
 export interface EncomendaItem {
+  // Vazio quando o item veio de um orçamento sem produto cadastrado.
   produtoId: string;
   quantidade: number;
   precoUnitario: number;
+  // Usados só nos itens sem produto (vindos de orçamento).
+  descricao?: string;
+  custoUnitario?: number;
 }
 
 export interface LinkUtil {
