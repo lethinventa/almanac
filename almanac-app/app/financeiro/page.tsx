@@ -765,8 +765,14 @@ export default function FinanceiroPage() {
   const receitaMes = encEntregues.reduce((s, e) => s + e.totalCobrado, 0);
   const custoVarMes = encEntregues.reduce((s, e) => s + e.custoProducao, 0);
 
-  const historico = Array.from({ length: 5 }, (_, i) => {
-    const d = new Date(agora.getFullYear(), agora.getMonth() - 5 + i, 1);
+  // Histórico começa em novembro/2026 e vai até o mês atual.
+  const INICIO_HISTORICO = { ano: 2026, mes: 10 }; // mês 0-indexed (10 = novembro)
+  const totalMesesHistorico = Math.max(
+    0,
+    (agora.getFullYear() - INICIO_HISTORICO.ano) * 12 + agora.getMonth() - INICIO_HISTORICO.mes + 1,
+  );
+  const historico = Array.from({ length: totalMesesHistorico }, (_, i) => {
+    const d = new Date(INICIO_HISTORICO.ano, INICIO_HISTORICO.mes + i, 1);
     const anoMes = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const mesLabel = `${MESES_CURTO[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`;
     const enc = encomendasData.filter((e) => e.status === "entregue" && e.dataEntrega?.startsWith(anoMes));

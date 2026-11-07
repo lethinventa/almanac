@@ -192,17 +192,24 @@ export function KanbanBoard({
                     {cardFoto && (
                       <div
                         style={{
-                          margin: "-12px -12px 0",
-                          borderRadius: "var(--radius-lg, 6px) var(--radius-lg, 6px) 0 0",
+                          margin: "-16px -16px 0",
+                          borderRadius: "var(--radius-md) var(--radius-md) 0 0",
                           overflow: "hidden",
-                          height: 100,
+                          position: "relative",
+                          aspectRatio: "1 / 1",
                           flexShrink: 0,
                         }}
                       >
                         <img
                           src={cardFoto}
                           alt={enc.cliente}
-                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
                         />
                       </div>
                     )}

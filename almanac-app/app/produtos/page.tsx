@@ -62,6 +62,10 @@ const CATEGORIAS_DEFAULT = [
   "Planner",
   "Kit",
   "Impressão 3D",
+  "Utilidades",
+  "Abridor lata",
+  "Mesa posta",
+  "Corporativo",
   "Outro",
 ];
 

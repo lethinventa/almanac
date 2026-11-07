@@ -16,6 +16,7 @@ import {
   ImagePlus,
   MoreVertical,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import {
   formatBRL,
@@ -46,7 +47,7 @@ function isAlerta(i: Insumo) {
 }
 
 // ─── Modal wrapper (Lessons 19 + 20 — enter + exit animation) ─
-type ModalMode = "detalhe" | "entrada" | "ajuste" | "preco" | "novo";
+type ModalMode = "detalhe" | "entrada" | "ajuste" | "preco" | "novo" | "editar";
 
 function Modal({
   open,
@@ -252,6 +253,52 @@ function InfoRow({ label, value, mono, error }: { label: string; value: string; 
         {value}
       </span>
     </div>
+  );
+}
+
+function EditarInsumoContent({ insumo, nomeRef, categoriaRef, unidadeRef }: {
+  insumo: Insumo;
+  nomeRef: React.RefObject<HTMLInputElement | null>;
+  categoriaRef: React.RefObject<HTMLSelectElement | null>;
+  unidadeRef: React.RefObject<HTMLSelectElement | null>;
+}) {
+  const [categoria, setCategoria] = useState<InsumoCategoria>(insumo.categoria);
+  const [unidade, setUnidade] = useState(insumo.unidade);
+  const rotativo = categoria === "visivel" || categoria === "invisivel";
+
+  function handleCategoriaChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    setCategoria(e.target.value as InsumoCategoria);
+  }
+
+  return (
+    <>
+      <div className="alm-field">
+        <label className="alm-label">Nome</label>
+        <input ref={nomeRef} className="atlas-input" type="text" defaultValue={insumo.nome} autoFocus />
+      </div>
+
+      <div className="alm-field">
+        <label className="alm-label">Categoria</label>
+        <select ref={categoriaRef} className="alm-select" value={categoria} onChange={handleCategoriaChange}>
+          <option value="visivel">Rotativo visível</option>
+          <option value="invisivel">Rotativo invisível</option>
+          <option value="ferramenta">Ferramenta</option>
+          <option value="maquinario">Maquinário</option>
+        </select>
+      </div>
+
+      {rotativo && (
+        <div className="alm-field">
+          <label className="alm-label">Unidade</label>
+          <Combobox
+            ref={unidadeRef}
+            value={unidade}
+            onChange={setUnidade}
+            options={["unidade", "folha", "metro", "g", "ml", "cm²"]}
+          />
+        </div>
+      )}
+    </>
   );
 }
 
@@ -492,7 +539,7 @@ function RowActionsMenu({
   onAction,
 }: {
   insumo: Insumo;
-  onAction: (action: "detalhe" | "entrada" | "ajuste" | "preco" | "excluir") => void;
+  onAction: (action: "detalhe" | "editar" | "entrada" | "ajuste" | "preco" | "excluir") => void;
 }) {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
@@ -534,7 +581,7 @@ function RowActionsMenu({
     setOpen((v) => !v);
   }
 
-  function select(action: "detalhe" | "entrada" | "ajuste" | "preco" | "excluir") {
+  function select(action: "detalhe" | "editar" | "entrada" | "ajuste" | "preco" | "excluir") {
     setOpen(false);
     onAction(action);
   }
@@ -566,6 +613,9 @@ function RowActionsMenu({
         >
           <MenuItem onClick={() => select("detalhe")} icon={<ChevronRight size={13} strokeWidth={1.5} />}>
             Ver detalhe
+          </MenuItem>
+          <MenuItem onClick={() => select("editar")} icon={<Pencil size={13} strokeWidth={1.5} />}>
+            Editar insumo
           </MenuItem>
           {rotativo && (
             <>
@@ -664,6 +714,11 @@ export default function InsumosPage() {
   // Ref para o modal "Preço"
   const precoNovoRef = useRef<HTMLInputElement>(null);
 
+  // Refs para o modal "Editar insumo"
+  const editarNomeRef      = useRef<HTMLInputElement>(null);
+  const editarCategoriaRef = useRef<HTMLSelectElement>(null);
+  const editarUnidadeRef   = useRef<HTMLSelectElement>(null);
+
   useEffect(() => {
     buscarInsumos().then(data => { setInsumos(data); setLoading(false); });
   }, []);
@@ -736,6 +791,18 @@ export default function InsumosPage() {
         return;
       }
 
+      if (mode === "editar") {
+        const nome      = editarNomeRef.current?.value.trim() ?? "";
+        const categoria = (editarCategoriaRef.current?.value ?? selected.categoria) as InsumoCategoria;
+        const rotativo  = categoria === "visivel" || categoria === "invisivel";
+        const unidade   = rotativo ? (editarUnidadeRef.current?.value ?? selected.unidade) : selected.unidade;
+        if (!nome) return;
+        await editarInsumo(selected.id, { nome, categoria, unidade });
+        await refresh();
+        closeModal();
+        return;
+      }
+
       if (mode === "preco") {
         const novoPreco = parseFloat(precoNovoRef.current?.value ?? "0") || 0;
         if (novoPreco <= 0) return;
@@ -774,6 +841,7 @@ export default function InsumosPage() {
     ajuste:  "Ajuste manual de estoque",
     preco:   "Atualizar preço",
     novo:    "Novo insumo",
+    editar:  "Editar insumo",
   };
 
   return (
@@ -946,6 +1014,14 @@ export default function InsumosPage() {
         }
       >
         {mode === "detalhe" && selected && <DetalheContent insumo={selected} />}
+        {mode === "editar" && selected && (
+          <EditarInsumoContent
+            insumo={selected}
+            nomeRef={editarNomeRef}
+            categoriaRef={editarCategoriaRef}
+            unidadeRef={editarUnidadeRef}
+          />
+        )}
         {mode === "entrada" && selected && (
           <EntradaContent
             insumo={selected}
