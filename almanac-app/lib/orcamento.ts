@@ -58,7 +58,9 @@ export function calcularItem(
   const custoMaterial = custoInsumos + (item.materialAvulso || 0);
 
   const custoTempo = (item.tempoMin / 60) * taxaHoraria(config, totalCustos);
-  const custoUnitario = custoMaterial + custoTempo;
+  // Custo de produção = só material, igual ao custo de produto em encomendas.
+  // O tempo continua no preço, mas não entra no custo/margem.
+  const custoUnitario = custoMaterial;
 
   const precoCalculado = arredondar(
     calcPrecoSugerido(

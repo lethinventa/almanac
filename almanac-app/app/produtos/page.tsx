@@ -291,7 +291,7 @@ function DetalheContent({
             {[
               { label: "Insumos", value: produto.custo },
               {
-                label: `Impressão (${produto.etapas3D!.impressao ?? 0}min × R$${config.custoHoraBambu.toFixed(2)}/h)`,
+                label: `Impressão (${produto.etapas3D!.impressao ?? 0}min × R$${hourlyRate.toFixed(2)}/h)`,
                 value: r3D.custoImpressao,
               },
               {
@@ -916,7 +916,7 @@ function ProdutoFormContent({
             <>
               {[
                 { label: "Insumos", value: materialCost },
-                { label: `Impressão (${impressaoNum}min × R$${config.custoHoraBambu.toFixed(2)}/h)`, value: r3D.custoImpressao },
+                { label: `Impressão (${impressaoNum}min × R$${hourlyRate.toFixed(2)}/h)`, value: r3D.custoImpressao },
                 { label: `Modelagem (${modelagemNum}min × R$${hourlyRate.toFixed(2)}/h)`, value: r3D.custoModelagem },
                 { label: `Acabamento (${acabamentoNum}min × R$${hourlyRate.toFixed(2)}/h)`, value: r3D.custoAcabamento },
               ].map(({ label, value }) => (
