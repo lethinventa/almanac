@@ -32,7 +32,8 @@ export function calcPreco3D(
   totalCustos: number
 ): Preco3D {
   const hourlyRate = taxaHoraria(config, totalCustos);
-  const custoImpressao = ((etapas.impressao ?? 0) / 60) * config.custoHoraBambu;
+  // Mesma regra do orçamento: todo o tempo (impressão, modelagem, acabamento) à taxa horária.
+  const custoImpressao = ((etapas.impressao ?? 0) / 60) * hourlyRate;
   const custoModelagem = ((etapas.modelagem ?? 0) / 60) * hourlyRate;
   const custoAcabamento = ((etapas.acabamento ?? 0) / 60) * hourlyRate;
   const custoTotal = materialCost + custoImpressao + custoModelagem + custoAcabamento;
