@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, X, Truck, ExternalLink } from "lucide-react";
 import { formatBRL, formatDate } from "@/lib/utils";
+import "./orcamento.css";
 import {
   listarOrcamentos,
   recusarOrcamento,
