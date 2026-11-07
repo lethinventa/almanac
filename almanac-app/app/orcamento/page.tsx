@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Plus, Trash2, Copy, Check, RotateCcw, Package, Download, Share2, ImageIcon, ImagePlus, Send } from "lucide-react";
 import { lerImagem } from "@/lib/imagem";
 import { registrarOrcamentoEnviado } from "@/lib/repositories/orcamentos";
-import { OrcamentosEnviados } from "./orcamentos-enviados";
 import { formatBRL } from "@/lib/utils";
 import { buscarInsumos, type Insumo } from "@/lib/repositories/insumos";
 import { buscarConfiguracoes, type Configuracoes } from "@/lib/repositories/configuracoes";
@@ -373,7 +372,6 @@ export default function OrcamentoPage() {
   const [copiado, setCopiado] = useState(false);
   const [salvandoEnvio, setSalvandoEnvio] = useState(false);
   const [envioRegistrado, setEnvioRegistrado] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [foto, setFoto] = useState<string | null>(null);
 
   useEffect(() => {
@@ -433,7 +431,6 @@ export default function OrcamentoPage() {
         custoTotal: custoEnviado,
         margem: margemEnviada,
       });
-      setRefreshKey((k) => k + 1);
       setEnvioRegistrado(true);
       setTimeout(() => setEnvioRegistrado(false), 2500);
     } catch (err) {
@@ -625,12 +622,11 @@ export default function OrcamentoPage() {
               {envioRegistrado ? <Check size={14} strokeWidth={1.5} /> : <Send size={14} strokeWidth={1.5} />}
               {envioRegistrado ? "Orçamento registrado!" : salvandoEnvio ? "Registrando…" : "Registrar como enviado"}
             </button>
-            <span className="orc-ajuda">Salva o orçamento na lista abaixo para acompanhar a aprovação.</span>
+            <span className="orc-ajuda">Salva o orçamento para acompanhar a aprovação em <Link href="/orcamentos">Orçamentos</Link>.</span>
           </div>
         </aside>
       </div>
 
-      <OrcamentosEnviados refreshKey={refreshKey} />
     </div>
   );
 }
