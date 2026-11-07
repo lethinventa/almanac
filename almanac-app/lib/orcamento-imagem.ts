@@ -35,9 +35,9 @@ export interface DadosImagem {
   validadeDias: number;
 }
 
-// Tamanho fixo da imagem final, vertical como o modelo (4:5).
+// Tamanho fixo da imagem final, vertical no formato story (9:16).
 const LARGURA = 1080;
-const ALTURA = 1350;
+const ALTURA = 1920;
 const PAD = 90;
 const ESCALA = 2; // desenha em 2x e reduz para o tamanho final (nitidez)
 const LOGO_SRC = "/ginga-logo.png";
@@ -217,7 +217,7 @@ function desenhar(
 
   // Foto do orçamento, em faixa larga com proporção preservada (corte centralizado)
   if (recursos.foto) {
-    const altFoto = 320;
+    const altFoto = 560;
     if (pintar) {
       const f = recursos.foto;
       const escalaCobrir = Math.max(CONTEUDO / f.naturalWidth, altFoto / f.naturalHeight);
@@ -399,7 +399,7 @@ export async function gerarImagemOrcamento(dados: DadosImagem): Promise<Blob> {
   auxCtx.fillRect(0, 0, L, alvo);
   desenhar(auxCtx, dados, recursos, false, alvo, L, tabelaY, { topoTabela: 0, alturaTabela: 0, altRodape: 0 });
 
-  // Passo 3: canvas final com o tamanho fixo 1080 x 1350.
+  // Passo 3: canvas final com o tamanho fixo 1080 x 1920.
   const canvas = document.createElement("canvas");
   canvas.width = LARGURA;
   canvas.height = ALTURA;
