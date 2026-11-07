@@ -247,7 +247,9 @@
 
 /* Orçamentos enviados */
 .orc-enviados {
-  margin-top: 32px;
+  margin-top: 0;
+  width: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -263,6 +265,9 @@
 
 .orc-enviado {
   padding: 14px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 10px;

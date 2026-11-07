@@ -70,11 +70,6 @@ export function OrcamentosEnviados({ refreshKey }: { refreshKey: number }) {
 
   return (
     <section className="orc-enviados">
-      <div className="orc-enviados-header">
-        <h2 className="alm-page-title" style={{ fontSize: 18 }}>Orçamentos enviados</h2>
-        <span className="orc-ajuda">Quando o cliente aprovar, mande para produção aqui.</span>
-      </div>
-
       {erro && <div className="orc-erro">{erro}</div>}
 
       {lista === null && <span className="orc-ajuda">Carregando…</span>}
