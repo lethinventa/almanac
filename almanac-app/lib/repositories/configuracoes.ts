@@ -10,6 +10,7 @@ export interface Configuracoes {
   // Dados que aparecem no orçamento enviado ao cliente
   nomeLoja: string;
   telefone: string;
+  email: string;
   instagram: string;
   endereco: string;
   validadeDias: number;

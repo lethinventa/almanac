@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Trash2, Copy, Check, RotateCcw, Package, Download, Share2, ImageIcon, Send } from "lucide-react";
+import { Plus, Trash2, Copy, Check, RotateCcw, Package, Download, Share2, ImageIcon, ImagePlus, Send } from "lucide-react";
+import { lerImagem } from "@/lib/imagem";
 import { registrarOrcamentoEnviado } from "@/lib/repositories/orcamentos";
 import { OrcamentosEnviados } from "./orcamentos-enviados";
 import { formatBRL } from "@/lib/utils";
@@ -373,6 +374,7 @@ export default function OrcamentoPage() {
   const [salvandoEnvio, setSalvandoEnvio] = useState(false);
   const [envioRegistrado, setEnvioRegistrado] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [foto, setFoto] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([buscarConfiguracoes(), buscarTotalCustosIndiretos(), buscarInsumos()]).then(
@@ -454,9 +456,11 @@ export default function OrcamentoPage() {
           desconto: resumo.desconto,
           total: resumo.total,
           data: new Date().toISOString().slice(0, 10),
+          foto: foto ?? undefined,
           nomeLoja: config.nomeLoja,
           instagram: config.instagram,
           telefone: config.telefone,
+          email: config.email,
           endereco: config.endereco,
           validadeDias: config.validadeDias,
         }
@@ -473,6 +477,7 @@ export default function OrcamentoPage() {
     setCliente("");
     setPrazo("");
     setDesconto(null);
+    setFoto(null);
     setItens([novoItem(config.multiplicadorPreco, novoId())]);
   };
 
@@ -537,6 +542,38 @@ export default function OrcamentoPage() {
             <div className="alm-field">
               <label className="alm-label">Desconto (R$)</label>
               <NumInput value={desconto} placeholder="0,00" onChange={setDesconto} />
+            </div>
+
+            <div className="alm-field">
+              <label className="alm-label">Foto do orçamento (opcional)</label>
+              {foto ? (
+                <div className="orc-foto-linha">
+                  <img src={foto} alt="Foto do orçamento" className="orc-foto-thumb" />
+                  <button type="button" className="orc-link" onClick={() => setFoto(null)}>
+                    remover foto
+                  </button>
+                </div>
+              ) : (
+                <label className="orc-link" style={{ display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+                  <ImagePlus size={12} strokeWidth={1.5} />
+                  Adicionar foto para a imagem
+                  <input
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!f) return;
+                      try {
+                        setFoto(await lerImagem(f));
+                      } catch (err) {
+                        console.error("Erro ao ler imagem:", err);
+                      }
+                    }}
+                  />
+                </label>
+              )}
             </div>
 
             <div className="orc-totais">

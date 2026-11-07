@@ -31,6 +31,7 @@ const DEFAULT_CONFIGURACOES: Configuracoes = {
   valorHoraTrabalho: 0,
   nomeLoja: "Ginga",
   telefone: "",
+  email: "",
   instagram: "",
   endereco: "",
   validadeDias: 7,

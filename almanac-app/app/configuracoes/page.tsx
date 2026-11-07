@@ -15,6 +15,7 @@ const DEFAULT_CONFIGURACOES: Configuracoes = {
   valorHoraTrabalho: 0,
   nomeLoja: "Ginga",
   telefone: "",
+  email: "",
   instagram: "",
   endereco: "",
   validadeDias: 7,
@@ -101,6 +102,10 @@ export default function ConfiguracoesPage() {
           <div className="alm-field">
             <label className="alm-label">Telefone / WhatsApp</label>
             <input className="atlas-input" placeholder="(11) 90000-0000" value={config.telefone} onChange={(e) => setConfig((p) => ({ ...p, telefone: e.target.value }))} />
+          </div>
+          <div className="alm-field">
+            <label className="alm-label">E-mail</label>
+            <input className="atlas-input" placeholder="contato@seudominio.com" value={config.email} onChange={(e) => setConfig((p) => ({ ...p, email: e.target.value }))} />
           </div>
           <div className="alm-field">
             <label className="alm-label">Validade do orçamento (dias)</label>
