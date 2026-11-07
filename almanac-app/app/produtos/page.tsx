@@ -28,6 +28,7 @@ const DEFAULT_CONFIGURACOES: Configuracoes = {
   horasTrabalhoMes: 160,
   multiplicadorPreco: 3,
   custoHoraBambu: 4.5,
+  valorHoraTrabalho: 0,
   nomeLoja: "Ginga",
   telefone: "",
   instagram: "",
@@ -565,10 +566,7 @@ function ProdutoFormContent({
     return sum;
   }, 0);
 
-  const hourlyRate =
-    config.horasTrabalhoMes > 0
-      ? totalCustos / config.horasTrabalhoMes
-      : 0;
+  const hourlyRate = taxaHoraria(config, totalCustos);
 
   const impressaoNum = parseInt(impressaoMin) || 0;
   const modelagemNum = parseInt(modelagemMin) || 0;

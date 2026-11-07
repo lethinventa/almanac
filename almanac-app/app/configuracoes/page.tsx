@@ -6,11 +6,13 @@ import { buscarConfiguracoes, salvarConfiguracoes, type Configuracoes } from "@/
 import { buscarTotalCustosIndiretos } from "@/lib/repositories/financeiro";
 import { formatBRL } from "@/lib/utils";
 import { importarDoNavegador } from "@/lib/importar-local";
+import { taxaHoraria } from "@/lib/produto-calculos";
 
 const DEFAULT_CONFIGURACOES: Configuracoes = {
   horasTrabalhoMes: 160,
   multiplicadorPreco: 3,
   custoHoraBambu: 4.5,
+  valorHoraTrabalho: 0,
   nomeLoja: "Ginga",
   telefone: "",
   instagram: "",
@@ -30,10 +32,7 @@ export default function ConfiguracoesPage() {
     buscarTotalCustosIndiretos().then(setTotalCustos);
   }, []);
 
-  const hourlyRate =
-    config.horasTrabalhoMes > 0
-      ? totalCustos / config.horasTrabalhoMes
-      : 0;
+  const hourlyRate = taxaHoraria(config, totalCustos);
 
   const exampleMaterial = 5.0;
   const exampleTempo = 30;
@@ -210,6 +209,26 @@ export default function ConfiguracoesPage() {
             />
             <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
               Energia + depreciação por hora de impressão — usado em produtos "Impressão 3D"
+            </span>
+          </div>
+
+          <div className="alm-field">
+            <label className="alm-label">Valor da sua hora de trabalho (R$/h)</label>
+            <input
+              className="atlas-input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={config.valorHoraTrabalho}
+              onChange={(e) =>
+                setConfig((prev) => ({
+                  ...prev,
+                  valorHoraTrabalho: Math.max(0, parseFloat(e.target.value) || 0),
+                }))
+              }
+            />
+            <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+              Cobrado sobre o tempo de cada item, somado aos custos indiretos. Use 0 para não cobrar.
             </span>
           </div>
 

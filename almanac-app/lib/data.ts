@@ -25,6 +25,7 @@ export const configuracoesSeed: Configuracoes = {
   horasTrabalhoMes: 160,
   multiplicadorPreco: 3,
   custoHoraBambu: 4.5,
+  valorHoraTrabalho: 0,
   nomeLoja: "Ginga",
   telefone: "",
   instagram: "",

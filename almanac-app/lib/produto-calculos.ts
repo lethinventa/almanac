@@ -1,9 +1,10 @@
 import type { Configuracoes } from "@/lib/repositories/configuracoes";
 import type { Etapas3D } from "@/lib/repositories/produtos-registro";
 
-// Taxa horária = custos indiretos mensais ÷ horas trabalhadas por mês
+// Taxa horária = custos indiretos mensais ÷ horas trabalhadas por mês + valor da sua hora de trabalho
 export function taxaHoraria(config: Configuracoes, totalCustos: number): number {
-  return config.horasTrabalhoMes > 0 ? totalCustos / config.horasTrabalhoMes : 0;
+  const indiretosPorHora = config.horasTrabalhoMes > 0 ? totalCustos / config.horasTrabalhoMes : 0;
+  return indiretosPorHora + (config.valorHoraTrabalho ?? 0);
 }
 
 export function calcPrecoSugerido(

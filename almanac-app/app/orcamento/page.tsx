@@ -18,6 +18,7 @@ import {
   type ItemCalculado,
 } from "@/lib/orcamento";
 import { gerarImagemOrcamento, type DadosImagem } from "@/lib/orcamento-imagem";
+import { taxaHoraria } from "@/lib/produto-calculos";
 import "./orcamento.css";
 
 const novoId = () => crypto.randomUUID();
@@ -496,6 +497,13 @@ export default function OrcamentoPage() {
           Novo orçamento
         </button>
       </div>
+
+      {taxaHoraria(config, totalCustos) === 0 && (
+        <div className="orc-erro" style={{ marginBottom: 12 }}>
+          O tempo de produção não está sendo cobrado: a taxa horária é R$ 0,00. Defina o valor da sua hora em
+          Configurações ou cadastre os custos indiretos em Financeiro.
+        </div>
+      )}
 
       <div className="orc-layout">
         <div className="orc-itens">

@@ -5,6 +5,8 @@ export interface Configuracoes {
   horasTrabalhoMes: number;
   multiplicadorPreco: number;
   custoHoraBambu: number;
+  // Quanto vale a sua hora de trabalho (R$/h), cobrado além dos custos indiretos
+  valorHoraTrabalho: number;
   // Dados que aparecem no orçamento enviado ao cliente
   nomeLoja: string;
   telefone: string;
