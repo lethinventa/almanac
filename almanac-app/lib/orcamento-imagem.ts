@@ -226,6 +226,21 @@ function desenhar(
       const sx = (f.naturalWidth - sw) / 2;
       const sy = (f.naturalHeight - sh) / 2;
       ctx.drawImage(f, sx, sy, sw, sh, PAD, y, CONTEUDO, altFoto);
+
+      // Aviso no canto inferior direito da foto, em bloco azul.
+      const aviso =
+        "Imagem produzida por inteligência artificial. Produto artesanal pode conter suaves diferenças de textura e tonalidade.";
+      const margem = 12;
+      const maxLarg = CONTEUDO * 0.6;
+      ctx.font = fonte(16, 600);
+      const linhasAviso = quebrarTexto(ctx, aviso, maxLarg - 20);
+      const larguraAviso = Math.max(...linhasAviso.map((l) => ctx.measureText(l).width)) + 20;
+      const alturaAviso = linhasAviso.length * 22 + 14;
+      const xAviso = PAD + CONTEUDO - margem - larguraAviso;
+      const yAviso = y + altFoto - margem - alturaAviso;
+      ctx.fillStyle = COR.azul;
+      ctx.fillRect(xAviso, yAviso, larguraAviso, alturaAviso);
+      linhasAviso.forEach((l, i) => txt(l, xAviso + 10, yAviso + 7 + 16 + i * 22, fonte(16, 600), COR.branco));
     }
     y += altFoto + 40;
   }
