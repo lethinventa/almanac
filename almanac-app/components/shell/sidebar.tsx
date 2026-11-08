@@ -61,7 +61,8 @@ export function Sidebar() {
   return (
     <>
       <div className="alm-brand">
-        <span className="alm-brand-name">ginga.web</span>
+        {/* Logo oficial da Ginga Studio 3D */}
+        <img src="/ginga-logo.png" alt="Ginga Studio 3D" style={{ width: 110, height: "auto", display: "block" }} />
       </div>
 
     <nav className="alm-nav">
