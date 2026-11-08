@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { BookMarked } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 
 export default function LoginPage() {
@@ -47,20 +46,12 @@ export default function LoginPage() {
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: "var(--radius-md)",
-              background: "var(--bg-raised)",
-              border: "1px solid var(--border-default)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <BookMarked size={22} strokeWidth={1.5} style={{ color: "var(--text-primary)" }} />
-          </div>
+          {/* Logo oficial da Ginga Studio 3D */}
+          <img
+            src="/ginga-logo.png"
+            alt="Ginga Studio 3D"
+            style={{ width: 200, height: "auto", display: "block" }}
+          />
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>ginga.web</div>
             <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>Papelaria criativa</div>
