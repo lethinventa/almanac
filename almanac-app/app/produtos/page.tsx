@@ -522,6 +522,7 @@ function ProdutoFormContent({
     tempo: number;
     receita: ReceitaRow[];
     multiplicador: number;
+    precoVenda: number | null;
     etapas3D?: Etapas3D;
     foto?: string;
   }) => void;
@@ -560,6 +561,10 @@ function ProdutoFormContent({
   );
 
   const [multInput, setMultInput] = useState(String(initial?.multiplicador ?? config.multiplicadorPreco));
+  // Preço de venda editável (o que vai pro site). Vazio = usa o preço sugerido.
+  const [precoVendaInput, setPrecoVendaInput] = useState(
+    initial?.precoVenda ? String(initial.precoVenda) : ""
+  );
 
   const multNum = Math.max(1, parseFloat(multInput) || 1);
   const is3D = categoria === "Impressão 3D";
@@ -603,6 +608,9 @@ function ProdutoFormContent({
       prev.map((r, i) => (i === idx ? { ...r, [field]: value } : r))
     );
 
+  const precoVendaNum = parseFloat(precoVendaInput);
+  const precoVendaValido = !isNaN(precoVendaNum) && precoVendaNum > 0 ? precoVendaNum : null;
+
   const canSave = nome.trim().length > 0;
 
   const handleSave = () => {
@@ -613,6 +621,7 @@ function ProdutoFormContent({
       tempo: tempoNum,
       receita,
       multiplicador: multNum,
+      precoVenda: precoVendaNum,
       etapas3D: is3D
         ? { impressao: impressaoNum, modelagem: modelagemNum, acabamento: acabamentoNum }
         : undefined,
@@ -957,6 +966,47 @@ function ProdutoFormContent({
           </span>
         )}
 
+        {/* Preço de venda (o que vai pro site) */}
+        <div
+          style={{
+            borderTop: "1px solid var(--border-default)",
+            paddingTop: 10,
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+          }}
+        >
+          <span className="alm-label">Preço de site</span>
+          <input
+            className="atlas-input"
+            type="number"
+            min="0"
+            step="0.01"
+            value={precoVendaInput}
+            onChange={(e) => setPrecoVendaInput(e.target.value)}
+            placeholder={precoCalculado.toFixed(2)}
+            style={{ height: 40, fontSize: 16, fontFamily: "var(--font-mono)", fontWeight: 700 }}
+          />
+          <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+            {precoVendaValido === null
+              ? "Vazio: usa o preço sugerido acima."
+              : precoVendaValido > precoCalculado + 0.001
+                ? `Acima do sugerido em ${formatBRL(precoVendaValido - precoCalculado)}.`
+                : precoVendaValido < precoCalculado - 0.001
+                  ? `Abaixo do sugerido em ${formatBRL(precoCalculado - precoVendaValido)}.`
+                  : "Igual ao preço sugerido."}
+          </span>
+          {precoVendaValido !== null && (
+            <button
+              type="button"
+              onClick={() => setPrecoVendaInput("")}
+              style={{ alignSelf: "flex-start", background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11, color: "var(--text-tertiary)" }}
+            >
+              Usar preço sugerido
+            </button>
+          )}
+        </div>
+
         {/* Multiplicador */}
         <div
           style={{
@@ -1078,7 +1128,9 @@ export default function ProdutosPage() {
   const [erro, setErro] = useState<string | null>(null);
 
   const [busca, setBusca] = useState("");
-  const [view, setView] = useState<"tabela" | "galeria">("tabela");
+  const [view, setView] = useState<"tabela" | "galeria">("galeria");
+  // Categorias recolhidas na galeria (agrupamento por categoria)
+  const [categoriasRecolhidas, setCategoriasRecolhidas] = useState<string[]>([]);
   const [selected, setSelected] = useState<ProdutoCalculado | null>(null);
   const [mode, setMode] = useState<ModalMode>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -1114,6 +1166,19 @@ export default function ProdutosPage() {
       p.categoria.toLowerCase().includes(busca.toLowerCase())
   );
 
+  // Agrupa por categoria, na ordem das categorias cadastradas
+  const grupos: [string, ProdutoCalculado[]][] = (() => {
+    const mapa = new Map<string, ProdutoCalculado[]>();
+    for (const p of filtrados) mapa.set(p.categoria, [...(mapa.get(p.categoria) ?? []), p]);
+    const ordem = [...categorias, ...[...mapa.keys()].filter((c) => !categorias.includes(c))];
+    return ordem.filter((c) => mapa.has(c)).map((c) => [c, mapa.get(c)!]);
+  })();
+
+  const alternarCategoria = (cat: string) =>
+    setCategoriasRecolhidas((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+    );
+
   const openDetalhe = (p: ProdutoCalculado) => {
     setConfirmDelete(false);
     setSelected(p);
@@ -1144,6 +1209,7 @@ export default function ProdutosPage() {
     tempo: number;
     receita: ReceitaRow[];
     multiplicador: number;
+    precoVenda: number | null;
     etapas3D?: Etapas3D;
     foto?: string;
   }) => {
@@ -1163,6 +1229,7 @@ export default function ProdutosPage() {
         })),
       etapas3D: data.etapas3D ?? null,
       multiplicador,
+      precoVenda: data.precoVenda,
     };
 
     setSaving(true);
@@ -1332,6 +1399,7 @@ export default function ProdutosPage() {
                   <th>Categoria</th>
                   <th className="num">Custo produção</th>
                   <th className="num">Preço sugerido</th>
+                  <th className="num">Preço de site</th>
                   <th className="num">Tempo</th>
                 </tr>
               </thead>
@@ -1374,9 +1442,15 @@ export default function ProdutosPage() {
                     </td>
                     <td
                       className="num"
-                      style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}
+                      style={{ fontFamily: "var(--font-mono)" }}
                     >
                       {formatBRL(p.precoSugerido)}
+                    </td>
+                    <td
+                      className="num"
+                      style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}
+                    >
+                      {formatBRL(p.precoVendaEfetivo)}
                     </td>
                     <td
                       className="num"
@@ -1408,14 +1482,41 @@ export default function ProdutosPage() {
             <EstadoVazio temProdutos={lista.length > 0} onNovo={abrirNovo} />
           </div>
         ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          {grupos.map(([categoria, itensGrupo]) => {
+            const recolhida = categoriasRecolhidas.includes(categoria);
+            return (
+            <div key={categoria} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => alternarCategoria(categoria)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  alignSelf: "flex-start",
+                  background: "none",
+                  border: "none",
+                  padding: "2px 0",
+                  cursor: "pointer",
+                  color: "var(--text-primary)",
+                }}
+              >
+                <span style={{ fontSize: 10, color: "var(--text-tertiary)", width: 10 }}>
+                  {recolhida ? "▶" : "▼"}
+                </span>
+                <span className="atlas-badge" style={{ fontSize: 12 }}>{categoria}</span>
+                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{itensGrupo.length}</span>
+              </button>
+              {!recolhida && (
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
               gap: 10,
             }}
           >
-            {filtrados.map((p) => (
+            {itensGrupo.map((p) => (
               <div
                 key={p.id}
                 onClick={() => openDetalhe(p)}
@@ -1424,6 +1525,8 @@ export default function ProdutosPage() {
                   border: "1px solid var(--border-default)",
                   borderRadius: "var(--radius-lg, 6px)",
                   overflow: "hidden",
+                  minWidth: 0,
+                  height: "100%",
                   cursor: "pointer",
                   transition:
                     "border-color 120ms ease, background-color 120ms ease",
@@ -1445,7 +1548,10 @@ export default function ProdutosPage() {
               >
                 <div
                   style={{
-                    height: 120,
+                    // Proporção panorâmica, como a capa de galeria do Notion (~1.9:1)
+                    position: "relative",
+                    aspectRatio: "1.9 / 1",
+                    flexShrink: 0,
                     background: "var(--bg-input)",
                     display: "flex",
                     alignItems: "center",
@@ -1454,9 +1560,22 @@ export default function ProdutosPage() {
                   }}
                 >
                   {p.foto
-                    ? <img src={p.foto} alt={p.nome} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ? <img src={p.foto} alt={p.nome} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                     : <Box size={32} strokeWidth={1} style={{ color: "var(--text-tertiary)", opacity: 0.4 }} />
                   }
+                  <span
+                    className="atlas-badge"
+                    style={{
+                      position: "absolute",
+                      top: 8,
+                      right: 8,
+                      fontSize: 10,
+                      background: "var(--bg-raised)",
+                      border: "1px solid var(--border-default)",
+                    }}
+                  >
+                    {p.categoria}
+                  </span>
                 </div>
                 <div
                   style={{
@@ -1472,28 +1591,29 @@ export default function ProdutosPage() {
                   >
                     {p.nome}
                   </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                    <span
-                      className="atlas-badge"
-                      style={{ alignSelf: "flex-start", fontSize: 10 }}
-                    >
-                      {p.categoria}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                      Preço de site
                     </span>
-                  </div>
-                  <div style={{ marginTop: "auto" }}>
                     <div
                       style={{
                         fontFamily: "var(--font-mono)",
                         fontWeight: 700,
-                        fontSize: 14,
+                        fontSize: 18,
+                        color: "var(--accent-primary)",
                       }}
                     >
-                      {formatBRL(p.precoSugerido)}
+                      {formatBRL(p.precoVendaEfetivo)}
                     </div>
                   </div>
                 </div>
               </div>
             ))}
+          </div>
+              )}
+            </div>
+            );
+          })}
           </div>
         ))}
 

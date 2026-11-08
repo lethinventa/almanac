@@ -24,6 +24,8 @@ export interface Produto {
   etapas3D?: Etapas3D;
   // Multiplicador próprio do produto. Se ausente, usa o multiplicador global de Configurações.
   multiplicador?: number;
+  // Preço de venda definido pela proprietária (o que vai pro site). Se ausente, vale o sugerido.
+  precoVenda?: number;
 }
 
 export interface ProdutoInput {
@@ -34,6 +36,7 @@ export interface ProdutoInput {
   foto?: string;
   etapas3D?: Etapas3D | null;
   multiplicador?: number | null;
+  precoVenda?: number | null;
 }
 
 const store = createRemoteStore<Produto>("produtos");
@@ -52,6 +55,7 @@ export async function criarProduto(dados: ProdutoInput): Promise<Produto> {
     foto: dados.foto,
     etapas3D: dados.etapas3D ?? undefined,
     multiplicador: dados.multiplicador ?? undefined,
+    precoVenda: dados.precoVenda ?? undefined,
   });
 }
 
@@ -64,6 +68,7 @@ export async function editarProduto(id: string, dados: Partial<ProdutoInput>): P
   if ("foto" in dados) patch.foto = dados.foto ?? undefined;
   if ("etapas3D" in dados) patch.etapas3D = dados.etapas3D ?? undefined;
   if ("multiplicador" in dados) patch.multiplicador = dados.multiplicador ?? undefined;
+  if ("precoVenda" in dados) patch.precoVenda = dados.precoVenda ?? undefined;
 
   const updated = await store.update(id, patch);
   if (!updated) throw new Error("Produto não encontrado");

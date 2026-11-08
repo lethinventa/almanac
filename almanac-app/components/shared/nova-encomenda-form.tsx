@@ -60,10 +60,12 @@ export function NovaEncomendaForm({
   const [dataEntrega, setDataEntrega] = useState("");
   const [itens, setItens] = useState<ItemRow[]>(
     produtos.length > 0
-      ? [{ produtoId: produtos[0].id, quantidade: "1", precoUnitario: String(produtos[0].precoSugerido) }]
+      ? [{ produtoId: produtos[0].id, quantidade: "1", precoUnitario: String(produtos[0].precoVendaEfetivo) }]
       : []
   );
   const [desconto, setDesconto] = useState("0");
+  // Valor realmente cobrado do cliente. Vazio = calculado pelos itens menos o desconto.
+  const [valorCobrado, setValorCobrado] = useState("");
   const [links, setLinks] = useState<LinkUtil[]>([]);
   const [novoLinkLabel, setNovoLinkLabel] = useState("");
   const [novoLinkUrl, setNovoLinkUrl] = useState("");
@@ -71,7 +73,10 @@ export function NovaEncomendaForm({
 
   const subtotal = itens.reduce((s, r) => s + (parseFloat(r.quantidade) || 0) * (parseFloat(r.precoUnitario) || 0), 0);
   const descontoNum = parseFloat(desconto) || 0;
-  const total = Math.max(subtotal - descontoNum, 0);
+  const totalAutomatico = Math.max(subtotal - descontoNum, 0);
+  const valorCobradoNum = parseFloat(valorCobrado);
+  const temValorCobrado = valorCobrado.trim() !== "" && !isNaN(valorCobradoNum);
+  const total = temValorCobrado ? valorCobradoNum : totalAutomatico;
   const custo = itens.reduce((s, r) => {
     const prod = produtos.find((p) => p.id === r.produtoId);
     return s + (prod?.custo ?? 0) * (parseFloat(r.quantidade) || 0);
@@ -82,7 +87,7 @@ export function NovaEncomendaForm({
   const addItem = () =>
     setItens((prev) => [
       ...prev,
-      { produtoId: produtos[0]?.id ?? "", quantidade: "1", precoUnitario: String(produtos[0]?.precoSugerido ?? 0) },
+      { produtoId: produtos[0]?.id ?? "", quantidade: "1", precoUnitario: String(produtos[0]?.precoVendaEfetivo ?? 0) },
     ]);
 
   const removeItem = (idx: number) =>
@@ -94,7 +99,7 @@ export function NovaEncomendaForm({
         if (i !== idx) return r;
         if (field === "produtoId") {
           const prod = produtos.find((p) => p.id === value);
-          return { ...r, produtoId: value, precoUnitario: prod ? String(prod.precoSugerido) : r.precoUnitario };
+          return { ...r, produtoId: value, precoUnitario: prod ? String(prod.precoVendaEfetivo) : r.precoUnitario };
         }
         return { ...r, [field]: value };
       })
@@ -128,6 +133,7 @@ export function NovaEncomendaForm({
         precoUnitario: parseFloat(r.precoUnitario) || 0,
       })),
       desconto: descontoNum,
+      valorCobrado: temValorCobrado ? valorCobradoNum : null,
       totalCobrado: total,
       custoProducao: custo,
       margem,
@@ -201,6 +207,14 @@ export function NovaEncomendaForm({
       <div className="alm-field" style={{ maxWidth: 200 }}>
         <label className="alm-label">Desconto (R$)</label>
         <input className="atlas-input" type="number" min="0" step="0.01" placeholder="0,00" value={desconto} onChange={(e) => setDesconto(e.target.value)} />
+      </div>
+
+      <div className="alm-field" style={{ maxWidth: 200 }}>
+        <label className="alm-label">Valor cobrado (R$)</label>
+        <input className="atlas-input" type="number" min="0" step="0.01" placeholder={totalAutomatico.toFixed(2)} value={valorCobrado} onChange={(e) => setValorCobrado(e.target.value)} />
+        <span style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4, display: "block" }}>
+          {temValorCobrado ? "Valor combinado com o cliente, usado no total." : "Vazio: usa o total calculado pelos itens."}
+        </span>
       </div>
 
       {subtotal > 0 && (

@@ -13,6 +13,8 @@ import type { Produto } from "@/lib/repositories/produtos-registro";
 export interface ProdutoCalculado extends Produto {
   custo: number;
   precoSugerido: number;
+  // Preço de venda vigente: o definido pela proprietária ou, se não houver, o sugerido.
+  precoVendaEfetivo: number;
   margem: number;
   multiplicador: number;
 }
@@ -36,9 +38,10 @@ function calcularProduto(
       ? calcPreco3D(custo, produto.etapas3D, configProduto, totalCustos).precoSugerido
       : calcPrecoSugerido(custo, produto.tempoProducao, configProduto, totalCustos);
 
-  const margem = precoSugerido > 0 ? ((precoSugerido - custo) / precoSugerido) * 100 : 0;
+  const precoVendaEfetivo = produto.precoVenda && produto.precoVenda > 0 ? produto.precoVenda : precoSugerido;
+  const margem = precoVendaEfetivo > 0 ? ((precoVendaEfetivo - custo) / precoVendaEfetivo) * 100 : 0;
 
-  return { ...produto, custo, precoSugerido, margem, multiplicador };
+  return { ...produto, custo, precoSugerido, precoVendaEfetivo, margem, multiplicador };
 }
 
 export async function buscarProdutos(): Promise<ProdutoCalculado[]> {

@@ -342,7 +342,7 @@ function TabelaProdutos({
   const [newItem, setNewItem] = useState({
     produtoId: produtos[0]?.id ?? "",
     quantidade: "1",
-    precoUnitario: String(produtos[0]?.precoSugerido ?? 0),
+    precoUnitario: String(produtos[0]?.precoVendaEfetivo ?? 0),
   });
 
   const startEdit = (row: number, field: "quantidade" | "precoUnitario") => {
@@ -379,7 +379,7 @@ function TabelaProdutos({
     setNewItem({
       produtoId: first?.id ?? "",
       quantidade: "1",
-      precoUnitario: String(first?.precoSugerido ?? 0),
+      precoUnitario: String(first?.precoVendaEfetivo ?? 0),
     });
   };
 
@@ -583,7 +583,7 @@ function TabelaProdutos({
                     setNewItem((n) => ({
                       ...n,
                       produtoId: e.target.value,
-                      precoUnitario: String(prod?.precoSugerido ?? n.precoUnitario),
+                      precoUnitario: String(prod?.precoVendaEfetivo ?? n.precoUnitario),
                     }));
                   }}
                 >
@@ -876,6 +876,9 @@ function ProdutoDetalheModal({
             <InfoRow label="Custo unitário">
               <span style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(produto.custo)}</span>
             </InfoRow>
+            <InfoRow label="Preço de site">
+              <span style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(produto.precoVendaEfetivo)}</span>
+            </InfoRow>
             <InfoRow label="Preço sugerido">
               <span style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(produto.precoSugerido)}</span>
             </InfoRow>
@@ -1104,6 +1107,63 @@ function TimelinePedido({ status, dataPedido }: { status: EncomendaStatus; dataP
   );
 }
 
+// ── Valor cobrado (sobrescreve o total calculado pelos itens) ──
+function ValorCobradoField({
+  valor,
+  automatico,
+  onChange,
+}: {
+  valor: number | null;
+  automatico: number;
+  onChange: (v: number | null) => void;
+}) {
+  const [draft, setDraft] = useState(valor !== null ? String(valor) : "");
+
+  // Acompanha mudanças externas (ex.: itens alterados) quando não há valor manual
+  useEffect(() => {
+    setDraft(valor !== null ? String(valor) : "");
+  }, [valor]);
+
+  const commit = () => {
+    const n = parseFloat(draft);
+    const novo = draft.trim() !== "" && !isNaN(n) && n >= 0 ? n : null;
+    if (novo === valor) return;
+    onChange(novo);
+  };
+
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <input
+        className="atlas-input"
+        type="number"
+        min="0"
+        step="0.01"
+        placeholder={automatico.toFixed(2)}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        style={{ width: 120, height: 28, fontFamily: "var(--font-mono)", fontSize: 12, textAlign: "right" }}
+      />
+      {valor !== null && (
+        <button
+          type="button"
+          className="atlas-btn atlas-btn-ghost atlas-btn-sm"
+          title="Voltar ao total calculado pelos itens"
+          onClick={() => {
+            setDraft("");
+            onChange(null);
+          }}
+        >
+          Automático
+        </button>
+      )}
+    </span>
+  );
+}
+
 // ── InfoRow ───────────────────────────────────────────────────
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -1188,7 +1248,9 @@ export default function EncomendaDetalhePage() {
 
   const subtotal = itens.reduce((s, i) => s + i.quantidade * i.precoUnitario, 0);
   const desconto = enc.desconto ?? 0;
-  const totalCobrado = Math.max(subtotal - desconto, 0);
+  const totalAutomatico = Math.max(subtotal - desconto, 0);
+  // Valor cobrado manualmente prevalece sobre o cálculo pelos itens
+  const totalCobrado = enc.valorCobrado ?? totalAutomatico;
   const custoProducao = itens.reduce((s, i) => {
     const prod = produtosList.find((p) => p.id === i.produtoId);
     return s + (prod ? prod.custo : (i.custoUnitario ?? 0)) * i.quantidade;
@@ -1233,7 +1295,7 @@ export default function EncomendaDetalhePage() {
   const handleItensChange = (newItens: EncomendaItem[]) => {
     setItens(newItens);
     const sub = newItens.reduce((s, i) => s + i.quantidade * i.precoUnitario, 0);
-    const newTotal = Math.max(sub - desconto, 0);
+    const newTotal = enc.valorCobrado ?? Math.max(sub - desconto, 0);
     const newCusto = newItens.reduce((s, i) => {
       const prod = produtosList.find((p) => p.id === i.produtoId);
       return s + (prod ? prod.custo : (i.custoUnitario ?? 0)) * i.quantidade;
@@ -1244,6 +1306,19 @@ export default function EncomendaDetalhePage() {
       totalCobrado: newTotal,
       custoProducao: newCusto,
       margem: newMargem,
+    });
+  };
+
+  const handleValorCobradoChange = (v: number | null) => {
+    const sub = itens.reduce((s, i) => s + i.quantidade * i.precoUnitario, 0);
+    const automatico = Math.max(sub - desconto, 0);
+    const novoTotal = v ?? automatico;
+    const novaMargem = novoTotal > 0 ? ((novoTotal - custoProducao) / novoTotal) * 100 : 0;
+    setEnc((prev) => (prev ? { ...prev, valorCobrado: v ?? undefined, totalCobrado: novoTotal, margem: novaMargem } : prev));
+    editarEncomenda(enc.id, {
+      valorCobrado: v,
+      totalCobrado: novoTotal,
+      margem: novaMargem,
     });
   };
 
@@ -1452,6 +1527,13 @@ export default function EncomendaDetalhePage() {
                   </span>
                 </InfoRow>
               )}
+              <InfoRow label="Valor cobrado">
+                <ValorCobradoField
+                  valor={enc.valorCobrado ?? null}
+                  automatico={totalAutomatico}
+                  onChange={handleValorCobradoChange}
+                />
+              </InfoRow>
               <InfoRow label="Total cobrado">
                 <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>{formatBRL(totalCobrado)}</span>
               </InfoRow>

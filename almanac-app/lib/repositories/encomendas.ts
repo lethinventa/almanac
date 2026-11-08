@@ -27,6 +27,9 @@ export interface Encomenda {
   dataEntrega: string;
   itens: EncomendaItem[];
   desconto: number;
+  // Valor que a proprietária efetivamente cobrou (pode ser diferente do site).
+  // Se ausente, o total é calculado pelos itens menos o desconto.
+  valorCobrado?: number;
   totalCobrado: number;
   custoProducao: number;
   margem: number;
@@ -44,6 +47,7 @@ export interface EncomendaInput {
   dataEntrega: string;
   itens: EncomendaItem[];
   desconto?: number;
+  valorCobrado?: number | null;
   totalCobrado: number;
   custoProducao: number;
   margem: number;
@@ -72,6 +76,7 @@ export async function criarEncomenda(dados: EncomendaInput): Promise<Encomenda> 
     dataEntrega: dados.dataEntrega,
     itens: dados.itens,
     desconto: dados.desconto ?? 0,
+    valorCobrado: dados.valorCobrado ?? undefined,
     totalCobrado: dados.totalCobrado,
     custoProducao: dados.custoProducao,
     margem: dados.margem,
@@ -92,6 +97,7 @@ export async function editarEncomenda(id: string, dados: Partial<EncomendaInput>
   if (dados.dataEntrega !== undefined) patch.dataEntrega = dados.dataEntrega;
   if (dados.itens !== undefined) patch.itens = dados.itens;
   if (dados.desconto !== undefined) patch.desconto = dados.desconto;
+  if ("valorCobrado" in dados) patch.valorCobrado = dados.valorCobrado ?? undefined;
   if (dados.totalCobrado !== undefined) patch.totalCobrado = dados.totalCobrado;
   if (dados.custoProducao !== undefined) patch.custoProducao = dados.custoProducao;
   if (dados.margem !== undefined) patch.margem = dados.margem;

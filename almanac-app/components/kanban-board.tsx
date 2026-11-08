@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, AlertTriangle } from "lucide-react";
+import { Calendar, AlertTriangle, Package } from "lucide-react";
 import {
   formatBRL,
   formatDate,
@@ -189,17 +189,23 @@ export function KanbanBoard({
                       userSelect: "none",
                     }}
                   >
-                    {cardFoto && (
-                      <div
-                        style={{
-                          margin: "-16px -16px 0",
-                          borderRadius: "var(--radius-md) var(--radius-md) 0 0",
-                          overflow: "hidden",
-                          position: "relative",
-                          aspectRatio: "1 / 1",
-                          flexShrink: 0,
-                        }}
-                      >
+                    {/* Mesmo modelo do card de produto: capa panorâmica com tag no canto superior direito */}
+                    <div
+                      style={{
+                        margin: "-16px -16px 0",
+                        borderRadius: "var(--radius-md) var(--radius-md) 0 0",
+                        overflow: "hidden",
+                        position: "relative",
+                        aspectRatio: "1.9 / 1",
+                        flexShrink: 0,
+                        background: "var(--bg-input)",
+                        borderBottom: "1px solid var(--border-default)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {cardFoto ? (
                         <img
                           src={cardFoto}
                           alt={enc.cliente}
@@ -209,10 +215,26 @@ export function KanbanBoard({
                             width: "100%",
                             height: "100%",
                             objectFit: "cover",
+                            display: "block",
                           }}
                         />
-                      </div>
-                    )}
+                      ) : (
+                        <Package size={28} strokeWidth={1} style={{ color: "var(--text-tertiary)", opacity: 0.4 }} />
+                      )}
+                      <span
+                        className="atlas-badge"
+                        style={{
+                          position: "absolute",
+                          top: 8,
+                          right: 8,
+                          fontSize: 10,
+                          background: "var(--bg-raised)",
+                          border: "1px solid var(--border-default)",
+                        }}
+                      >
+                        {enc.canal === "whatsapp" ? "WhatsApp" : "Presencial"}
+                      </span>
+                    </div>
                     <div className="alm-kanban-card-client">{enc.cliente}</div>
                     <div
                       className="alm-kanban-card-items"

@@ -18,11 +18,11 @@
   --bg-overlay: #FFFFFF;
   --bg-elevated: #FFFFFF;
   --bg-input: #FFFFFF;
-  --bg-tab-active: #FEEAAE;
+  --bg-tab-active: #DCE5FA;
   --bg-tab-inactive: transparent;
-  --bg-hover: #FDF1DA;
-  --bg-selected: #FEEAAE;
-  --bg-active: #FCE3A0;
+  --bg-hover: #EDF2FD;
+  --bg-selected: #DCE5FA;
+  --bg-active: #CAD9F8;
 
   /* ---------- Texto ---------- */
   --text-primary: #1E1E1E;
@@ -311,6 +311,10 @@ body {
   flex-direction: column;
   gap: 22px;
   min-height: 100%;
+  /* Em telas largas o conteúdo fica centralizado, com margens laterais */
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
 }
 
 .alm-page-header {
