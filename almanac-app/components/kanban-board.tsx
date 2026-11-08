@@ -59,7 +59,10 @@ export function KanbanBoard({
   return (
     <div className="alm-kanban">
       {columns.map((status) => {
-        const cards = lista.filter((e) => e.status === status);
+        // Prioridade pelo prazo: entrega mais próxima (ou atrasada) no topo
+        const cards = lista
+          .filter((e) => e.status === status)
+          .sort((a, b) => a.dataEntrega.localeCompare(b.dataEntrega) || a.dataPedido.localeCompare(b.dataPedido));
         const isOver = dragOverStatus === status;
 
         return (
