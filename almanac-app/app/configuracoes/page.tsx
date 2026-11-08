@@ -7,6 +7,7 @@ import { buscarTotalCustosIndiretos } from "@/lib/repositories/financeiro";
 import { formatBRL } from "@/lib/utils";
 import { importarDoNavegador } from "@/lib/importar-local";
 import { taxaHoraria } from "@/lib/produto-calculos";
+import { CategoriasCard } from "@/components/shared/categorias-card";
 
 const DEFAULT_CONFIGURACOES: Configuracoes = {
   horasTrabalhoMes: 160,
@@ -353,6 +354,9 @@ export default function ConfiguracoesPage() {
 
         </div>
       </div>
+
+      {/* Categorias de produto */}
+      <CategoriasCard />
     </div>
   );
 }

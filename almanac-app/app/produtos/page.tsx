@@ -21,6 +21,7 @@ import {
 import { formatBRL } from "@/lib/utils";
 import { lerImagem } from "@/lib/imagem";
 import { buscarTotalCustosIndiretos } from "@/lib/repositories/financeiro";
+import { buscarCategorias, criarCategoria, type Categoria } from "@/lib/repositories/categorias";
 import { buscarConfiguracoes, type Configuracoes } from "@/lib/repositories/configuracoes";
 import { calcPrecoSugerido, calcPreco3D, taxaHoraria } from "@/lib/produto-calculos";
 
@@ -54,20 +55,6 @@ interface ReceitaRow {
   quantidade: string;
 }
 
-const CATEGORIAS_DEFAULT = [
-  "Chaveiro",
-  "Adesivo",
-  "Tag",
-  "Cartão",
-  "Planner",
-  "Kit",
-  "Impressão 3D",
-  "Utilidades",
-  "Abridor lata",
-  "Mesa posta",
-  "Corporativo",
-  "Outro",
-];
 
 
 // ── Modal wrapper ────────────────────────────────────────────
@@ -568,6 +555,11 @@ function ProdutoFormContent({
 
   const multNum = Math.max(1, parseFloat(multInput) || 1);
   const is3D = categoria === "Impressão 3D";
+  // Categoria arquivada de um produto existente continua aparecendo para não perder o valor
+  const opcoesCategoria =
+    initial && !categorias.includes(initial.categoria)
+      ? [initial.categoria, ...categorias]
+      : categorias;
 
   const materialCost = receita.reduce((sum, r) => {
     const ins = insumos.find((i) => i.id === r.insumoId);
@@ -649,7 +641,7 @@ function ProdutoFormContent({
           <CategoriaSelect
             value={categoria}
             onChange={setCategoria}
-            categorias={categorias}
+            categorias={opcoesCategoria}
             onAddCategoria={onAddCategoria}
           />
         </div>
@@ -1134,10 +1126,15 @@ export default function ProdutosPage() {
   const [selected, setSelected] = useState<ProdutoCalculado | null>(null);
   const [mode, setMode] = useState<ModalMode>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [categorias, setCategorias] = useState<string[]>(CATEGORIAS_DEFAULT);
+  const [categoriasDoc, setCategoriasDoc] = useState<Categoria[]>([]);
+  // Todas as categorias, na ordem cadastrada (agrupamento da galeria)
+  const categorias = categoriasDoc.map((c) => c.nome);
+  // Só as ativas aparecem ao cadastrar produto
+  const categoriasAtivas = categoriasDoc.filter((c) => !c.arquivada).map((c) => c.nome);
 
   // Load initial data
   useEffect(() => {
+    buscarCategorias().then(setCategoriasDoc).catch((e) => setErro(String(e)));
     Promise.all([buscarProdutos(), buscarInsumos(), buscarConfiguracoes(), buscarTotalCustosIndiretos()])
       .then(([prods, inss, cfg, custos]) => {
         setLista(prods);
@@ -1197,10 +1194,13 @@ export default function ProdutosPage() {
     setMode("novo");
   };
 
-  const handleAddCategoria = (cat: string) => {
-    setCategorias((prev) =>
-      prev.includes(cat) ? prev : [...prev, cat]
-    );
+  const handleAddCategoria = async (cat: string) => {
+    try {
+      await criarCategoria(cat);
+      setCategoriasDoc(await buscarCategorias());
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    }
   };
 
   const handleSave = async (data: {
@@ -1726,7 +1726,7 @@ export default function ProdutosPage() {
         wide
       >
         <ProdutoFormContent
-          categorias={categorias}
+          categorias={categoriasAtivas}
           insumos={insumos}
           config={config}
           totalCustos={totalCustos}
@@ -1746,7 +1746,7 @@ export default function ProdutosPage() {
         {selected && (
           <ProdutoFormContent
             initial={selected}
-            categorias={categorias}
+            categorias={categoriasAtivas}
             insumos={insumos}
             config={config}
             totalCustos={totalCustos}
