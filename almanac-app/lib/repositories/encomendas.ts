@@ -2,6 +2,8 @@ import { createRemoteStore, newId } from "@/lib/remote-store";
 
 export type EncomendaStatus = "aguardando" | "em_producao" | "pronto" | "entregue" | "cancelado";
 
+export type EtapaProducao = "impressao" | "acabamento" | "embalagem" | "finalizado";
+
 export interface EncomendaItem {
   // Vazio quando o item veio de um orçamento sem produto cadastrado.
   produtoId: string;
@@ -10,6 +12,9 @@ export interface EncomendaItem {
   // Usados só nos itens sem produto (vindos de orçamento).
   descricao?: string;
   custoUnitario?: number;
+  // Só para itens de impressão 3D: quantas peças estão em cada etapa da produção.
+  // A soma deve dar a quantidade; ausente = tudo em impressão.
+  etapas?: Partial<Record<EtapaProducao, number>>;
 }
 
 export interface LinkUtil {
