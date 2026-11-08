@@ -214,7 +214,13 @@ export default function DashboardPage() {
       const custo = entregues.reduce((s, e) => s + e.custoProducao, 0);
       setReceitaMes(receita);
       setLucroBruto(receita - custo);
-      setLucroLiquido(receita - custo - totalCustos);
+      // Estimativa: inclui encomendas já iniciadas (em produção, prontas ou entregues) do mês
+      const iniciadas = encs.filter(e =>
+        ['em_producao', 'pronto', 'entregue'].includes(e.status) && e.dataEntrega?.startsWith(anoMesAtual)
+      );
+      const receitaEstimada = iniciadas.reduce((s, e) => s + e.totalCobrado, 0);
+      const custoEstimado = iniciadas.reduce((s, e) => s + e.custoProducao, 0);
+      setLucroLiquido(receitaEstimada - custoEstimado - totalCustos);
     });
   }, []);
 
