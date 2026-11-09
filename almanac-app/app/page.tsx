@@ -5,16 +5,24 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle, TrendingUp, ShoppingBag, Package, Plus,
-  ClipboardList, Box, PackageCheck, X,
+  ClipboardList, Box, PackageCheck, X, ArrowDown, ArrowUp, Wallet,
 } from "lucide-react";
 import { KanbanWidget } from "@/components/kanban-widget";
 import { PlanningProducao } from "@/components/planning-producao";
 import { formatBRL, categoriaLabel } from "@/lib/utils";
 import { buscarInsumos, criarInsumo, type Insumo, type InsumoCategoria } from "@/lib/repositories/insumos";
 import { buscarProdutos, type ProdutoCalculado } from "@/lib/repositories/produtos";
+import { buscarCustosIndiretos } from "@/lib/repositories/financeiro";
+import { buscarTodosPagamentos } from "@/lib/repositories/pagamentos";
+import {
+  gerarAutoMovimentacoes,
+  getPeriodRange,
+  loadManuais,
+  resumoDoPeriodo,
+  calcularLucroTotal,
+} from "@/lib/fluxo-caixa";
 import { buscarProdutosPE, type ProdutoPE } from "@/lib/repositories/pronta-entrega";
 import { buscarEncomendas, criarEncomenda, type Encomenda, type EncomendaInput } from "@/lib/repositories/encomendas";
-import { buscarTotalCustosIndiretos } from "@/lib/repositories/financeiro";
 import { NovaEncomendaForm } from "@/components/shared/nova-encomenda-form";
 
 // ── Modal wrapper ─────────────────────────────────────────────
@@ -189,9 +197,8 @@ export default function DashboardPage() {
   const [insumosAlerta, setInsumosAlerta] = useState<Insumo[]>([]);
   const [produtosAlerta, setProdutosAlerta] = useState<ProdutoPE[]>([]);
   const [encomendasAbertas, setEncomendasAbertas] = useState<Encomenda[]>([]);
-  const [receitaMes, setReceitaMes] = useState(0);
-  const [lucroBruto, setLucroBruto] = useState(0);
-  const [lucroLiquido, setLucroLiquido] = useState(0);
+  const [fluxo, setFluxo] = useState({ entradas: 0, saidas: 0, saldo: 0 });
+  const [lucroTotal, setLucroTotal] = useState(0);
   const [produtosList, setProdutosList] = useState<ProdutoCalculado[]>([]);
 
   useEffect(() => {
@@ -199,28 +206,22 @@ export default function DashboardPage() {
       buscarInsumos(),
       buscarProdutos(),
       buscarEncomendas(),
-      buscarTotalCustosIndiretos(),
+      buscarCustosIndiretos(),
       buscarProdutosPE(),
-    ]).then(([ins, prods, encs, totalCustos, prontaEntrega]) => {
+      buscarTodosPagamentos(),
+    ]).then(([ins, prods, encs, custos, prontaEntrega, pagamentos]) => {
       setInsumosAlerta(ins.filter(i => i.estoque !== null && i.estoqueMin !== null && (i.estoque ?? 0) <= (i.estoqueMin ?? 0)));
       setProdutosAlerta(prontaEntrega.filter(p => p.estoqueAtual <= p.estoqueMin));
       const abertas = encs.filter(e => e.status !== 'entregue' && e.status !== 'cancelado');
       setEncomendasAbertas(abertas);
       setProdutosList(prods);
-      const agora = new Date();
-      const anoMesAtual = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
-      const entregues = encs.filter(e => e.status === 'entregue' && e.dataEntrega?.startsWith(anoMesAtual));
-      const receita = entregues.reduce((s, e) => s + e.totalCobrado, 0);
-      const custo = entregues.reduce((s, e) => s + e.custoProducao, 0);
-      setReceitaMes(receita);
-      setLucroBruto(receita - custo);
-      // Estimativa: inclui encomendas já iniciadas (em produção, prontas ou entregues) do mês
-      const iniciadas = encs.filter(e =>
-        ['em_producao', 'pronto', 'entregue'].includes(e.status) && e.dataEntrega?.startsWith(anoMesAtual)
-      );
-      const receitaEstimada = iniciadas.reduce((s, e) => s + e.totalCobrado, 0);
-      const custoEstimado = iniciadas.reduce((s, e) => s + e.custoProducao, 0);
-      setLucroLiquido(receitaEstimada - custoEstimado - totalCustos);
+      // Mesmos números do Financeiro (fluxo de caixa do mês atual)
+      const { inicio, fim } = getPeriodRange("mes", "", "");
+      const movs = [...gerarAutoMovimentacoes(custos, pagamentos, encs), ...loadManuais()];
+      setFluxo(resumoDoPeriodo(movs, inicio, fim));
+      // Lucro total: desde o início, contando encomendas já iniciadas na produção
+      const custosMensais = custos.reduce((s, c) => s + c.valorMensal, 0);
+      setLucroTotal(calcularLucroTotal(encs, custosMensais));
     });
   }, []);
 
@@ -246,11 +247,12 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="alm-stats-grid">
-        <StatCard label="Receita do mês" value={formatBRL(receitaMes)} icon={TrendingUp} />
-        <StatCard label="Lucro bruto" value={formatBRL(lucroBruto)} icon={TrendingUp} />
+      <div className="alm-stats-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
+        <StatCard label="Entradas do mês" value={formatBRL(fluxo.entradas)} icon={ArrowDown} />
+        <StatCard label="Saídas do mês" value={formatBRL(fluxo.saidas)} icon={ArrowUp} />
+        <StatCard label="Saldo do mês" value={formatBRL(fluxo.saldo)} icon={Wallet} />
+        <StatCard label="Lucro total" value={formatBRL(lucroTotal)} icon={TrendingUp} highlight />
         <StatCard label="Encomendas abertas" value={String(encomendasAbertas.length)} icon={ShoppingBag} />
-        <StatCard label="Lucro líquido estimado" value={formatBRL(lucroLiquido)} icon={TrendingUp} highlight />
       </div>
 
       <KanbanWidget />

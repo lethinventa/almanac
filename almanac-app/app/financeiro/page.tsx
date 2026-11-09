@@ -12,40 +12,20 @@ import {
 } from "@/lib/repositories/financeiro";
 import { buscarEncomendas, type Encomenda } from "@/lib/repositories/encomendas";
 import { buscarTodosPagamentos } from "@/lib/repositories/pagamentos";
+import {
+  type MovCategoria,
+  type Movimentacao,
+  type Periodo,
+  type AllPagamentos,
+  loadManuais,
+  saveManuaisLS,
+  gerarAutoMovimentacoes,
+  getPeriodRange,
+} from "@/lib/fluxo-caixa";
 
-// ── Types ─────────────────────────────────────────────────────
-type MovCategoria =
-  | "pagamento_encomenda"
-  | "entrada_avulsa"
-  | "compra_insumo"
-  | "custo_fixo"
-  | "saida_avulsa";
-
-interface Movimentacao {
-  id: string;
-  tipo: "entrada" | "saida";
-  valor: number;
-  data: string;
-  categoria: MovCategoria;
-  descricao: string;
-  vinculada?: boolean;
-}
-
-type Periodo = "semana" | "mes" | "mes_ant" | "custom";
 
 // ── localStorage helpers ─────────────────────────────────────
 
-function loadManuais(): Movimentacao[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const s = localStorage.getItem("almanac_manuais");
-    return s ? JSON.parse(s) : [];
-  } catch { return []; }
-}
-
-function saveManuaisLS(items: Movimentacao[]) {
-  localStorage.setItem("almanac_manuais", JSON.stringify(items));
-}
 
 // ── Fluxo de caixa helpers ────────────────────────────────────
 const CAT_LABEL: Record<MovCategoria, string> = {
@@ -67,101 +47,7 @@ const FORM_CAT_SAIDA: { value: MovCategoria; label: string }[] = [
   { value: "saida_avulsa", label: "Saída avulsa" },
 ];
 
-type AllPagamentos = Record<
-  string,
-  Array<{ id: string; valor: number; data: string; forma: string; observacao?: string }>
->;
 
-function gerarAutoMovimentacoes(
-  custos: CustoIndireto[],
-  allPagamentos: AllPagamentos,
-  encomendasData: Encomenda[]
-): Movimentacao[] {
-  const result: Movimentacao[] = [];
-
-  // Entradas: usa pagamentos reais quando existem, senão totalCobrado (só entregues).
-  // Pagamentos de encomendas canceladas continuam contando: o dinheiro foi recebido.
-  encomendasData
-    .forEach((e) => {
-      const pags = allPagamentos[e.id] ?? [];
-      if (pags.length > 0) {
-        pags.forEach((p) => {
-          if (p.valor === 0) return;
-          result.push({
-            id: `pag-${p.id}`,
-            tipo: p.valor > 0 ? "entrada" : "saida",
-            valor: Math.abs(p.valor),
-            data: p.data,
-            categoria: "pagamento_encomenda",
-            descricao: e.cliente,
-            vinculada: true,
-          });
-        });
-      } else if (e.status === "entregue") {
-        result.push({
-          id: `enc-${e.id}`,
-          tipo: "entrada",
-          valor: e.totalCobrado,
-          data: e.dataEntrega,
-          categoria: "pagamento_encomenda",
-          descricao: e.cliente,
-          vinculada: true,
-        });
-      }
-    });
-
-  // Custos fixos → saídas (último 6 meses)
-  const hoje = new Date();
-  for (let i = 0; i < 6; i++) {
-    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
-    const ano = d.getFullYear();
-    const mes = String(d.getMonth() + 1).padStart(2, "0");
-    const dataStr = `${ano}-${mes}-01`;
-    custos.forEach((c) => {
-      result.push({
-        id: `custo-${c.id}-${ano}-${mes}`,
-        tipo: "saida",
-        valor: c.valorMensal,
-        data: dataStr,
-        categoria: "custo_fixo",
-        descricao: c.nome,
-        vinculada: true,
-      });
-    });
-  }
-
-  return result;
-}
-
-function getPeriodRange(
-  filtro: Periodo,
-  customInicio: string,
-  customFim: string
-): { inicio: string; fim: string } {
-  const hoje = new Date();
-  const toISO = (d: Date) => d.toISOString().slice(0, 10);
-
-  if (filtro === "semana") {
-    const start = new Date(hoje);
-    start.setDate(hoje.getDate() - 6);
-    return { inicio: toISO(start), fim: toISO(hoje) };
-  }
-  if (filtro === "mes") {
-    return {
-      inicio: `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-01`,
-      fim: toISO(hoje),
-    };
-  }
-  if (filtro === "mes_ant") {
-    const start = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
-    const end = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
-    return { inicio: toISO(start), fim: toISO(end) };
-  }
-  // custom
-  const fim = customFim || toISO(hoje);
-  const inicio = customInicio || fim;
-  return { inicio, fim };
-}
 
 // ── DRERow ────────────────────────────────────────────────────
 function DRERow({
