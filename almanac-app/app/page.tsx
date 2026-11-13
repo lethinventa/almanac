@@ -122,6 +122,7 @@ function NovoInsumoForm({ onClose }: { onClose: () => void }) {
           <option value="invisivel">Rotativo invisível</option>
           <option value="ferramenta">Ferramenta</option>
           <option value="maquinario">Maquinário</option>
+          <option value="embalagem">Embalagem</option>
         </select>
       </div>
 

@@ -24,9 +24,11 @@ export interface LinkUtil {
   url: string;
 }
 
-// Embalagem usada neste pedido. Não é produto: depende da quantidade de itens.
+// Embalagem usada neste pedido: vem de um insumo da categoria "embalagem".
+// Custo unitário é o preço do insumo no momento em que foi adicionado.
 export interface EmbalagemEncomenda {
   id: string;
+  insumoId: string;
   descricao: string;
   quantidade: number;
   custoUnitario: number;
@@ -103,6 +105,7 @@ export async function criarEncomenda(dados: EncomendaInput): Promise<Encomenda> 
     observacoesInternas: dados.observacoesInternas,
     foto: dados.foto,
     orcamentoImagem: dados.orcamentoImagem,
+    embalagens: dados.embalagens ?? [],
     linksUteis: [],
   };
   return store.insert(encomenda);

@@ -33,4 +33,5 @@ export const categoriaLabel: Record<string, string> = {
   invisivel: 'Rotativo invisível',
   ferramenta: 'Ferramenta',
   maquinario: 'Maquinário',
+  embalagem: 'Embalagem',
 }

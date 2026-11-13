@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Plus, Trash2, Package, ImagePlus, Link2, FileText,
 } from "lucide-react";
@@ -9,7 +9,9 @@ import { lerImagem } from "@/lib/imagem";
 import { gerarOrcamentoEncomenda } from "@/lib/orcamento-encomenda";
 import { Combobox } from "@/components/shared/combobox";
 import type { ProdutoCalculado } from "@/lib/repositories/produtos";
-import type { EncomendaInput } from "@/lib/repositories/encomendas";
+import type { EmbalagemEncomenda, EncomendaInput } from "@/lib/repositories/encomendas";
+import { buscarInsumos, type Insumo } from "@/lib/repositories/insumos";
+import { EmbalagensPedido } from "@/components/shared/embalagens-pedido";
 
 interface ItemRow {
   produtoId: string;
@@ -73,6 +75,12 @@ export function NovaEncomendaForm({
   const [obs, setObs] = useState("");
   const [gerando, setGerando] = useState(false);
   const [erroOrcamento, setErroOrcamento] = useState("");
+  const [embalagens, setEmbalagens] = useState<EmbalagemEncomenda[]>([]);
+  const [insumos, setInsumos] = useState<Insumo[]>([]);
+
+  useEffect(() => {
+    buscarInsumos().then(setInsumos);
+  }, []);
 
   const subtotal = itens.reduce((s, r) => s + (parseFloat(r.quantidade) || 0) * (parseFloat(r.precoUnitario) || 0), 0);
   const descontoNum = parseFloat(desconto) || 0;
@@ -80,10 +88,12 @@ export function NovaEncomendaForm({
   const valorCobradoNum = parseFloat(valorCobrado);
   const temValorCobrado = valorCobrado.trim() !== "" && !isNaN(valorCobradoNum);
   const total = temValorCobrado ? valorCobradoNum : totalAutomatico;
-  const custo = itens.reduce((s, r) => {
+  const custoItens = itens.reduce((s, r) => {
     const prod = produtos.find((p) => p.id === r.produtoId);
     return s + (prod?.custo ?? 0) * (parseFloat(r.quantidade) || 0);
   }, 0);
+  const custoEmbalagens = embalagens.reduce((s, e) => s + e.quantidade * e.custoUnitario, 0);
+  const custo = custoItens + custoEmbalagens;
   const margem = total > 0 ? ((total - custo) / total) * 100 : 0;
   const margemColor = margem >= 60 ? "var(--status-success)" : margem >= 30 ? "var(--status-warning)" : "var(--status-error)";
 
@@ -161,6 +171,7 @@ export function NovaEncomendaForm({
         observacoes: obs.trim() || undefined,
         foto: foto ?? undefined,
         orcamentoImagem,
+        embalagens,
       });
     } catch (err) {
       console.error("Erro ao gerar imagem do orçamento:", err);
@@ -230,6 +241,8 @@ export function NovaEncomendaForm({
           })}
         </div>
       </div>
+
+      <EmbalagensPedido embalagens={embalagens} onChange={setEmbalagens} insumosEmbalagem={insumos.filter((i) => i.categoria === "embalagem")} />
 
       <div className="alm-field" style={{ maxWidth: 200 }}>
         <label className="alm-label">Desconto (R$)</label>

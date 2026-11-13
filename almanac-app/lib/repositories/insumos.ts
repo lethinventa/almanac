@@ -1,7 +1,7 @@
 import { createRemoteStore, newId } from "@/lib/remote-store";
 import { listarProdutos } from "@/lib/repositories/produtos-registro";
 
-export type InsumoCategoria = "visivel" | "invisivel" | "ferramenta" | "maquinario";
+export type InsumoCategoria = "visivel" | "invisivel" | "ferramenta" | "maquinario" | "embalagem";
 
 export interface Insumo {
   id: string;

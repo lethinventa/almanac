@@ -40,6 +40,7 @@ const categoriaBadge: Record<InsumoCategoria, string> = {
   invisivel:  "atlas-badge",
   ferramenta: "atlas-badge atlas-badge-warning",
   maquinario: "atlas-badge atlas-badge-warning",
+  embalagem:  "atlas-badge atlas-badge-success",
 };
 
 function isAlerta(i: Insumo) {
@@ -284,6 +285,7 @@ function EditarInsumoContent({ insumo, nomeRef, categoriaRef, unidadeRef }: {
           <option value="invisivel">Rotativo invisível</option>
           <option value="ferramenta">Ferramenta</option>
           <option value="maquinario">Maquinário</option>
+          <option value="embalagem">Embalagem</option>
         </select>
       </div>
 
@@ -464,6 +466,7 @@ function NovoInsumoContent({
           <option value="invisivel">Rotativo invisível</option>
           <option value="ferramenta">Ferramenta</option>
           <option value="maquinario">Maquinário</option>
+          <option value="embalagem">Embalagem</option>
         </select>
       </div>
 
@@ -672,15 +675,16 @@ function MenuItem({
 }
 
 // ─── Página principal ─────────────────────────────────────────
-const filtros = ["Todos", "Rotativo visível", "Rotativo invisível", "Ferramenta", "Maquinário"] as const;
+const filtros = ["Todos", "Rotativo visível", "Rotativo invisível", "Ferramenta", "Maquinário", "Embalagem"] as const;
 type Filtro = (typeof filtros)[number];
 
 const filtroMap: Record<Filtro, InsumoCategoria[]> = {
-  "Todos":             ["visivel", "invisivel", "ferramenta", "maquinario"],
+  "Todos":             ["visivel", "invisivel", "ferramenta", "maquinario", "embalagem"],
   "Rotativo visível":  ["visivel"],
   "Rotativo invisível":["invisivel"],
   "Ferramenta":        ["ferramenta"],
   "Maquinário":        ["maquinario"],
+  "Embalagem":         ["embalagem"],
 };
 
 export default function InsumosPage() {
