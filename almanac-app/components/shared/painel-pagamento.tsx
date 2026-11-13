@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { formatBRL, formatDate } from "@/lib/utils";
-import { buscarPagamentos, registrarPagamento, estornarPagamento, type Pagamento } from "@/lib/repositories/pagamentos";
+import { buscarPagamentos, registrarPagamento, excluirPagamento, type Pagamento } from "@/lib/repositories/pagamentos";
 
 const METODO_LABEL: Record<string, string> = {
   pix: "Pix",
@@ -41,8 +41,7 @@ export function PainelPagamento({
   const hoje = new Date().toISOString().slice(0, 10);
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [estornoId, setEstornoId] = useState<string | null>(null);
-  const [estornoMotivo, setEstornoMotivo] = useState("");
+  const [excluindoId, setExcluindoId] = useState<string | null>(null);
 
   const [fValor, setFValor] = useState("");
   const [fData, setFData] = useState(hoje);
@@ -69,14 +68,12 @@ export function PainelPagamento({
     setFObs("");
   }
 
-  async function handleEstorno(id: string) {
-    await estornarPagamento(id, estornoMotivo.trim() || "sem motivo");
+  async function handleExcluir(id: string) {
+    await excluirPagamento(id);
     reload();
-    setEstornoId(null);
-    setEstornoMotivo("");
+    setExcluindoId(null);
   }
 
-  const estornados = new Set(pagamentos.map((p) => p.estornoDeId).filter(Boolean));
   const totalRecebido = pagamentos.reduce((s, p) => s + p.valor, 0);
   const saldo = totalCobrado - totalRecebido;
 
@@ -153,39 +150,29 @@ export function PainelPagamento({
           <div style={{ marginTop: 10 }}>
             {pagamentos.map((p) => {
               const isNeg = p.tipo === "estorno";
-              const isEstornando = estornoId === p.id;
+              const isExcluindo = excluindoId === p.id;
 
-              if (isEstornando) {
+              if (isExcluindo) {
+                const afetaEstornos = p.tipo === "recebimento" && pagamentos.some((x) => x.estornoDeId === p.id);
                 return (
                   <div key={p.id} style={{ padding: "6px 0", borderTop: "1px solid var(--border-subtle)" }}>
                     <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 4 }}>
-                      Motivo do estorno:
+                      Excluir este lançamento de {formatBRL(Math.abs(p.valor))}?
+                      {afetaEstornos && " Os estornos ligados a ele também serão excluídos."}
                     </div>
-                    <div style={{ display: "flex", gap: 4 }}>
-                      <input
-                        autoFocus
-                        className="atlas-input"
-                        style={{ flex: 1, fontSize: 11, height: 26 }}
-                        placeholder="Ex: cliente desistiu"
-                        value={estornoMotivo}
-                        onChange={(e) => setEstornoMotivo(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleEstorno(p.id);
-                          if (e.key === "Escape") setEstornoId(null);
-                        }}
-                      />
+                    <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
                       <button
                         className="atlas-btn atlas-btn-sm"
                         style={{ background: "var(--status-error)", color: "#fff", border: "none", fontSize: 11 }}
-                        onClick={() => handleEstorno(p.id)}
+                        onClick={() => handleExcluir(p.id)}
                       >
-                        Confirmar
+                        Sim, excluir
                       </button>
                       <button
                         className="atlas-btn atlas-btn-ghost atlas-btn-sm"
-                        onClick={() => { setEstornoId(null); setEstornoMotivo(""); }}
+                        onClick={() => setExcluindoId(null)}
                       >
-                        Cancelar
+                        Não
                       </button>
                     </div>
                   </div>
@@ -229,22 +216,20 @@ export function PainelPagamento({
                     >
                       {isNeg ? "−" : "+"} {formatBRL(Math.abs(p.valor))}
                     </span>
-                    {!isNeg && !estornados.has(p.id) && (
-                      <button
-                        style={{
-                          background: "none",
-                          border: "none",
-                          fontSize: 10,
-                          color: "var(--text-tertiary)",
-                          cursor: "pointer",
-                          padding: 0,
-                          textDecoration: "underline",
-                        }}
-                        onClick={() => setEstornoId(p.id)}
-                      >
-                        estornar
-                      </button>
-                    )}
+                    <button
+                      style={{
+                        background: "none",
+                        border: "none",
+                        fontSize: 10,
+                        color: "var(--text-tertiary)",
+                        cursor: "pointer",
+                        padding: 0,
+                        textDecoration: "underline",
+                      }}
+                      onClick={() => setExcluindoId(p.id)}
+                    >
+                      excluir
+                    </button>
                   </div>
                 </div>
               );

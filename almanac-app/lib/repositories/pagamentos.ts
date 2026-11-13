@@ -58,22 +58,14 @@ export async function excluirPagamentosDaEncomenda(encomendaId: string): Promise
   }
 }
 
-export async function estornarPagamento(pagamentoId: string, motivo: string): Promise<void> {
-  const original = await store.find(pagamentoId);
-  if (!original) throw new Error("Pagamento não encontrado");
-  if (original.tipo !== "recebimento") throw new Error("Só é possível estornar um recebimento.");
-
-  const jaEstornado = (await store.list()).some((p) => p.estornoDeId === pagamentoId);
-  if (jaEstornado) throw new Error("Este pagamento já foi estornado.");
-
-  await store.insert({
-    id: newId(),
-    encomendaId: original.encomendaId,
-    valor: -Math.abs(original.valor),
-    metodo: original.metodo,
-    data: new Date().toISOString().slice(0, 10),
-    tipo: "estorno",
-    motivoEstorno: motivo,
-    estornoDeId: pagamentoId,
-  });
+// Exclui o lançamento (ex.: valor digitado errado). Não gera saída no caixa.
+// Excluir um recebimento também remove os estornos antigos ligados a ele.
+export async function excluirPagamento(pagamentoId: string): Promise<void> {
+  const todos = await store.list();
+  const alvo = todos.find((p) => p.id === pagamentoId);
+  if (!alvo) throw new Error("Pagamento não encontrado");
+  const remover = alvo.tipo === "recebimento" ? todos.filter((p) => p.id === pagamentoId || p.estornoDeId === pagamentoId) : [alvo];
+  for (const p of remover) {
+    await store.remove(p.id);
+  }
 }

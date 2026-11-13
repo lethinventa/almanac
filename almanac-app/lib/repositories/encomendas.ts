@@ -145,9 +145,9 @@ export async function excluirEncomenda(id: string): Promise<void> {
   const pagamentos = await buscarPagamentos(id);
   const saldoRegistrado = pagamentos.reduce((s, p) => s + p.valor, 0);
   if (Math.abs(saldoRegistrado) > 0.005) {
-    throw new Error("Esta encomenda tem pagamentos registrados. Estorne-os antes de excluir.");
+    throw new Error("Esta encomenda tem pagamentos registrados. Exclua-os antes de excluir a encomenda.");
   }
-  // Restam apenas pares recebimento/estorno, que se anulam no caixa.
+  // Saldo zero: os lançamentos restantes se anulam e são removidos junto.
   await excluirPagamentosDaEncomenda(id);
   await store.remove(id);
 }
