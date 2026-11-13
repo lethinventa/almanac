@@ -20,6 +20,7 @@ import {
 } from "@/lib/utils";
 import { buscarEncomendas, criarEncomenda, atualizarStatus, type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
 import { buscarProdutos, type ProdutoCalculado } from "@/lib/repositories/produtos";
+import { buscarTodosPagamentos } from "@/lib/repositories/pagamentos";
 import { KanbanBoard } from "@/components/kanban-board";
 import { NovaEncomendaForm } from "@/components/shared/nova-encomenda-form";
 
@@ -101,10 +102,18 @@ export default function EncomendasPage() {
   const [busca, setBusca] = useState("");
   const [view, setView] = useState<"kanban" | "lista">("kanban");
   const [mode, setMode] = useState<ModalMode>(null);
+  const [recebidoPorEncomenda, setRecebidoPorEncomenda] = useState<Record<string, number>>({});
 
   useEffect(() => {
     buscarEncomendas().then(setLista);
     buscarProdutos().then(setProdutosList);
+    buscarTodosPagamentos().then((todos) => {
+      const totais: Record<string, number> = {};
+      for (const [encId, pags] of Object.entries(todos)) {
+        totais[encId] = pags.reduce((s, p) => s + p.valor, 0);
+      }
+      setRecebidoPorEncomenda(totais);
+    });
   }, []);
 
   useEffect(() => {
@@ -206,7 +215,12 @@ export default function EncomendasPage() {
 
       {/* Kanban */}
       {view === "kanban" && (
-        <KanbanBoard lista={filtrados} onCardClick={goDetalhe} onStatusChange={handleStatusChange} />
+        <KanbanBoard
+          lista={filtrados}
+          onCardClick={goDetalhe}
+          onStatusChange={handleStatusChange}
+          recebidoPorEncomenda={recebidoPorEncomenda}
+        />
       )}
 
       {/* Lista */}

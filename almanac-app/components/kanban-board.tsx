@@ -31,6 +31,8 @@ interface KanbanBoardProps {
   onCardClick: (enc: Encomenda) => void;
   onStatusChange: (id: string, newStatus: EncomendaStatus) => void;
   columns?: EncomendaStatus[];
+  // Total já recebido por encomenda (id → valor). Se informado, o card mostra a tag Pago/Pendente.
+  recebidoPorEncomenda?: Record<string, number>;
 }
 
 export function KanbanBoard({
@@ -38,6 +40,7 @@ export function KanbanBoard({
   onCardClick,
   onStatusChange,
   columns = STATUS_ORDER,
+  recebidoPorEncomenda,
 }: KanbanBoardProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<EncomendaStatus | null>(null);
@@ -168,6 +171,10 @@ export function KanbanBoard({
                   enc.status !== "cancelado" &&
                   new Date(enc.dataEntrega) < new Date();
 
+                const recebido = recebidoPorEncomenda?.[enc.id] ?? 0;
+                const pago = enc.totalCobrado > 0 && recebido >= enc.totalCobrado - 0.005;
+                const mostrarPagamento = recebidoPorEncomenda !== undefined && enc.status !== "cancelado";
+
                 return (
                   <div
                     key={enc.id}
@@ -223,6 +230,21 @@ export function KanbanBoard({
                         />
                       ) : (
                         <Package size={28} strokeWidth={1} style={{ color: "var(--text-tertiary)", opacity: 0.4 }} />
+                      )}
+                      {mostrarPagamento && (
+                        <span
+                          className={`atlas-badge ${pago ? "atlas-badge-success" : "atlas-badge-warning"}`}
+                          style={{
+                            position: "absolute",
+                            top: 8,
+                            left: 8,
+                            fontSize: 10,
+                            background: "var(--bg-raised)",
+                            border: "1px solid var(--border-default)",
+                          }}
+                        >
+                          {pago ? "Pago" : "Pendente"}
+                        </span>
                       )}
                       <span
                         className="atlas-badge"

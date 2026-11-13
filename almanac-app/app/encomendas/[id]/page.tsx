@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -32,6 +32,7 @@ import {
   atualizarStatus,
   adicionarLink,
   removerLink,
+  excluirEncomenda,
   type Encomenda,
   type EncomendaStatus,
   type LinkUtil,
@@ -1186,6 +1187,7 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
 // ── Page ──────────────────────────────────────────────────────
 export default function EncomendaDetalhePage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
 
   const [enc, setEnc] = useState<Encomenda | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1199,6 +1201,9 @@ export default function EncomendaDetalhePage() {
   const [observacoes, setObservacoes] = useState("");
   const [observacoesInternas, setObservacoesInternas] = useState("");
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [erroExcluir, setErroExcluir] = useState("");
+  const [excluindo, setExcluindo] = useState(false);
   const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
   const [produtoModal, setProdutoModal] = useState<ProdutoCalculado | null>(null);
 
@@ -1292,6 +1297,18 @@ export default function EncomendaDetalhePage() {
     setConfirmCancel(false);
   };
 
+  const handleExcluir = async () => {
+    setExcluindo(true);
+    setErroExcluir("");
+    try {
+      await excluirEncomenda(enc.id);
+      router.push("/encomendas");
+    } catch (err) {
+      setErroExcluir(err instanceof Error ? err.message : "Erro ao excluir encomenda.");
+      setExcluindo(false);
+    }
+  };
+
   const handleItensChange = (newItens: EncomendaItem[]) => {
     setItens(newItens);
     const sub = newItens.reduce((s, i) => s + i.quantidade * i.precoUnitario, 0);
@@ -1348,7 +1365,7 @@ export default function EncomendaDetalhePage() {
       {/* ── Header ─────────────────────────────────────────── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {/* Row 1: back + actions */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
           <Link
             href="/encomendas"
             className="atlas-btn atlas-btn-ghost atlas-btn-sm"
@@ -1358,8 +1375,29 @@ export default function EncomendaDetalhePage() {
             Voltar para encomendas
           </Link>
 
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {confirmCancel ? (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {confirmDelete ? (
+              <>
+                <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                  {erroExcluir ? erroExcluir : "Excluir esta encomenda permanentemente?"}
+                </span>
+                <button
+                  className="atlas-btn atlas-btn-secondary atlas-btn-sm"
+                  disabled={excluindo}
+                  onClick={() => { setConfirmDelete(false); setErroExcluir(""); }}
+                >
+                  Não
+                </button>
+                <button
+                  className="atlas-btn atlas-btn-sm"
+                  disabled={excluindo}
+                  style={{ background: "var(--status-error)", color: "#fff", border: "none" }}
+                  onClick={handleExcluir}
+                >
+                  {excluindo ? "Excluindo…" : "Sim, excluir"}
+                </button>
+              </>
+            ) : confirmCancel ? (
               <>
                 <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Cancelar pedido?</span>
                 <button className="atlas-btn atlas-btn-secondary atlas-btn-sm" onClick={() => setConfirmCancel(false)}>
@@ -1384,6 +1422,14 @@ export default function EncomendaDetalhePage() {
                     Cancelar pedido
                   </button>
                 )}
+                <button
+                  className="atlas-btn atlas-btn-ghost atlas-btn-sm"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "var(--text-tertiary)" }}
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  <Trash2 size={13} strokeWidth={1.5} />
+                  Excluir
+                </button>
                 {nextStatus && (
                   <button
                     className="atlas-btn atlas-btn-primary atlas-btn-sm"

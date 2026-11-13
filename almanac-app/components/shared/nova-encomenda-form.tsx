@@ -185,8 +185,8 @@ export function NovaEncomendaForm({
             const p = parseFloat(row.precoUnitario) || 0;
             const sub = q * p;
             return (
-              <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 64px 88px 72px 24px", gap: 6, alignItems: "center" }}>
-                <select className="alm-select" style={{ height: 32, fontSize: 12 }} value={row.produtoId} onChange={(e) => updateItem(idx, "produtoId", e.target.value)}>
+              <div key={idx} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 64px 88px 72px 24px", gap: 6, alignItems: "center" }}>
+                <select className="alm-select" style={{ height: 32, fontSize: 12, width: "100%", minWidth: 0, textOverflow: "ellipsis" }} value={row.produtoId} onChange={(e) => updateItem(idx, "produtoId", e.target.value)}>
                   {produtos.length === 0 && <option value="" disabled>Nenhum produto cadastrado</option>}
                   {produtos.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
                 </select>
@@ -195,7 +195,7 @@ export function NovaEncomendaForm({
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: sub > 0 ? "var(--text-primary)" : "var(--text-tertiary)", textAlign: "right", paddingRight: 4 }}>
                   {sub > 0 ? formatBRL(sub) : "—"}
                 </span>
-                <button type="button" onClick={() => removeItem(idx)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-tertiary)", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <button type="button" title="Remover item" aria-label="Remover item" onClick={() => removeItem(idx)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-tertiary)", padding: 0, width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <Trash2 size={13} strokeWidth={1.5} />
                 </button>
               </div>

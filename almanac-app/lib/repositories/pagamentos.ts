@@ -51,6 +51,13 @@ export async function buscarTodosPagamentos(): Promise<
   return result;
 }
 
+// Remove todos os registros de pagamento de uma encomenda (usado ao excluí-la).
+export async function excluirPagamentosDaEncomenda(encomendaId: string): Promise<void> {
+  for (const p of await buscarPagamentos(encomendaId)) {
+    await store.remove(p.id);
+  }
+}
+
 export async function estornarPagamento(pagamentoId: string, motivo: string): Promise<void> {
   const original = await store.find(pagamentoId);
   if (!original) throw new Error("Pagamento não encontrado");

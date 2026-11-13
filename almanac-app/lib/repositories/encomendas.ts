@@ -1,4 +1,5 @@
 import { createRemoteStore, newId } from "@/lib/remote-store";
+import { buscarPagamentos, excluirPagamentosDaEncomenda } from "@/lib/repositories/pagamentos";
 
 export type EncomendaStatus = "aguardando" | "em_producao" | "pronto" | "entregue" | "cancelado";
 
@@ -117,6 +118,19 @@ export async function editarEncomenda(id: string, dados: Partial<EncomendaInput>
 
 export async function atualizarStatus(id: string, status: EncomendaStatus): Promise<void> {
   await store.update(id, { status });
+}
+
+// Exclui a encomenda. Bloqueia se houver recebimento sem estorno, para não
+// deixar entradas no fluxo de caixa apontando para um pedido inexistente.
+export async function excluirEncomenda(id: string): Promise<void> {
+  const pagamentos = await buscarPagamentos(id);
+  const saldoRegistrado = pagamentos.reduce((s, p) => s + p.valor, 0);
+  if (Math.abs(saldoRegistrado) > 0.005) {
+    throw new Error("Esta encomenda tem pagamentos registrados. Estorne-os antes de excluir.");
+  }
+  // Restam apenas pares recebimento/estorno, que se anulam no caixa.
+  await excluirPagamentosDaEncomenda(id);
+  await store.remove(id);
 }
 
 export async function adicionarLink(encomendaId: string, link: { label: string; url: string }): Promise<void> {
