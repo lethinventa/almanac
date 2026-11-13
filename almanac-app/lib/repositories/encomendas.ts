@@ -24,6 +24,14 @@ export interface LinkUtil {
   url: string;
 }
 
+// Embalagem usada neste pedido. Não é produto: depende da quantidade de itens.
+export interface EmbalagemEncomenda {
+  id: string;
+  descricao: string;
+  quantidade: number;
+  custoUnitario: number;
+}
+
 export interface Encomenda {
   id: string;
   cliente: string;
@@ -44,6 +52,7 @@ export interface Encomenda {
   foto?: string;
   // Imagem de orçamento da encomenda (PNG em data URL), no mesmo modelo do módulo Orçamento.
   orcamentoImagem?: string;
+  embalagens?: EmbalagemEncomenda[];
   linksUteis: LinkUtil[];
 }
 
@@ -63,6 +72,7 @@ export interface EncomendaInput {
   observacoesInternas?: string;
   foto?: string;
   orcamentoImagem?: string;
+  embalagens?: EmbalagemEncomenda[];
 }
 
 const store = createRemoteStore<Encomenda>("encomendas");
@@ -115,6 +125,7 @@ export async function editarEncomenda(id: string, dados: Partial<EncomendaInput>
   if ("observacoesInternas" in dados) patch.observacoesInternas = dados.observacoesInternas;
   if ("foto" in dados) patch.foto = dados.foto;
   if (dados.orcamentoImagem !== undefined) patch.orcamentoImagem = dados.orcamentoImagem;
+  if (dados.embalagens !== undefined) patch.embalagens = dados.embalagens;
 
   const updated = await store.update(id, patch);
   if (!updated) throw new Error("Encomenda não encontrada");

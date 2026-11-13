@@ -29,6 +29,7 @@ import {
 import {
   buscarEncomenda,
   editarEncomenda,
+  type EmbalagemEncomenda,
   atualizarStatus,
   adicionarLink,
   removerLink,
@@ -919,6 +920,87 @@ function ProdutoDetalheModal({
   );
 }
 
+// ── EmbalagensCard ────────────────────────────────────────────
+// Embalagens do pedido: custo de produção deste pedido, não um produto cadastrado.
+function EmbalagensCard({
+  embalagens,
+  onChange,
+}: {
+  embalagens: EmbalagemEncomenda[];
+  onChange: (novas: EmbalagemEncomenda[]) => void;
+}) {
+  const [descricao, setDescricao] = useState("");
+  const [quantidade, setQuantidade] = useState("1");
+  const [custo, setCusto] = useState("");
+
+  const total = embalagens.reduce((s, e) => s + e.quantidade * e.custoUnitario, 0);
+
+  const adicionar = () => {
+    const qtd = parseFloat(quantidade);
+    if (!descricao.trim() || !(qtd > 0)) return;
+    const custoUnit = parseFloat(custo.replace(",", ".")) || 0;
+    onChange([
+      ...embalagens,
+      { id: crypto.randomUUID(), descricao: descricao.trim(), quantidade: qtd, custoUnitario: custoUnit },
+    ]);
+    setDescricao("");
+    setQuantidade("1");
+    setCusto("");
+  };
+
+  const remover = (id: string) => onChange(embalagens.filter((e) => e.id !== id));
+
+  return (
+    <div className="atlas-card" style={{ padding: 0 }}>
+      <div className="atlas-card-header" style={{ justifyContent: "space-between", padding: "0 12px" }}>
+        <span className="atlas-panel-title">Embalagens</span>
+        <span className="atlas-badge" style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(total)}</span>
+      </div>
+      <div style={{ padding: "8px 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+        {embalagens.length === 0 && (
+          <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Nenhuma embalagem neste pedido.</span>
+        )}
+        {embalagens.map((e) => (
+          <div
+            key={e.id}
+            style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 56px 88px 88px 24px", gap: 6, alignItems: "center", fontSize: 12 }}
+          >
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.descricao}</span>
+            <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-secondary)" }}>× {e.quantidade}</span>
+            <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", textAlign: "right" }}>{formatBRL(e.custoUnitario)}</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, textAlign: "right" }}>{formatBRL(e.quantidade * e.custoUnitario)}</span>
+            <button
+              type="button"
+              title="Remover embalagem"
+              aria-label="Remover embalagem"
+              onClick={() => remover(e.id)}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-tertiary)", padding: 0, width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              <Trash2 size={13} strokeWidth={1.5} />
+            </button>
+          </div>
+        ))}
+
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 56px 88px 32px", gap: 6, marginTop: 4 }}>
+          <input className="atlas-input" placeholder="Ex: Caixa, saquinho, fita" style={{ fontSize: 12 }} value={descricao} onChange={(e) => setDescricao(e.target.value)} onKeyDown={(e) => e.key === "Enter" && adicionar()} />
+          <input className="atlas-input" type="number" min="1" placeholder="Qtd" style={{ fontSize: 12 }} value={quantidade} onChange={(e) => setQuantidade(e.target.value)} />
+          <input className="atlas-input" type="number" min="0" step="0.01" placeholder="R$ unit." style={{ fontSize: 12 }} value={custo} onChange={(e) => setCusto(e.target.value)} onKeyDown={(e) => e.key === "Enter" && adicionar()} />
+          <button
+            type="button"
+            className="atlas-btn atlas-btn-secondary atlas-btn-sm"
+            style={{ padding: 0, justifyContent: "center" }}
+            disabled={!descricao.trim()}
+            onClick={adicionar}
+            aria-label="Adicionar embalagem"
+          >
+            <Plus size={12} strokeWidth={1.5} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── ArquivosPedido ────────────────────────────────────────────
 function ArquivosPedido({
   arquivos,
@@ -1288,10 +1370,12 @@ export default function EncomendaDetalhePage() {
   const totalAutomatico = Math.max(subtotal - desconto, 0);
   // Valor cobrado manualmente prevalece sobre o cálculo pelos itens
   const totalCobrado = enc.valorCobrado ?? totalAutomatico;
-  const custoProducao = itens.reduce((s, i) => {
+  const custoItens = itens.reduce((s, i) => {
     const prod = produtosList.find((p) => p.id === i.produtoId);
     return s + (prod ? prod.custo : (i.custoUnitario ?? 0)) * i.quantidade;
   }, 0);
+  const custoEmbalagens = (enc.embalagens ?? []).reduce((s, e) => s + e.quantidade * e.custoUnitario, 0);
+  const custoProducao = custoItens + custoEmbalagens;
   const margem = totalCobrado > 0 ? ((totalCobrado - custoProducao) / totalCobrado) * 100 : 0;
   const margemColor =
     margem >= 60 ? "var(--status-success)" : margem >= 30 ? "var(--status-warning)" : "var(--status-error)";
@@ -1348,7 +1432,7 @@ export default function EncomendaDetalhePage() {
     const newCusto = newItens.reduce((s, i) => {
       const prod = produtosList.find((p) => p.id === i.produtoId);
       return s + (prod ? prod.custo : (i.custoUnitario ?? 0)) * i.quantidade;
-    }, 0);
+    }, 0) + custoEmbalagens;
     const newMargem = newTotal > 0 ? ((newTotal - newCusto) / newTotal) * 100 : 0;
     editarEncomenda(enc.id, {
       itens: newItens,
@@ -1356,6 +1440,13 @@ export default function EncomendaDetalhePage() {
       custoProducao: newCusto,
       margem: newMargem,
     });
+  };
+
+  const handleEmbalagensChange = (novas: EmbalagemEncomenda[]) => {
+    const novoCusto = custoItens + novas.reduce((s, e) => s + e.quantidade * e.custoUnitario, 0);
+    const novaMargem = totalCobrado > 0 ? ((totalCobrado - novoCusto) / totalCobrado) * 100 : 0;
+    setEnc((prev) => (prev ? { ...prev, embalagens: novas, custoProducao: novoCusto, margem: novaMargem } : prev));
+    editarEncomenda(enc.id, { embalagens: novas, custoProducao: novoCusto, margem: novaMargem });
   };
 
   const handleValorCobradoChange = (v: number | null) => {
@@ -1541,6 +1632,8 @@ export default function EncomendaDetalhePage() {
             onProdutoClick={(prod) => setProdutoModal(prod)}
             produtos={produtosList}
           />
+
+          <EmbalagensCard embalagens={enc.embalagens ?? []} onChange={handleEmbalagensChange} />
 
           <PainelPagamento recordId={enc.id} totalCobrado={totalCobrado} cancelada={enc.status === "cancelado"} />
 
