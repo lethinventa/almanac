@@ -47,7 +47,7 @@ export async function recusarOrcamento(id: string): Promise<void> {
 }
 
 // Cliente aprovou: cria a encomenda já em produção e liga as duas.
-export async function aprovarOrcamento(orcamento: Orcamento, dataEntrega: string): Promise<Encomenda> {
+export async function aprovarOrcamento(orcamento: Orcamento, dataEntrega: string, orcamentoImagem: string): Promise<Encomenda> {
   const hoje = new Date().toISOString().slice(0, 10);
   const encomenda = await criarEncomenda({
     cliente: orcamento.cliente.trim() || "Sem nome",
@@ -67,6 +67,7 @@ export async function aprovarOrcamento(orcamento: Orcamento, dataEntrega: string
     custoProducao: orcamento.custoTotal,
     margem: orcamento.margem,
     observacoes: orcamento.prazo ? `Prazo combinado no orçamento: ${orcamento.prazo}` : undefined,
+    orcamentoImagem,
   });
   const atualizado = await store.update(orcamento.id, { status: "aprovado", encomendaId: encomenda.id });
   if (!atualizado) throw new Error("Orçamento não encontrado");

@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, X, Truck, ExternalLink } from "lucide-react";
 import { formatBRL, formatDate } from "@/lib/utils";
+import { gerarOrcamentoEncomenda } from "@/lib/orcamento-encomenda";
 import "./orcamento.css";
 import {
   listarOrcamentos,
@@ -49,7 +50,21 @@ export function OrcamentosEnviados({ refreshKey }: { refreshKey: number }) {
     setOcupado(true);
     setErro("");
     try {
-      await aprovarOrcamento(orc, dataEntrega);
+      // A encomenda leva a imagem do orçamento aprovado, no mesmo modelo enviado ao cliente.
+      const orcamentoImagem = await gerarOrcamentoEncomenda({
+        cliente: orc.cliente.trim() || "Sem nome",
+        prazo: orc.prazo,
+        data: new Date().toISOString().slice(0, 10),
+        linhas: orc.itens.map((i) => ({
+          descricao: i.descricao,
+          quantidade: i.quantidade,
+          precoUnitario: i.precoUnitario,
+          subtotal: i.subtotal,
+        })),
+        desconto: orc.desconto,
+        total: orc.total,
+      });
+      await aprovarOrcamento(orc, dataEntrega, orcamentoImagem);
       setAprovandoId(null);
       setDataEntrega("");
       await carregar();

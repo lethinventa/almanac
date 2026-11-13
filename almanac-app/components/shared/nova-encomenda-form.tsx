@@ -4,8 +4,9 @@ import { useState, useRef } from "react";
 import {
   Plus, Trash2, Package, ImagePlus, Link2, FileText,
 } from "lucide-react";
-import { formatBRL } from "@/lib/utils";
+import { formatBRL, formatDate } from "@/lib/utils";
 import { lerImagem } from "@/lib/imagem";
+import { gerarOrcamentoEncomenda } from "@/lib/orcamento-encomenda";
 import { Combobox } from "@/components/shared/combobox";
 import type { ProdutoCalculado } from "@/lib/repositories/produtos";
 import type { EncomendaInput } from "@/lib/repositories/encomendas";
@@ -70,6 +71,8 @@ export function NovaEncomendaForm({
   const [novoLinkLabel, setNovoLinkLabel] = useState("");
   const [novoLinkUrl, setNovoLinkUrl] = useState("");
   const [obs, setObs] = useState("");
+  const [gerando, setGerando] = useState(false);
+  const [erroOrcamento, setErroOrcamento] = useState("");
 
   const subtotal = itens.reduce((s, r) => s + (parseFloat(r.quantidade) || 0) * (parseFloat(r.precoUnitario) || 0), 0);
   const descontoNum = parseFloat(desconto) || 0;
@@ -119,27 +122,51 @@ export function NovaEncomendaForm({
   ].filter(Boolean) as string[];
   const canSave = camposFaltando.length === 0;
 
-  const handleSave = () => {
-    if (!canSave) return;
-    onSave({
-      cliente: cliente.trim(),
-      canal,
-      status: "aguardando",
-      dataPedido: hoje,
-      dataEntrega,
-      itens: itens.map((r) => ({
-        produtoId: r.produtoId,
-        quantidade: parseFloat(r.quantidade) || 1,
-        precoUnitario: parseFloat(r.precoUnitario) || 0,
-      })),
-      desconto: descontoNum,
-      valorCobrado: temValorCobrado ? valorCobradoNum : null,
-      totalCobrado: total,
-      custoProducao: custo,
-      margem,
-      observacoes: obs.trim() || undefined,
-      foto: foto ?? undefined,
-    });
+  const handleSave = async () => {
+    if (!canSave || gerando) return;
+    setGerando(true);
+    setErroOrcamento("");
+    const itensSalvos = itens.map((r) => ({
+      produtoId: r.produtoId,
+      quantidade: parseFloat(r.quantidade) || 1,
+      precoUnitario: parseFloat(r.precoUnitario) || 0,
+    }));
+    try {
+      // Toda encomenda leva a imagem de orçamento, no mesmo modelo do módulo Orçamento.
+      const orcamentoImagem = await gerarOrcamentoEncomenda({
+        cliente: cliente.trim(),
+        prazo: formatDate(dataEntrega),
+        data: hoje,
+        linhas: itensSalvos.map((i) => ({
+          descricao: produtos.find((p) => p.id === i.produtoId)?.nome ?? "Item",
+          quantidade: i.quantidade,
+          precoUnitario: i.precoUnitario,
+          subtotal: i.quantidade * i.precoUnitario,
+        })),
+        desconto: descontoNum,
+        total,
+      });
+      onSave({
+        cliente: cliente.trim(),
+        canal,
+        status: "aguardando",
+        dataPedido: hoje,
+        dataEntrega,
+        itens: itensSalvos,
+        desconto: descontoNum,
+        valorCobrado: temValorCobrado ? valorCobradoNum : null,
+        totalCobrado: total,
+        custoProducao: custo,
+        margem,
+        observacoes: obs.trim() || undefined,
+        foto: foto ?? undefined,
+        orcamentoImagem,
+      });
+    } catch (err) {
+      console.error("Erro ao gerar imagem do orçamento:", err);
+      setErroOrcamento("Não foi possível gerar a imagem do orçamento. Tente de novo.");
+      setGerando(false);
+    }
   };
 
   return (
@@ -265,14 +292,16 @@ export function NovaEncomendaForm({
       </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, paddingTop: 4, borderTop: "1px solid var(--border-default)", marginTop: 4 }}>
-        {!canSave && (
+        {erroOrcamento ? (
+          <span style={{ marginRight: "auto", fontSize: 11, color: "var(--status-error)" }}>{erroOrcamento}</span>
+        ) : !canSave ? (
           <span style={{ marginRight: "auto", fontSize: 11, color: "var(--text-tertiary)" }}>
             Falta preencher: {camposFaltando.join(", ")}
           </span>
-        )}
+        ) : null}
         <button type="button" className="atlas-btn atlas-btn-secondary atlas-btn-sm" onClick={onClose}>Cancelar</button>
-        <button type="button" className="atlas-btn atlas-btn-primary atlas-btn-sm" disabled={!canSave} style={{ opacity: canSave ? 1 : 0.4 }} onClick={handleSave}>
-          Criar encomenda
+        <button type="button" className="atlas-btn atlas-btn-primary atlas-btn-sm" disabled={!canSave || gerando} style={{ opacity: canSave && !gerando ? 1 : 0.4 }} onClick={handleSave}>
+          {gerando ? "Gerando orçamento…" : "Criar encomenda"}
         </button>
       </div>
     </>

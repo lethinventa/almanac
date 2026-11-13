@@ -40,6 +40,7 @@ import {
 } from "@/lib/repositories/encomendas";
 import { buscarProdutos, type ProdutoCalculado } from "@/lib/repositories/produtos";
 import { lerImagem } from "@/lib/imagem";
+import { gerarOrcamentoEncomenda } from "@/lib/orcamento-encomenda";
 import { buscarInsumos, type Insumo } from "@/lib/repositories/insumos";
 import { PainelPagamento } from "@/components/shared/painel-pagamento";
 
@@ -1228,6 +1229,37 @@ export default function EncomendaDetalhePage() {
     });
   }, [id]);
 
+  // Encomendas criadas antes desta função não têm imagem de orçamento: gera e salva uma vez.
+  useEffect(() => {
+    if (loading || !enc || enc.orcamentoImagem) return;
+    let cancelado = false;
+    const desconto = enc.desconto ?? 0;
+    const subtotal = enc.itens.reduce((s, i) => s + i.quantidade * i.precoUnitario, 0);
+    const total = enc.valorCobrado ?? Math.max(subtotal - desconto, 0);
+    gerarOrcamentoEncomenda({
+      cliente: enc.cliente,
+      prazo: formatDate(enc.dataEntrega),
+      data: enc.dataPedido,
+      linhas: enc.itens.map((i) => ({
+        descricao: produtosList.find((p) => p.id === i.produtoId)?.nome ?? i.descricao ?? "Item",
+        quantidade: i.quantidade,
+        precoUnitario: i.precoUnitario,
+        subtotal: i.quantidade * i.precoUnitario,
+      })),
+      desconto,
+      total,
+    })
+      .then(async (orcamentoImagem) => {
+        if (cancelado) return;
+        await editarEncomenda(enc.id, { orcamentoImagem });
+        setEnc((prev) => (prev ? { ...prev, orcamentoImagem } : prev));
+      })
+      .catch((err) => console.error("Erro ao gerar imagem do orçamento:", err));
+    return () => {
+      cancelado = true;
+    };
+  }, [loading, enc, produtosList]);
+
   if (loading) {
     return (
       <div className="alm-page">
@@ -1511,6 +1543,34 @@ export default function EncomendaDetalhePage() {
           />
 
           <PainelPagamento recordId={enc.id} totalCobrado={totalCobrado} cancelada={enc.status === "cancelado"} />
+
+          <div className="atlas-card" style={{ padding: 0 }}>
+            <div className="atlas-card-header" style={{ justifyContent: "space-between", padding: "0 12px" }}>
+              <span className="atlas-panel-title">Imagem do orçamento</span>
+              {enc.orcamentoImagem && (
+                <a
+                  className="atlas-btn atlas-btn-secondary atlas-btn-sm"
+                  href={enc.orcamentoImagem}
+                  download={`orcamento-${enc.id.slice(-6).toLowerCase()}.png`}
+                  style={{ textDecoration: "none" }}
+                >
+                  Baixar PNG
+                </a>
+              )}
+            </div>
+            <div style={{ padding: 12 }}>
+              {enc.orcamentoImagem ? (
+                <img
+                  src={enc.orcamentoImagem}
+                  alt={`Orçamento de ${enc.cliente}`}
+                  onClick={() => setLightbox({ src: enc.orcamentoImagem!, alt: `Orçamento de ${enc.cliente}` })}
+                  style={{ width: "100%", maxWidth: 240, display: "block", borderRadius: "var(--radius-md)", border: "1px solid var(--border-default)", cursor: "zoom-in" }}
+                />
+              ) : (
+                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Gerando imagem do orçamento…</span>
+              )}
+            </div>
+          </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <ObservacoesCard

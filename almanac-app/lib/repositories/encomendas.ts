@@ -42,6 +42,8 @@ export interface Encomenda {
   observacoes?: string;
   observacoesInternas?: string;
   foto?: string;
+  // Imagem de orçamento da encomenda (PNG em data URL), no mesmo modelo do módulo Orçamento.
+  orcamentoImagem?: string;
   linksUteis: LinkUtil[];
 }
 
@@ -60,6 +62,7 @@ export interface EncomendaInput {
   observacoes?: string;
   observacoesInternas?: string;
   foto?: string;
+  orcamentoImagem?: string;
 }
 
 const store = createRemoteStore<Encomenda>("encomendas");
@@ -89,6 +92,7 @@ export async function criarEncomenda(dados: EncomendaInput): Promise<Encomenda> 
     observacoes: dados.observacoes,
     observacoesInternas: dados.observacoesInternas,
     foto: dados.foto,
+    orcamentoImagem: dados.orcamentoImagem,
     linksUteis: [],
   };
   return store.insert(encomenda);
@@ -110,6 +114,7 @@ export async function editarEncomenda(id: string, dados: Partial<EncomendaInput>
   if ("observacoes" in dados) patch.observacoes = dados.observacoes;
   if ("observacoesInternas" in dados) patch.observacoesInternas = dados.observacoesInternas;
   if ("foto" in dados) patch.foto = dados.foto;
+  if (dados.orcamentoImagem !== undefined) patch.orcamentoImagem = dados.orcamentoImagem;
 
   const updated = await store.update(id, patch);
   if (!updated) throw new Error("Encomenda não encontrada");
