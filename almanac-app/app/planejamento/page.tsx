@@ -308,22 +308,23 @@ function Cartao({
       onClick={(e) => { e.stopPropagation(); onAbrir(); }}
       style={{
         display: "flex",
-        alignItems: "center",
+        alignItems: compacto ? "flex-start" : "center",
         gap: 6,
-        padding: compacto ? "2px 6px" : "8px 10px",
+        padding: compacto ? "4px 6px" : "8px 10px",
         borderRadius: "var(--radius-sm)",
-        background: compacto ? "transparent" : "var(--bg-raised)",
-        border: compacto ? "none" : "1px solid var(--border-subtle)",
+        background: "var(--bg-raised)",
+        border: "1px solid var(--border-subtle)",
         cursor: "pointer",
         fontSize: compacto ? 12 : 13,
+        lineHeight: 1.35,
         color: "var(--text-primary)",
         minWidth: 0,
       }}
       onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
-      onMouseLeave={(e) => (e.currentTarget.style.background = compacto ? "transparent" : "var(--bg-raised)")}
+      onMouseLeave={(e) => (e.currentTarget.style.background = "var(--bg-raised)")}
     >
-      <span style={{ width: 7, height: 7, borderRadius: "50%", background: COR_STATUS[post.status], flexShrink: 0 }} />
-      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: compacto ? "nowrap" : "normal", minWidth: 0 }}>
+      <span style={{ width: 7, height: 7, borderRadius: "50%", background: COR_STATUS[post.status], flexShrink: 0, marginTop: compacto ? 4 : 0 }} />
+      <span style={{ whiteSpace: "normal", overflowWrap: "anywhere", minWidth: 0 }}>
         {post.titulo || "Sem título"}
       </span>
       {!compacto && (
