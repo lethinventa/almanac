@@ -24,12 +24,6 @@ export const ROTULO_FORMATO: Record<FormatoInstagram, string> = {
   carrossel: "Carrossel",
 };
 
-// Vínculo opcional com algo que já existe no negócio (sem dados de cliente).
-export interface VinculoPost {
-  tipo: "produto" | "pe";
-  id: string;
-}
-
 export interface PostInstagram {
   id: string;
   titulo: string;
@@ -38,9 +32,7 @@ export interface PostInstagram {
   // Data de publicação planejada, no formato AAAA-MM-DD. Ausente em ideias.
   data?: string;
   legenda?: string;
-  hashtags?: string;
   observacoes?: string;
-  vinculo?: VinculoPost;
   criadoEm: string;
 }
 

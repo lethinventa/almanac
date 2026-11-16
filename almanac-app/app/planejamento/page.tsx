@@ -15,8 +15,6 @@ import {
   type PostInstagramInput,
   type StatusPost,
 } from "@/lib/repositories/planejamento-instagram";
-import { listarProdutos, type Produto } from "@/lib/repositories/produtos-registro";
-import { buscarProdutosPE, type ProdutoPE } from "@/lib/repositories/pronta-entrega";
 
 type Visao = "quadro" | "calendario" | "tabela";
 type Patch = Partial<PostInstagramInput>;
@@ -68,12 +66,14 @@ function CampoTexto({
   placeholder,
   estilo,
   multilinha,
+  linhas,
 }: {
   valor: string;
   onSalvar: (v: string) => void;
   placeholder?: string;
   estilo?: React.CSSProperties;
   multilinha?: boolean;
+  linhas?: number;
 }) {
   const [rascunho, setRascunho] = useState(valor);
   useEffect(() => setRascunho(valor), [valor]);
@@ -101,7 +101,7 @@ function CampoTexto({
       onChange={(e) => setRascunho(e.target.value)}
       onBlur={commit}
       style={{ ...base, resize: "vertical", lineHeight: 1.6 }}
-      rows={5}
+      rows={linhas ?? 5}
     />
   ) : (
     <input
@@ -143,15 +143,11 @@ const selectNotion: React.CSSProperties = {
 
 function PainelPost({
   post,
-  produtos,
-  produtosPE,
   onPatch,
   onDelete,
   onClose,
 }: {
   post: PostInstagram;
-  produtos: Produto[];
-  produtosPE: ProdutoPE[];
   onPatch: (patch: Patch) => void;
   onDelete: () => void;
   onClose: () => void;
@@ -161,14 +157,6 @@ function PainelPost({
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
   }, [onClose]);
-
-  const vinculoTipo = post.vinculo?.tipo ?? "";
-  const itensVinculo =
-    vinculoTipo === "produto"
-      ? produtos.map((p) => ({ id: p.id, nome: p.nome }))
-      : vinculoTipo === "pe"
-        ? produtosPE.map((p) => ({ id: p.id, nome: p.nome }))
-        : [];
 
   return (
     <>
@@ -234,36 +222,6 @@ function PainelPost({
             </div>
           </Propriedade>
 
-          <Propriedade rotulo="Vincular a">
-            <div style={{ display: "flex", gap: 8 }}>
-              <select
-                style={{ ...selectNotion, width: 130 }}
-                value={vinculoTipo}
-                onChange={(e) => {
-                  const tipo = e.target.value as "" | "produto" | "pe";
-                  onPatch({ vinculo: tipo ? { tipo, id: "" } : undefined });
-                }}
-              >
-                <option value="">Nada</option>
-                <option value="produto">Produto</option>
-                <option value="pe">Pronta entrega</option>
-              </select>
-              {vinculoTipo && (
-                <select
-                  style={{ ...selectNotion, flex: 1, minWidth: 0 }}
-                  value={post.vinculo?.id ?? ""}
-                  onChange={(e) => onPatch({ vinculo: { tipo: vinculoTipo, id: e.target.value } })}
-                >
-                  <option value="">Selecione…</option>
-                  {itensVinculo.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
-                </select>
-              )}
-            </div>
-          </Propriedade>
-
-          <Propriedade rotulo="Hashtags">
-            <CampoTexto valor={post.hashtags ?? ""} placeholder="#papelaria #cadernos" onSalvar={(v) => onPatch({ hashtags: v.trim() || undefined })} />
-          </Propriedade>
         </div>
 
         <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 16 }}>
@@ -281,6 +239,7 @@ function PainelPost({
           <CampoTexto
             multilinha
             valor={post.observacoes ?? ""}
+            linhas={12}
             placeholder="Roteiro, referências, lembretes…"
             onSalvar={(v) => onPatch({ observacoes: v.trim() || undefined })}
           />
@@ -340,8 +299,6 @@ function Cartao({
 
 export default function PlanejamentoPage() {
   const [posts, setPosts] = useState<PostInstagram[]>([]);
-  const [produtos, setProdutos] = useState<Produto[]>([]);
-  const [produtosPE, setProdutosPE] = useState<ProdutoPE[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [visao, setVisao] = useState<Visao>("quadro");
@@ -353,10 +310,7 @@ export default function PlanejamentoPage() {
   const [arrastando, setArrastando] = useState<string | null>(null);
 
   async function recarregar() {
-    const [p, pr, pe] = await Promise.all([buscarPosts(), listarProdutos(), buscarProdutosPE()]);
-    setPosts(p);
-    setProdutos(pr);
-    setProdutosPE(pe);
+    setPosts(await buscarPosts());
   }
 
   useEffect(() => {
@@ -398,12 +352,6 @@ export default function PlanejamentoPage() {
   }
 
   const postAberto = posts.find((p) => p.id === aberto) ?? null;
-  const nomeVinculo = useMemo(() => {
-    const m: Record<string, string> = {};
-    for (const p of produtos) m[`produto:${p.id}`] = p.nome;
-    for (const p of produtosPE) m[`pe:${p.id}`] = p.nome;
-    return (v?: { tipo: string; id: string }) => (v ? m[`${v.tipo}:${v.id}`] ?? "—" : "—");
-  }, [produtos, produtosPE]);
 
   // Grade do mês: começa no domingo anterior ao dia 1.
   const grade = useMemo(() => {
@@ -608,8 +556,8 @@ export default function PlanejamentoPage() {
       ) : (
         <div style={{ overflowX: "auto" }}>
           <div style={{ minWidth: 760 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(220px,2fr) 130px 110px 130px minmax(160px,1.2fr)", gap: 8, padding: "6px 8px", borderBottom: "1px solid var(--border-subtle)", fontSize: 12, color: "var(--text-tertiary)" }}>
-              <span>Título</span><span>Status</span><span>Formato</span><span>Data</span><span>Vinculado a</span>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(220px,2fr) 130px 110px 130px", gap: 8, padding: "6px 8px", borderBottom: "1px solid var(--border-subtle)", fontSize: 12, color: "var(--text-tertiary)" }}>
+              <span>Título</span><span>Status</span><span>Formato</span><span>Data</span>
             </div>
             {posts.length === 0 && (
               <div style={{ color: "var(--text-tertiary)", fontSize: 13, padding: "20px 8px" }}>Nenhum post ainda.</div>
@@ -617,7 +565,7 @@ export default function PlanejamentoPage() {
             {posts.map((p) => (
               <div
                 key={p.id}
-                style={{ display: "grid", gridTemplateColumns: "minmax(220px,2fr) 130px 110px 130px minmax(160px,1.2fr)", gap: 8, alignItems: "center", padding: "0 8px", minHeight: 36, borderBottom: "1px solid var(--border-subtle)", fontSize: 13 }}
+                style={{ display: "grid", gridTemplateColumns: "minmax(220px,2fr) 130px 110px 130px", gap: 8, alignItems: "center", padding: "0 8px", minHeight: 36, borderBottom: "1px solid var(--border-subtle)", fontSize: 13 }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
               >
@@ -631,7 +579,6 @@ export default function PlanejamentoPage() {
                   {FORMATOS_INSTAGRAM.map((f) => <option key={f} value={f}>{ROTULO_FORMATO[f]}</option>)}
                 </select>
                 <input type="date" value={p.data ?? ""} onChange={(e) => atualizar(p.id, { data: e.target.value || undefined })} style={{ ...selectNotion, fontSize: 12, colorScheme: "dark" }} />
-                <span style={{ color: "var(--text-tertiary)", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nomeVinculo(p.vinculo)}</span>
               </div>
             ))}
           </div>
@@ -642,8 +589,6 @@ export default function PlanejamentoPage() {
         <PainelPost
           key={postAberto.id}
           post={postAberto}
-          produtos={produtos}
-          produtosPE={produtosPE}
           onPatch={(patch) => atualizar(postAberto.id, patch)}
           onDelete={() => excluir(postAberto.id)}
           onClose={() => setAberto(null)}
