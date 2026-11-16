@@ -12,6 +12,7 @@ import {
   Settings,
   Calculator,
   CalendarDays,
+  Palette,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -32,6 +33,7 @@ const mainNav: NavItem[] = [
     badge: null,
     badgeType: "error",
   },
+  { href: "/filamentos", label: "Filamentos", icon: Palette },
   { href: "/produtos", label: "Produtos", icon: Box },
   { href: "/orcamentos", label: "Orçamentos", icon: Calculator },
   {
