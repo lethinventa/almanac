@@ -13,6 +13,7 @@ import {
   Calculator,
   CalendarDays,
   Palette,
+  Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -43,6 +44,7 @@ const mainNav: NavItem[] = [
     badge: null,
     badgeType: "neutral",
   },
+  { href: "/clientes", label: "Clientes", icon: Users },
   {
     href: "/pronta-entrega",
     label: "Pronta Entrega",
