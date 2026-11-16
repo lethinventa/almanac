@@ -8,7 +8,6 @@ import {
   ClipboardList, Box, PackageCheck, X, ArrowDown, ArrowUp, Wallet,
 } from "lucide-react";
 import { KanbanWidget } from "@/components/kanban-widget";
-import { PlanningProducao } from "@/components/planning-producao";
 import { formatBRL, categoriaLabel } from "@/lib/utils";
 import { buscarInsumos, criarInsumo, type Insumo, type InsumoCategoria } from "@/lib/repositories/insumos";
 import { buscarProdutos, type ProdutoCalculado } from "@/lib/repositories/produtos";
@@ -257,8 +256,6 @@ export default function DashboardPage() {
       </div>
 
       <KanbanWidget />
-
-      <PlanningProducao />
 
       <div className="alm-bento">
         {/* Estoque em alerta */}

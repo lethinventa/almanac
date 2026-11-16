@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, AlertTriangle, Package } from "lucide-react";
+import { Calendar, AlertTriangle, Package, Eye, EyeOff } from "lucide-react";
 import {
   formatBRL,
   formatDate,
@@ -17,6 +17,27 @@ const STATUS_ORDER: EncomendaStatus[] = [
   "entregue",
   "cancelado",
 ];
+
+// Colunas ocultas ficam salvas no navegador (preferência de visualização).
+const STORAGE_KEY_OCULTAS = "alm-kanban-ocultas";
+
+function lerOcultas(): EncomendaStatus[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY_OCULTAS);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((s): s is EncomendaStatus => STATUS_ORDER.includes(s)) : [];
+  } catch {
+    return [];
+  }
+}
+
+function salvarOcultas(ocultas: EncomendaStatus[]) {
+  try {
+    window.localStorage.setItem(STORAGE_KEY_OCULTAS, JSON.stringify(ocultas));
+  } catch {
+    // Armazenamento indisponível: a preferência vale só para esta sessão.
+  }
+}
 
 const STATUS_COLOR: Record<EncomendaStatus, string> = {
   aguardando: "var(--text-tertiary)",
@@ -45,10 +66,20 @@ export function KanbanBoard({
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<EncomendaStatus | null>(null);
   const [produtosList, setProdutosList] = useState<ProdutoCalculado[]>([]);
+  const [ocultas, setOcultas] = useState<EncomendaStatus[]>([]);
 
   useEffect(() => {
     buscarProdutos().then(setProdutosList);
+    setOcultas(lerOcultas());
   }, []);
+
+  const toggleOculta = (status: EncomendaStatus) => {
+    setOcultas((prev) => {
+      const next = prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status];
+      salvarOcultas(next);
+      return next;
+    });
+  };
 
   const getCardFoto = (enc: Encomenda): string | undefined => {
     if (enc.foto) return enc.foto;
@@ -60,13 +91,50 @@ export function KanbanBoard({
   };
 
   return (
-    <div className="alm-kanban">
+    <div
+      className="alm-kanban"
+      style={{
+        gridTemplateColumns: columns
+          .map((s) => (ocultas.includes(s) ? "44px" : "minmax(160px, 200px)"))
+          .join(" "),
+      }}
+    >
       {columns.map((status) => {
         // Prioridade pelo prazo: entrega mais próxima (ou atrasada) no topo
         const cards = lista
           .filter((e) => e.status === status)
           .sort((a, b) => a.dataEntrega.localeCompare(b.dataEntrega) || a.dataPedido.localeCompare(b.dataPedido));
         const isOver = dragOverStatus === status;
+
+        if (ocultas.includes(status)) {
+          return (
+            <div
+              key={status}
+              className="alm-kanban-col"
+              style={{ alignItems: "center", gap: 10, paddingTop: 4 }}
+            >
+              <button
+                type="button"
+                className="atlas-btn atlas-btn-icon"
+                onClick={() => toggleOculta(status)}
+                title={`Mostrar ${statusLabels[status]}`}
+                aria-label={`Mostrar coluna ${statusLabels[status]}`}
+              >
+                <Eye size={14} strokeWidth={1.5} />
+              </button>
+              <span
+                style={{
+                  writingMode: "vertical-rl",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "var(--text-secondary)",
+                }}
+              >
+                {statusLabels[status]} · {cards.length}
+              </span>
+            </div>
+          );
+        }
 
         return (
           <div
@@ -114,14 +182,25 @@ export function KanbanBoard({
                 />
                 {statusLabels[status]}
               </span>
-              <span
-                style={{
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: "var(--text-tertiary)",
-                }}
-              >
-                {cards.length}
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: "var(--text-tertiary)",
+                  }}
+                >
+                  {cards.length}
+                </span>
+                <button
+                  type="button"
+                  className="atlas-btn atlas-btn-icon"
+                  onClick={() => toggleOculta(status)}
+                  title="Ocultar coluna"
+                  aria-label={`Ocultar coluna ${statusLabels[status]}`}
+                >
+                  <EyeOff size={13} strokeWidth={1.5} />
+                </button>
               </span>
             </div>
 
