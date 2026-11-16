@@ -7,7 +7,7 @@ import {
   formatDate,
   statusLabels,
 } from "@/lib/utils";
-import { type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
+import { isPessoal, type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
 import { buscarProdutos, type ProdutoCalculado } from "@/lib/repositories/produtos";
 
 const STATUS_ORDER: EncomendaStatus[] = [
@@ -265,9 +265,10 @@ export function KanbanBoard({
                   enc.status !== "cancelado" &&
                   new Date(enc.dataEntrega) < new Date();
 
+                const pessoal = isPessoal(enc);
                 const recebido = recebidoPorEncomenda?.[enc.id] ?? 0;
                 const pago = enc.totalCobrado > 0 && recebido >= enc.totalCobrado - 0.005;
-                const mostrarPagamento = recebidoPorEncomenda !== undefined && enc.status !== "cancelado";
+                const mostrarPagamento = recebidoPorEncomenda !== undefined && enc.status !== "cancelado" && !pessoal;
 
                 return (
                   <div
@@ -351,7 +352,7 @@ export function KanbanBoard({
                           border: "1px solid var(--border-default)",
                         }}
                       >
-                        {enc.canal === "whatsapp" ? "WhatsApp" : "Presencial"}
+                        {pessoal ? "Pessoal" : enc.canal === "whatsapp" ? "WhatsApp" : "Presencial"}
                       </span>
                     </div>
                     <div className="alm-kanban-card-client">{enc.cliente}</div>
@@ -389,7 +390,7 @@ export function KanbanBoard({
                           color: "var(--text-primary)",
                         }}
                       >
-                        {formatBRL(enc.totalCobrado)}
+                        {pessoal ? "—" : formatBRL(enc.totalCobrado)}
                       </span>
                     </div>
                   </div>

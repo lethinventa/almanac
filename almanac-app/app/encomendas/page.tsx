@@ -18,7 +18,7 @@ import {
   statusLabels,
   statusBadge,
 } from "@/lib/utils";
-import { buscarEncomendas, criarEncomenda, atualizarStatus, type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
+import { buscarEncomendas, criarEncomenda, atualizarStatus, isPessoal, type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
 import { buscarProdutos, type ProdutoCalculado } from "@/lib/repositories/produtos";
 import { buscarTodosPagamentos } from "@/lib/repositories/pagamentos";
 import { KanbanBoard } from "@/components/kanban-board";
@@ -100,6 +100,7 @@ export default function EncomendasPage() {
   const [lista, setLista] = useState<Encomenda[]>([]);
   const [produtosList, setProdutosList] = useState<ProdutoCalculado[]>([]);
   const [busca, setBusca] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState<"todas" | "clientes" | "pessoal">("todas");
   const [view, setView] = useState<"kanban" | "lista">("kanban");
   const [mode, setMode] = useState<ModalMode>(null);
   const [recebidoPorEncomenda, setRecebidoPorEncomenda] = useState<Record<string, number>>({});
@@ -124,8 +125,10 @@ export default function EncomendasPage() {
 
   const filtrados = lista.filter(
     (e) =>
-      e.cliente.toLowerCase().includes(busca.toLowerCase()) ||
-      statusLabels[e.status].toLowerCase().includes(busca.toLowerCase())
+      (filtroTipo === "todas" ||
+        (filtroTipo === "pessoal" ? isPessoal(e) : !isPessoal(e))) &&
+      (e.cliente.toLowerCase().includes(busca.toLowerCase()) ||
+        statusLabels[e.status].toLowerCase().includes(busca.toLowerCase()))
   );
 
   const goDetalhe = (e: Encomenda) => router.push(`/encomendas/${e.id}`);
@@ -197,20 +200,49 @@ export default function EncomendasPage() {
         </div>
       </div>
 
-      {/* Busca */}
-      <div style={{ position: "relative", maxWidth: 320 }}>
-        <Search
-          size={13}
-          strokeWidth={1.5}
-          style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "var(--text-tertiary)", pointerEvents: "none" }}
-        />
-        <input
-          className="atlas-input"
-          placeholder="Buscar por cliente ou status…"
-          style={{ paddingLeft: 26 }}
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-        />
+      {/* Busca e filtro por tipo */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ position: "relative", maxWidth: 320, flex: "1 1 220px" }}>
+          <Search
+            size={13}
+            strokeWidth={1.5}
+            style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "var(--text-tertiary)", pointerEvents: "none" }}
+          />
+          <input
+            className="atlas-input"
+            placeholder="Buscar por cliente ou status…"
+            style={{ paddingLeft: 26 }}
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+          />
+        </div>
+        <div style={{ display: "flex", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md, 4px)", overflow: "hidden" }}>
+          {(
+            [
+              { v: "todas", label: "Todas" },
+              { v: "clientes", label: "Clientes" },
+              { v: "pessoal", label: "Pessoal" },
+            ] as const
+          ).map(({ v, label }, i) => (
+            <button
+              key={v}
+              onClick={() => setFiltroTipo(v)}
+              style={{
+                height: 32,
+                padding: "0 10px",
+                fontSize: 12,
+                border: "none",
+                borderLeft: i > 0 ? "1px solid var(--border-default)" : "none",
+                cursor: "pointer",
+                background: filtroTipo === v ? "var(--bg-tab-active)" : "transparent",
+                color: filtroTipo === v ? "var(--text-primary)" : "var(--text-tertiary)",
+                fontWeight: filtroTipo === v ? 600 : 400,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Kanban */}
@@ -249,15 +281,23 @@ export default function EncomendasPage() {
                     enc.margem >= 60 ? "var(--status-success)" : enc.margem >= 30 ? "var(--status-warning)" : "var(--status-error)";
                   const isLate =
                     enc.status !== "entregue" && enc.status !== "cancelado" && new Date(enc.dataEntrega) < new Date();
+                  const pessoalEnc = isPessoal(enc);
                   return (
                     <tr key={enc.id} onClick={() => goDetalhe(enc)}>
-                      <td style={{ fontWeight: 500 }}>{enc.cliente}</td>
+                      <td style={{ fontWeight: 500 }}>
+                        {enc.cliente}
+                        {pessoalEnc && <span className="atlas-badge" style={{ marginLeft: 8, fontSize: 10, verticalAlign: "middle" }}>Pessoal</span>}
+                      </td>
                       <td><span className={statusBadge[enc.status]}>{statusLabels[enc.status]}</span></td>
                       <td>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--text-tertiary)" }}>
-                          {enc.canal === "whatsapp" ? <MessageCircle size={11} strokeWidth={1.5} /> : <Users size={11} strokeWidth={1.5} />}
-                          {enc.canal === "whatsapp" ? "WhatsApp" : "Presencial"}
-                        </span>
+                        {pessoalEnc ? (
+                          <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>—</span>
+                        ) : (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--text-tertiary)" }}>
+                            {enc.canal === "whatsapp" ? <MessageCircle size={11} strokeWidth={1.5} /> : <Users size={11} strokeWidth={1.5} />}
+                            {enc.canal === "whatsapp" ? "WhatsApp" : "Presencial"}
+                          </span>
+                        )}
                       </td>
                       <td className="num" style={{ fontSize: 12, color: isLate ? "var(--status-error)" : "var(--text-secondary)" }}>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
@@ -266,10 +306,10 @@ export default function EncomendasPage() {
                         </span>
                       </td>
                       <td className="num" style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>
-                        {formatBRL(enc.totalCobrado)}
+                        {pessoalEnc ? "—" : formatBRL(enc.totalCobrado)}
                       </td>
                       <td className="num" style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: margemColor }}>
-                        {enc.margem.toFixed(1)}%
+                        {pessoalEnc ? "—" : `${enc.margem.toFixed(1)}%`}
                       </td>
                     </tr>
                   );

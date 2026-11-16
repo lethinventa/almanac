@@ -10,7 +10,7 @@ import {
   deletarCustoIndireto,
   type CustoIndireto,
 } from "@/lib/repositories/financeiro";
-import { buscarEncomendas, type Encomenda } from "@/lib/repositories/encomendas";
+import { buscarEncomendas, isPessoal, type Encomenda } from "@/lib/repositories/encomendas";
 import { buscarTodosPagamentos } from "@/lib/repositories/pagamentos";
 import {
   type MovCategoria,
@@ -647,7 +647,8 @@ export default function FinanceiroPage() {
   const mesSubtitle = `${mesNomeCapitalized} ${agora.getFullYear()}`;
   const mesDRE = `DRE — ${mesNomeCapitalized} ${agora.getFullYear()}`;
 
-  const encEntregues = encomendasData.filter((e) => e.status === "entregue" && e.dataEntrega.startsWith(anoMesAtual));
+  // Encomendas pessoais não entram na DRE (não são venda nem custo de cliente).
+  const encEntregues = encomendasData.filter((e) => e.status === "entregue" && !isPessoal(e) && e.dataEntrega.startsWith(anoMesAtual));
   const receitaMes = encEntregues.reduce((s, e) => s + e.totalCobrado, 0);
   const custoVarMes = encEntregues.reduce((s, e) => s + e.custoProducao, 0);
 
@@ -661,7 +662,7 @@ export default function FinanceiroPage() {
     const d = new Date(INICIO_HISTORICO.ano, INICIO_HISTORICO.mes + i, 1);
     const anoMes = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const mesLabel = `${MESES_CURTO[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`;
-    const enc = encomendasData.filter((e) => e.status === "entregue" && e.dataEntrega?.startsWith(anoMes));
+    const enc = encomendasData.filter((e) => e.status === "entregue" && !isPessoal(e) && e.dataEntrega?.startsWith(anoMes));
     return {
       mes: mesLabel,
       receita: enc.reduce((s, e) => s + e.totalCobrado, 0),

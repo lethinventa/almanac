@@ -9,7 +9,7 @@ import { lerImagem } from "@/lib/imagem";
 import { gerarOrcamentoEncomenda } from "@/lib/orcamento-encomenda";
 import { Combobox } from "@/components/shared/combobox";
 import type { ProdutoCalculado } from "@/lib/repositories/produtos";
-import type { EmbalagemEncomenda, EncomendaInput } from "@/lib/repositories/encomendas";
+import type { EmbalagemEncomenda, EncomendaInput, TipoEncomenda } from "@/lib/repositories/encomendas";
 import { buscarInsumos, type Insumo } from "@/lib/repositories/insumos";
 import { EmbalagensPedido } from "@/components/shared/embalagens-pedido";
 
@@ -58,6 +58,8 @@ export function NovaEncomendaForm({
   const hoje = new Date().toISOString().slice(0, 10);
 
   const [foto, setFoto] = useState<string | null>(null);
+  const [tipo, setTipo] = useState<TipoEncomenda>("cliente");
+  const pessoal = tipo === "pessoal";
   const [cliente, setCliente] = useState("");
   const [canal, setCanal] = useState<"whatsapp" | "presencial">("whatsapp");
   const [dataEntrega, setDataEntrega] = useState("");
@@ -126,14 +128,39 @@ export function NovaEncomendaForm({
   };
 
   const camposFaltando = [
-    cliente.trim().length === 0 && "cliente",
-    !dataEntrega && "data de entrega",
+    cliente.trim().length === 0 && (pessoal ? "título" : "cliente"),
+    !dataEntrega && (pessoal ? "data prevista" : "data de entrega"),
     itens.length === 0 && "ao menos um item",
   ].filter(Boolean) as string[];
   const canSave = camposFaltando.length === 0;
 
   const handleSave = async () => {
     if (!canSave || gerando) return;
+    // Encomenda pessoal: sem preço, sem orçamento e sem cobrança. Só a produção importa.
+    if (pessoal) {
+      onSave({
+        tipo: "pessoal",
+        cliente: cliente.trim(),
+        canal: "presencial",
+        status: "aguardando",
+        dataPedido: hoje,
+        dataEntrega,
+        itens: itens.map((r) => ({
+          produtoId: r.produtoId,
+          quantidade: parseFloat(r.quantidade) || 1,
+          precoUnitario: 0,
+        })),
+        desconto: 0,
+        valorCobrado: null,
+        totalCobrado: 0,
+        custoProducao: custo,
+        margem: 0,
+        observacoes: obs.trim() || undefined,
+        foto: foto ?? undefined,
+        embalagens,
+      });
+      return;
+    }
     setGerando(true);
     setErroOrcamento("");
     const itensSalvos = itens.map((r) => ({
@@ -157,6 +184,7 @@ export function NovaEncomendaForm({
         total,
       });
       onSave({
+        tipo: "cliente",
         cliente: cliente.trim(),
         canal,
         status: "aguardando",
@@ -184,26 +212,45 @@ export function NovaEncomendaForm({
     <>
       <FotoUploadSmall value={foto} onChange={setFoto} />
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}>
+      <div className="alm-field" style={{ maxWidth: 200 }}>
+        <label className="alm-label">Tipo</label>
+        <Combobox
+          value={tipo}
+          onChange={(v) => setTipo(v as TipoEncomenda)}
+          options={[
+            { value: "cliente", label: "Cliente" },
+            { value: "pessoal", label: "Pessoal (fotos, conteúdo)" },
+          ]}
+        />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: pessoal ? "1fr" : "1fr auto", gap: 10 }}>
         <div className="alm-field">
-          <label className="alm-label">Cliente</label>
-          <input className="atlas-input" placeholder="Nome do cliente" value={cliente} onChange={(e) => setCliente(e.target.value)} />
-        </div>
-        <div className="alm-field">
-          <label className="alm-label">Canal</label>
-          <Combobox
-            value={canal}
-            onChange={(v) => setCanal(v as "whatsapp" | "presencial")}
-            options={[
-              { value: "whatsapp", label: "WhatsApp" },
-              { value: "presencial", label: "Presencial" },
-            ]}
+          <label className="alm-label">{pessoal ? "Título / finalidade" : "Cliente"}</label>
+          <input
+            className="atlas-input"
+            placeholder={pessoal ? "Ex: Coleção outono — fotos para o feed" : "Nome do cliente"}
+            value={cliente}
+            onChange={(e) => setCliente(e.target.value)}
           />
         </div>
+        {!pessoal && (
+          <div className="alm-field">
+            <label className="alm-label">Canal</label>
+            <Combobox
+              value={canal}
+              onChange={(v) => setCanal(v as "whatsapp" | "presencial")}
+              options={[
+                { value: "whatsapp", label: "WhatsApp" },
+                { value: "presencial", label: "Presencial" },
+              ]}
+            />
+          </div>
+        )}
       </div>
 
       <div className="alm-field" style={{ maxWidth: 200 }}>
-        <label className="alm-label">Data de entrega</label>
+        <label className="alm-label">{pessoal ? "Data prevista" : "Data de entrega"}</label>
         <input className="atlas-input" type="date" min={hoje} value={dataEntrega} onChange={(e) => setDataEntrega(e.target.value)} />
       </div>
 
@@ -223,16 +270,20 @@ export function NovaEncomendaForm({
             const p = parseFloat(row.precoUnitario) || 0;
             const sub = q * p;
             return (
-              <div key={idx} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 64px 88px 72px 24px", gap: 6, alignItems: "center" }}>
+              <div key={idx} style={{ display: "grid", gridTemplateColumns: pessoal ? "minmax(0, 1fr) 64px 24px" : "minmax(0, 1fr) 64px 88px 72px 24px", gap: 6, alignItems: "center" }}>
                 <select className="alm-select" style={{ height: 32, fontSize: 12, width: "100%", minWidth: 0, textOverflow: "ellipsis" }} value={row.produtoId} onChange={(e) => updateItem(idx, "produtoId", e.target.value)}>
                   {produtos.length === 0 && <option value="" disabled>Nenhum produto cadastrado</option>}
                   {produtos.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
                 </select>
                 <input className="atlas-input" type="number" min="1" placeholder="Qtd" style={{ fontSize: 12 }} value={row.quantidade} onChange={(e) => updateItem(idx, "quantidade", e.target.value)} />
-                <input className="atlas-input" type="number" min="0" step="0.01" placeholder="R$ unit." style={{ fontSize: 12 }} value={row.precoUnitario} onChange={(e) => updateItem(idx, "precoUnitario", e.target.value)} />
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: sub > 0 ? "var(--text-primary)" : "var(--text-tertiary)", textAlign: "right", paddingRight: 4 }}>
-                  {sub > 0 ? formatBRL(sub) : "—"}
-                </span>
+                {!pessoal && (
+                  <>
+                    <input className="atlas-input" type="number" min="0" step="0.01" placeholder="R$ unit." style={{ fontSize: 12 }} value={row.precoUnitario} onChange={(e) => updateItem(idx, "precoUnitario", e.target.value)} />
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: sub > 0 ? "var(--text-primary)" : "var(--text-tertiary)", textAlign: "right", paddingRight: 4 }}>
+                      {sub > 0 ? formatBRL(sub) : "—"}
+                    </span>
+                  </>
+                )}
                 <button type="button" title="Remover item" aria-label="Remover item" onClick={() => removeItem(idx)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-tertiary)", padding: 0, width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <Trash2 size={13} strokeWidth={1.5} />
                 </button>
@@ -244,20 +295,24 @@ export function NovaEncomendaForm({
 
       <EmbalagensPedido embalagens={embalagens} onChange={setEmbalagens} insumosEmbalagem={insumos.filter((i) => i.categoria === "embalagem")} />
 
-      <div className="alm-field" style={{ maxWidth: 200 }}>
-        <label className="alm-label">Desconto (R$)</label>
-        <input className="atlas-input" type="number" min="0" step="0.01" placeholder="0,00" value={desconto} onChange={(e) => setDesconto(e.target.value)} />
-      </div>
+      {!pessoal && (
+        <>
+          <div className="alm-field" style={{ maxWidth: 200 }}>
+            <label className="alm-label">Desconto (R$)</label>
+            <input className="atlas-input" type="number" min="0" step="0.01" placeholder="0,00" value={desconto} onChange={(e) => setDesconto(e.target.value)} />
+          </div>
 
-      <div className="alm-field" style={{ maxWidth: 200 }}>
-        <label className="alm-label">Valor cobrado (R$)</label>
-        <input className="atlas-input" type="number" min="0" step="0.01" placeholder={totalAutomatico.toFixed(2)} value={valorCobrado} onChange={(e) => setValorCobrado(e.target.value)} />
-        <span style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4, display: "block" }}>
-          {temValorCobrado ? "Valor combinado com o cliente, usado no total." : "Vazio: usa o total calculado pelos itens."}
-        </span>
-      </div>
+          <div className="alm-field" style={{ maxWidth: 200 }}>
+            <label className="alm-label">Valor cobrado (R$)</label>
+            <input className="atlas-input" type="number" min="0" step="0.01" placeholder={totalAutomatico.toFixed(2)} value={valorCobrado} onChange={(e) => setValorCobrado(e.target.value)} />
+            <span style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4, display: "block" }}>
+              {temValorCobrado ? "Valor combinado com o cliente, usado no total." : "Vazio: usa o total calculado pelos itens."}
+            </span>
+          </div>
+        </>
+      )}
 
-      {subtotal > 0 && (
+      {!pessoal && subtotal > 0 && (
         <div style={{ background: "var(--bg-input)", borderRadius: "var(--radius-md, 4px)", border: "1px solid var(--border-default)", padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text-tertiary)" }}>
             <span>Subtotal</span><span style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(subtotal)}</span>

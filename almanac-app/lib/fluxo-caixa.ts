@@ -1,5 +1,5 @@
 import type { CustoIndireto } from "@/lib/repositories/financeiro";
-import type { Encomenda } from "@/lib/repositories/encomendas";
+import { isPessoal, type Encomenda } from "@/lib/repositories/encomendas";
 
 // ── Types ─────────────────────────────────────────────────────
 export type MovCategoria =
@@ -46,6 +46,7 @@ export function gerarAutoMovimentacoes(
   // Entradas: usa pagamentos reais quando existem, senão totalCobrado (só entregues).
   // Pagamentos de encomendas canceladas continuam contando: o dinheiro foi recebido.
   encomendasData
+    .filter((e) => !isPessoal(e)) // produção própria não é venda
     .forEach((e) => {
       const pags = allPagamentos[e.id] ?? [];
       if (pags.length > 0) {
@@ -142,8 +143,9 @@ const EM_PRODUCAO_OU_DEPOIS = ["em_producao", "pronto", "entregue"];
 
 // Lucro total acumulado desde a primeira encomenda iniciada: receita − custo de produção
 // − custos fixos mensais por cada mês decorrido (inclusive o atual).
+// Encomendas pessoais ficam de fora: não são venda.
 export function calcularLucroTotal(encs: Encomenda[], custosMensais: number, hoje = new Date()): number {
-  const iniciadas = encs.filter((e) => EM_PRODUCAO_OU_DEPOIS.includes(e.status));
+  const iniciadas = encs.filter((e) => EM_PRODUCAO_OU_DEPOIS.includes(e.status) && !isPessoal(e));
   if (iniciadas.length === 0) return 0;
 
   const receita = iniciadas.reduce((s, e) => s + e.totalCobrado, 0);

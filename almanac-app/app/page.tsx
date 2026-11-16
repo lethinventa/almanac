@@ -21,7 +21,7 @@ import {
   calcularLucroTotal,
 } from "@/lib/fluxo-caixa";
 import { buscarProdutosPE, type ProdutoPE } from "@/lib/repositories/pronta-entrega";
-import { buscarEncomendas, criarEncomenda, type Encomenda, type EncomendaInput } from "@/lib/repositories/encomendas";
+import { buscarEncomendas, criarEncomenda, isPessoal, type Encomenda, type EncomendaInput } from "@/lib/repositories/encomendas";
 import { NovaEncomendaForm } from "@/components/shared/nova-encomenda-form";
 
 // ── Modal wrapper ─────────────────────────────────────────────
@@ -212,7 +212,7 @@ export default function DashboardPage() {
     ]).then(([ins, prods, encs, custos, prontaEntrega, pagamentos]) => {
       setInsumosAlerta(ins.filter(i => i.estoque !== null && i.estoqueMin !== null && (i.estoque ?? 0) <= (i.estoqueMin ?? 0)));
       setProdutosAlerta(prontaEntrega.filter(p => p.estoqueAtual <= p.estoqueMin));
-      const abertas = encs.filter(e => e.status !== 'entregue' && e.status !== 'cancelado');
+      const abertas = encs.filter(e => e.status !== 'entregue' && e.status !== 'cancelado' && !isPessoal(e));
       setEncomendasAbertas(abertas);
       setProdutosList(prods);
       // Mesmos números do Financeiro (fluxo de caixa do mês atual)

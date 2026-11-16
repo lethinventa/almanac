@@ -5,6 +5,15 @@ export type EncomendaStatus = "aguardando" | "em_producao" | "pronto" | "entregu
 
 export type EtapaProducao = "impressao" | "acabamento" | "embalagem" | "finalizado";
 
+// "cliente": pedido de um cliente (preço, pagamento, orçamento).
+// "pessoal": peças produzidas para uso próprio (fotos, conteúdo). Passa pela
+// produção, mas não gera receita nem lucro. Ausente = cliente (encomendas antigas).
+export type TipoEncomenda = "cliente" | "pessoal";
+
+export function isPessoal(e: { tipo?: TipoEncomenda }): boolean {
+  return e.tipo === "pessoal";
+}
+
 export interface EncomendaItem {
   // Vazio quando o item veio de um orçamento sem produto cadastrado.
   produtoId: string;
@@ -36,6 +45,8 @@ export interface EmbalagemEncomenda {
 
 export interface Encomenda {
   id: string;
+  tipo?: TipoEncomenda;
+  // Nome do cliente; em encomenda pessoal, o título/finalidade da produção.
   cliente: string;
   canal: "whatsapp" | "presencial";
   status: EncomendaStatus;
@@ -59,6 +70,7 @@ export interface Encomenda {
 }
 
 export interface EncomendaInput {
+  tipo?: TipoEncomenda;
   cliente: string;
   canal: "whatsapp" | "presencial";
   status?: EncomendaStatus;
@@ -90,6 +102,7 @@ export async function buscarEncomenda(id: string): Promise<Encomenda | null> {
 export async function criarEncomenda(dados: EncomendaInput): Promise<Encomenda> {
   const encomenda: Encomenda = {
     id: newId(),
+    tipo: dados.tipo ?? "cliente",
     cliente: dados.cliente,
     canal: dados.canal,
     status: dados.status ?? "aguardando",

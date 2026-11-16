@@ -19,6 +19,7 @@ import {
   X,
   Eye,
   Info,
+  Camera,
 } from "lucide-react";
 import {
   formatBRL,
@@ -38,6 +39,7 @@ import {
   type EncomendaStatus,
   type LinkUtil,
   type EncomendaItem,
+  isPessoal,
 } from "@/lib/repositories/encomendas";
 import { buscarProdutos, type ProdutoCalculado } from "@/lib/repositories/produtos";
 import { lerImagem } from "@/lib/imagem";
@@ -330,12 +332,15 @@ function TabelaProdutos({
   onPreview,
   onProdutoClick,
   produtos,
+  semPreco = false,
 }: {
   itens: EncomendaItem[];
   onChange: (itens: EncomendaItem[]) => void;
   onPreview?: (src: string, alt: string) => void;
   onProdutoClick?: (prod: ProdutoCalculado) => void;
   produtos: ProdutoCalculado[];
+  // Encomenda pessoal: esconde as colunas de preço (não há venda).
+  semPreco?: boolean;
 }) {
   const [editCell, setEditCell] = useState<{
     row: number;
@@ -418,8 +423,8 @@ function TabelaProdutos({
             <th style={{ width: 44 }} />
             <th>Produto</th>
             <th className="num">Qtd</th>
-            <th className="num">Valor unit.</th>
-            <th className="num">Subtotal</th>
+            <th className="num" style={semPreco ? { display: "none" } : undefined}>Valor unit.</th>
+            <th className="num" style={semPreco ? { display: "none" } : undefined}>Subtotal</th>
             <th style={{ width: 36 }} />
           </tr>
         </thead>
@@ -516,7 +521,7 @@ function TabelaProdutos({
                   )}
                 </td>
 
-                <td className="num">
+                <td className="num" style={semPreco ? { display: "none" } : undefined}>
                   {editCell?.row === i && editCell.field === "precoUnitario" ? (
                     <input
                       autoFocus
@@ -550,7 +555,7 @@ function TabelaProdutos({
                   )}
                 </td>
 
-                <td className="num" style={{ fontFamily: "var(--font-mono)" }}>
+                <td className="num" style={semPreco ? { display: "none" } : { fontFamily: "var(--font-mono)" }}>
                   {formatBRL(sub)}
                 </td>
 
@@ -607,7 +612,7 @@ function TabelaProdutos({
                   onChange={(e) => setNewItem((n) => ({ ...n, quantidade: e.target.value }))}
                 />
               </td>
-              <td className="num">
+              <td className="num" style={semPreco ? { display: "none" } : undefined}>
                 <input
                   className="atlas-input"
                   type="number"
@@ -619,7 +624,7 @@ function TabelaProdutos({
                   onChange={(e) => setNewItem((n) => ({ ...n, precoUnitario: e.target.value }))}
                 />
               </td>
-              <td />
+              <td style={semPreco ? { display: "none" } : undefined} />
               <td style={{ padding: "0 8px 0 0" }}>
                 <div style={{ display: "flex", gap: 4 }}>
                   <button
@@ -672,12 +677,14 @@ function TabelaProdutos({
           <Plus size={12} strokeWidth={1.5} />
           Adicionar produto
         </button>
-        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-          Subtotal dos itens{" "}
-          <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--text-primary)", marginLeft: 6 }}>
-            {formatBRL(subtotal)}
+        {!semPreco && (
+          <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+            Subtotal dos itens{" "}
+            <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--text-primary)", marginLeft: 6 }}>
+              {formatBRL(subtotal)}
+            </span>
           </span>
-        </span>
+        )}
       </div>
     </div>
   );
@@ -1233,7 +1240,7 @@ export default function EncomendaDetalhePage() {
 
   // Encomendas criadas antes desta função não têm imagem de orçamento: gera e salva uma vez.
   useEffect(() => {
-    if (loading || !enc || enc.orcamentoImagem) return;
+    if (loading || !enc || enc.orcamentoImagem || isPessoal(enc)) return;
     let cancelado = false;
     const desconto = enc.desconto ?? 0;
     const subtotal = enc.itens.reduce((s, i) => s + i.quantidade * i.precoUnitario, 0);
@@ -1283,6 +1290,7 @@ export default function EncomendaDetalhePage() {
     );
   }
 
+  const pessoal = isPessoal(enc);
   const orderNumber = formatOrderNumber(enc.id);
 
   const subtotal = itens.reduce((s, i) => s + i.quantidade * i.precoUnitario, 0);
@@ -1309,13 +1317,14 @@ export default function EncomendaDetalhePage() {
   const nextStatus = NEXT_STATUS[status];
   const nextLabel = NEXT_LABEL[status];
 
-  const canalIcon =
-    enc.canal === "whatsapp" ? (
+  const canalIcon = pessoal ? (
+    <Camera size={12} strokeWidth={1.5} />
+  ) : enc.canal === "whatsapp" ? (
       <MessageCircle size={12} strokeWidth={1.5} />
     ) : (
       <Users size={12} strokeWidth={1.5} />
     );
-  const canalLabel = enc.canal === "whatsapp" ? "WhatsApp" : "Presencial";
+  const canalLabel = pessoal ? "Pessoal" : enc.canal === "whatsapp" ? "WhatsApp" : "Presencial";
 
   const handleFotoChange = (src: string | null) => {
     setFoto(src);
@@ -1546,6 +1555,7 @@ export default function EncomendaDetalhePage() {
         {/* Coluna principal */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <TabelaProdutos
+            semPreco={pessoal}
             itens={itens}
             onChange={handleItensChange}
             onPreview={(src, alt) => setLightbox({ src, alt })}
@@ -1561,8 +1571,9 @@ export default function EncomendaDetalhePage() {
             />
           </div>
 
-          <PainelPagamento recordId={enc.id} totalCobrado={totalCobrado} cancelada={enc.status === "cancelado"} />
+          {!pessoal && <PainelPagamento recordId={enc.id} totalCobrado={totalCobrado} cancelada={enc.status === "cancelado"} />}
 
+          {!pessoal && (
           <div className="atlas-card" style={{ padding: 0 }}>
             <div className="atlas-card-header" style={{ justifyContent: "space-between", padding: "0 12px" }}>
               <span className="atlas-panel-title">Imagem do orçamento</span>
@@ -1590,13 +1601,14 @@ export default function EncomendaDetalhePage() {
               )}
             </div>
           </div>
+          )}
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <ObservacoesCard
-              title="Observações do cliente"
+              title={pessoal ? "Observações" : "Observações do cliente"}
               value={observacoes}
               onChange={handleObservacoesChange}
-              placeholder="Nenhuma observação do cliente."
+              placeholder={pessoal ? "Nenhuma observação." : "Nenhuma observação do cliente."}
             />
             <ObservacoesCard
               title="Observações internas"
@@ -1617,7 +1629,7 @@ export default function EncomendaDetalhePage() {
               <span className="atlas-panel-title">Informações</span>
             </div>
             <div className="atlas-card-body" style={{ padding: "8px 12px 12px" }}>
-              <InfoRow label="Canal">
+              <InfoRow label={pessoal ? "Tipo" : "Canal"}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                   {canalIcon}
                   {canalLabel}
@@ -1636,7 +1648,19 @@ export default function EncomendaDetalhePage() {
             </div>
           </div>
 
-          {/* Financeiro */}
+          {/* Financeiro: pessoal mostra só o custo de material (não há venda) */}
+          {pessoal ? (
+          <div className="atlas-card">
+            <div className="atlas-card-header">
+              <span className="atlas-panel-title">Produção</span>
+            </div>
+            <div className="atlas-card-body" style={{ padding: "8px 12px 12px" }}>
+              <InfoRow label="Custo de material">
+                <span style={{ fontFamily: "var(--font-mono)" }}>{formatBRL(custoProducao)}</span>
+              </InfoRow>
+            </div>
+          </div>
+          ) : (
           <div className="atlas-card">
             <div className="atlas-card-header">
               <span className="atlas-panel-title">Financeiro</span>
@@ -1673,6 +1697,8 @@ export default function EncomendaDetalhePage() {
               </div>
             </div>
           </div>
+
+          )}
 
           {/* Visual do pedido */}
           <div className="atlas-card">
