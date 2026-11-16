@@ -159,21 +159,21 @@ function PainelPost({
   }, [onClose]);
 
   return (
-    <>
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 150 }} />
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 150, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+    >
       <aside
+        onClick={(e) => e.stopPropagation()}
         style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: "min(520px, 100vw)",
-          zIndex: 160,
+          width: "min(640px, 100%)",
+          maxHeight: "calc(100vh - 32px)",
           background: "var(--bg-base)",
-          borderLeft: "1px solid var(--border-subtle)",
-          boxShadow: "-12px 0 32px rgba(0,0,0,0.25)",
+          border: "1px solid var(--border-subtle)",
+          borderRadius: "var(--radius-md)",
+          boxShadow: "0 24px 48px rgba(0,0,0,0.35)",
           overflowY: "auto",
-          padding: "16px 28px 40px",
+          padding: "16px 28px 28px",
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -245,7 +245,7 @@ function PainelPost({
           />
         </div>
       </aside>
-    </>
+    </div>
   );
 }
 
