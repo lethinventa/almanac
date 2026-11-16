@@ -16,13 +16,17 @@ import {
 
 const COR_PADRAO = "#9ca3af";
 
+const OUTRA_MARCA = "__outra__";
+
 function FilamentoModal({
   inicial,
+  marcas,
   onClose,
   onSave,
   onDelete,
 }: {
   inicial?: Filamento;
+  marcas: string[];
   onClose: () => void;
   onSave: (input: FilamentoInput) => void;
   onDelete?: () => void;
@@ -31,6 +35,8 @@ function FilamentoModal({
   const [corHex, setCorHex] = useState(inicial?.corHex ?? COR_PADRAO);
   const [material, setMaterial] = useState<MaterialFilamento>(inicial?.material ?? "PLA");
   const [marca, setMarca] = useState(inicial?.marca ?? "");
+  const [novaMarca, setNovaMarca] = useState("");
+  const opcoesMarca = Array.from(new Set([...marcas, ...(inicial?.marca ? [inicial.marca] : [])])).sort();
   const [pesoRolo, setPesoRolo] = useState(String(inicial?.pesoRolo ?? PESO_ROLO_PADRAO));
   const [gramas, setGramas] = useState(String(inicial?.gramasRestantes ?? PESO_ROLO_PADRAO));
   const [quantidade, setQuantidade] = useState(String(inicial?.quantidade ?? 1));
@@ -68,7 +74,14 @@ function FilamentoModal({
             </div>
             <div className="alm-field" style={{ margin: 0 }}>
               <label className="alm-label">Marca</label>
-              <input className="atlas-input" placeholder="Ex: Bambu, Voolt3D" value={marca} onChange={(e) => setMarca(e.target.value)} />
+              <select className="atlas-input" value={marca} onChange={(e) => setMarca(e.target.value)}>
+                <option value="">Sem marca</option>
+                {opcoesMarca.map((m) => <option key={m} value={m}>{m}</option>)}
+                <option value={OUTRA_MARCA}>Outra marca…</option>
+              </select>
+              {marca === OUTRA_MARCA && (
+                <input autoFocus className="atlas-input" style={{ marginTop: 6 }} placeholder="Nome da marca" value={novaMarca} onChange={(e) => setNovaMarca(e.target.value)} />
+              )}
             </div>
           </div>
 
@@ -113,7 +126,7 @@ function FilamentoModal({
                   cor: cor.trim(),
                   corHex,
                   material,
-                  marca: marca.trim() || undefined,
+                  marca: (marca === OUTRA_MARCA ? novaMarca.trim() : marca) || undefined,
                   pesoRolo: parseFloat(pesoRolo),
                   gramasRestantes: Math.min(parseFloat(gramas) || 0, parseFloat(pesoRolo)),
                   quantidade: Math.max(1, parseInt(quantidade) || 1),
@@ -145,6 +158,11 @@ export default function FilamentosPage() {
   const visiveis = useMemo(
     () => (filtroMaterial === "todos" ? filamentos : filamentos.filter((f) => f.material === filtroMaterial)),
     [filamentos, filtroMaterial],
+  );
+
+  const marcas = useMemo(
+    () => Array.from(new Set(filamentos.map((f) => f.marca).filter((m): m is string => !!m))),
+    [filamentos],
   );
 
   const totalRolos = filamentos.reduce((s, f) => s + f.quantidade, 0);
@@ -253,6 +271,7 @@ export default function FilamentosPage() {
       {modal.aberto && (
         <FilamentoModal
           inicial={modal.filamento}
+          marcas={marcas}
           onClose={() => setModal({ aberto: false })}
           onSave={salvar}
           onDelete={modal.filamento ? excluir : undefined}
