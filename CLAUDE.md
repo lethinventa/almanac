@@ -27,6 +27,7 @@ persistidos em `localStorage` e mocks em `lib/data.ts`.
 | `/configuracoes`      | Configurações       | Horas trabalhadas/mês e multiplicador de preço; exibe taxa horária derivada                 |
 | `/pronta-entrega`     | Pronta Entrega      | Produtos prontos para venda imediata, independente de encomendas; alertas de estoque        |
 | `/pronta-entrega/[id]`| Detalhe PE          | Detalhes do produto de pronta entrega                                                       |
+| `/planejamento`       | Planejamento        | Calendário mensal e kanban por status de posts do Instagram; banco de ideias (posts sem data); vínculo opcional com produto ou pronta entrega (sem dados de cliente) |
 | `/login`              | Auth                | Login simples; sessão em localStorage; único perfil: proprietária                          |
 
 ## Modelo de precificação

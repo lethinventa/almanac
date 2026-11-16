@@ -11,6 +11,7 @@ import {
   BarChart2,
   Settings,
   Calculator,
+  CalendarDays,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -47,6 +48,7 @@ const mainNav: NavItem[] = [
     badge: null,
     badgeType: "neutral",
   },
+  { href: "/planejamento", label: "Planejamento", icon: CalendarDays },
   { href: "/financeiro", label: "Financeiro", icon: BarChart2 },
 ];
 
