@@ -12,7 +12,8 @@ export interface Filamento {
   material: MaterialFilamento;
   marca?: string;
   pesoRolo: number; // gramas do rolo cheio
-  gramasRestantes: number;
+  gramasRestantes: number; // gramas restantes em cada rolo
+  quantidade: number; // quantos rolos iguais a este tenho
   observacoes?: string;
 }
 
@@ -23,13 +24,17 @@ export interface FilamentoInput {
   marca?: string;
   pesoRolo: number;
   gramasRestantes: number;
+  quantidade: number;
   observacoes?: string;
 }
 
 const store = createRemoteStore<Filamento>("filamentos");
 
 export async function buscarFilamentos(): Promise<Filamento[]> {
-  return (await store.list()).sort(
+  // Registros antigos (sem quantidade) contam como 1 rolo.
+  return (await store.list())
+    .map((f) => ({ ...f, quantidade: f.quantidade ?? 1 }))
+    .sort(
     (a, b) => a.material.localeCompare(b.material) || a.cor.localeCompare(b.cor),
   );
 }

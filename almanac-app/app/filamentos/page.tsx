@@ -33,9 +33,11 @@ function FilamentoModal({
   const [marca, setMarca] = useState(inicial?.marca ?? "");
   const [pesoRolo, setPesoRolo] = useState(String(inicial?.pesoRolo ?? PESO_ROLO_PADRAO));
   const [gramas, setGramas] = useState(String(inicial?.gramasRestantes ?? PESO_ROLO_PADRAO));
+  const [quantidade, setQuantidade] = useState(String(inicial?.quantidade ?? 1));
   const [observacoes, setObservacoes] = useState(inicial?.observacoes ?? "");
 
-  const canSave = cor.trim() && parseFloat(pesoRolo) > 0 && parseFloat(gramas) >= 0;
+  const canSave =
+    cor.trim() && parseFloat(pesoRolo) > 0 && parseFloat(gramas) >= 0 && parseInt(quantidade) >= 1;
 
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
@@ -70,14 +72,18 @@ function FilamentoModal({
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <div className="alm-field" style={{ margin: 0 }}>
               <label className="alm-label">Peso do rolo (g) *</label>
               <input className="atlas-input" type="number" min="1" step="1" value={pesoRolo} onChange={(e) => setPesoRolo(e.target.value)} />
             </div>
             <div className="alm-field" style={{ margin: 0 }}>
-              <label className="alm-label">Restante (g) *</label>
+              <label className="alm-label">Restante por rolo (g) *</label>
               <input className="atlas-input" type="number" min="0" step="1" value={gramas} onChange={(e) => setGramas(e.target.value)} />
+            </div>
+            <div className="alm-field" style={{ margin: 0 }}>
+              <label className="alm-label">Qtd. de rolos *</label>
+              <input className="atlas-input" type="number" min="1" step="1" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} />
             </div>
           </div>
 
@@ -110,6 +116,7 @@ function FilamentoModal({
                   marca: marca.trim() || undefined,
                   pesoRolo: parseFloat(pesoRolo),
                   gramasRestantes: Math.min(parseFloat(gramas) || 0, parseFloat(pesoRolo)),
+                  quantidade: Math.max(1, parseInt(quantidade) || 1),
                   observacoes: observacoes.trim() || undefined,
                 });
               }}
@@ -140,8 +147,11 @@ export default function FilamentosPage() {
     [filamentos, filtroMaterial],
   );
 
-  const totalGramas = filamentos.reduce((s, f) => s + f.gramasRestantes, 0);
-  const rolosAcabando = filamentos.filter((f) => f.gramasRestantes / f.pesoRolo <= 0.2).length;
+  const totalRolos = filamentos.reduce((s, f) => s + f.quantidade, 0);
+  const totalGramas = filamentos.reduce((s, f) => s + f.gramasRestantes * f.quantidade, 0);
+  const rolosAcabando = filamentos
+    .filter((f) => f.gramasRestantes / f.pesoRolo <= 0.2)
+    .reduce((s, f) => s + f.quantidade, 0);
 
   async function salvar(input: FilamentoInput) {
     if (modal.filamento) await editarFilamento(modal.filamento.id, input);
@@ -172,9 +182,9 @@ export default function FilamentosPage() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-        <div className="atlas-stat"><div className="atlas-stat-label">Cores / rolos</div><div className="atlas-stat-value">{filamentos.length}</div></div>
+        <div className="atlas-stat"><div className="atlas-stat-label">Rolos ({filamentos.length} cores)</div><div className="atlas-stat-value">{totalRolos}</div></div>
         <div className="atlas-stat"><div className="atlas-stat-label">Total restante</div><div className="atlas-stat-value">{(totalGramas / 1000).toFixed(2).replace(".", ",")} kg</div></div>
-        <div className="atlas-stat"><div className="atlas-stat-label">Acabando (≤ 20%)</div><div className="atlas-stat-value" style={{ color: rolosAcabando > 0 ? "var(--status-warning)" : undefined }}>{rolosAcabando}</div></div>
+        <div className="atlas-stat"><div className="atlas-stat-label">Rolos acabando (≤ 20%)</div><div className="atlas-stat-value" style={{ color: rolosAcabando > 0 ? "var(--status-warning)" : undefined }}>{rolosAcabando}</div></div>
       </div>
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -197,13 +207,14 @@ export default function FilamentosPage() {
               <th>Cor</th>
               <th>Material</th>
               <th>Marca</th>
-              <th className="num">Restante</th>
+              <th className="num">Qtd.</th>
+              <th className="num">Restante (por rolo)</th>
               <th>Observações</th>
             </tr>
           </thead>
           <tbody>
             {visiveis.length === 0 ? (
-              <tr><td colSpan={6} style={{ textAlign: "center", color: "var(--text-tertiary)", padding: "32px 0", fontSize: 13 }}>Nenhum filamento cadastrado.</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: "center", color: "var(--text-tertiary)", padding: "32px 0", fontSize: 13 }}>Nenhum filamento cadastrado.</td></tr>
             ) : (
               visiveis.map((f) => {
                 const pct = Math.max(0, Math.min(100, (f.gramasRestantes / f.pesoRolo) * 100));
@@ -216,6 +227,9 @@ export default function FilamentosPage() {
                     <td style={{ fontWeight: 600 }}>{f.cor}</td>
                     <td><span className="atlas-badge atlas-badge-info">{f.material}</span></td>
                     <td style={{ color: "var(--text-tertiary)", fontSize: 12 }}>{f.marca ?? "—"}</td>
+                    <td className="num">
+                      <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>{f.quantidade}</span>
+                    </td>
                     <td className="num" style={{ minWidth: 160 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
                         <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: baixo ? "var(--status-warning)" : undefined }}>
