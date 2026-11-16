@@ -39,6 +39,21 @@ function salvarOcultas(ocultas: EncomendaStatus[]) {
   }
 }
 
+// Botão de olho discreto: sem caixa, pequeno, na cor terciária.
+const BOTAO_DISCRETO: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 20,
+  height: 20,
+  padding: 0,
+  border: "none",
+  background: "transparent",
+  color: "var(--text-tertiary)",
+  cursor: "pointer",
+  borderRadius: 4,
+};
+
 const STATUS_COLOR: Record<EncomendaStatus, string> = {
   aguardando: "var(--text-tertiary)",
   em_producao: "var(--status-warning)",
@@ -115,12 +130,12 @@ export function KanbanBoard({
             >
               <button
                 type="button"
-                className="atlas-btn atlas-btn-icon"
                 onClick={() => toggleOculta(status)}
                 title={`Mostrar ${statusLabels[status]}`}
                 aria-label={`Mostrar coluna ${statusLabels[status]}`}
+                style={BOTAO_DISCRETO}
               >
-                <Eye size={14} strokeWidth={1.5} />
+                <Eye size={12} strokeWidth={1.5} />
               </button>
               <span
                 style={{
@@ -194,12 +209,12 @@ export function KanbanBoard({
                 </span>
                 <button
                   type="button"
-                  className="atlas-btn atlas-btn-icon"
                   onClick={() => toggleOculta(status)}
                   title="Ocultar coluna"
                   aria-label={`Ocultar coluna ${statusLabels[status]}`}
+                  style={BOTAO_DISCRETO}
                 >
-                  <EyeOff size={13} strokeWidth={1.5} />
+                  <EyeOff size={12} strokeWidth={1.5} />
                 </button>
               </span>
             </div>
