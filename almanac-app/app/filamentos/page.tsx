@@ -48,10 +48,10 @@ function FilamentoModal({
         </div>
 
         <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 10, alignItems: "end" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 10, alignItems: "start" }}>
             <div className="alm-field" style={{ margin: 0 }}>
               <label className="alm-label">Cor</label>
-              <input type="color" value={corHex} onChange={(e) => setCorHex(e.target.value)} style={{ width: 42, height: 34, padding: 2, border: "1px solid var(--border-default)", borderRadius: "var(--radius-sm)", background: "var(--bg-input)", cursor: "pointer" }} />
+              <input type="color" value={corHex} onChange={(e) => setCorHex(e.target.value)} style={{ display: "block", width: 44, height: 36, padding: 2, border: "1px solid var(--border-default)", borderRadius: "var(--radius-sm)", background: "var(--bg-input)", cursor: "pointer" }} />
             </div>
             <div className="alm-field" style={{ margin: 0 }}>
               <label className="alm-label">Nome da cor *</label>
@@ -72,17 +72,17 @@ function FilamentoModal({
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, alignItems: "start" }}>
             <div className="alm-field" style={{ margin: 0 }}>
-              <label className="alm-label">Peso do rolo (g) *</label>
+              <label className="alm-label">Peso (g) *</label>
               <input className="atlas-input" type="number" min="1" step="1" value={pesoRolo} onChange={(e) => setPesoRolo(e.target.value)} />
             </div>
             <div className="alm-field" style={{ margin: 0 }}>
-              <label className="alm-label">Restante por rolo (g) *</label>
+              <label className="alm-label">Restante (g) *</label>
               <input className="atlas-input" type="number" min="0" step="1" value={gramas} onChange={(e) => setGramas(e.target.value)} />
             </div>
             <div className="alm-field" style={{ margin: 0 }}>
-              <label className="alm-label">Qtd. de rolos *</label>
+              <label className="alm-label">Qtd. rolos *</label>
               <input className="atlas-input" type="number" min="1" step="1" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} />
             </div>
           </div>
