@@ -9,9 +9,13 @@ import { lerImagem } from "@/lib/imagem";
 import { gerarOrcamentoEncomenda } from "@/lib/orcamento-encomenda";
 import { Combobox } from "@/components/shared/combobox";
 import type { ProdutoCalculado } from "@/lib/repositories/produtos";
-import type { EmbalagemEncomenda, EncomendaInput, TipoEncomenda } from "@/lib/repositories/encomendas";
+import type { EmbalagemEncomenda, EncomendaInput } from "@/lib/repositories/encomendas";
+import { buscarClientes, type Cliente } from "@/lib/repositories/clientes";
 import { buscarInsumos, type Insumo } from "@/lib/repositories/insumos";
 import { EmbalagensPedido } from "@/components/shared/embalagens-pedido";
+
+// Valor fixo no select de cliente: encomenda para uso próprio (não é venda).
+const PESSOAL = "__pessoal__";
 
 interface ItemRow {
   produtoId: string;
@@ -58,9 +62,11 @@ export function NovaEncomendaForm({
   const hoje = new Date().toISOString().slice(0, 10);
 
   const [foto, setFoto] = useState<string | null>(null);
-  const [tipo, setTipo] = useState<TipoEncomenda>("cliente");
-  const pessoal = tipo === "pessoal";
-  const [cliente, setCliente] = useState("");
+  // Seleção do campo Cliente: id de um cliente cadastrado, ou PESSOAL.
+  const [clienteSel, setClienteSel] = useState("");
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const pessoal = clienteSel === PESSOAL;
+  const nomeCliente = pessoal ? "Pessoal" : clientes.find((c) => c.id === clienteSel)?.nome ?? "";
   const [canal, setCanal] = useState<"whatsapp" | "presencial">("whatsapp");
   const [dataEntrega, setDataEntrega] = useState("");
   const [itens, setItens] = useState<ItemRow[]>(
@@ -82,6 +88,7 @@ export function NovaEncomendaForm({
 
   useEffect(() => {
     buscarInsumos().then(setInsumos);
+    buscarClientes().then(setClientes);
   }, []);
 
   const subtotal = itens.reduce((s, r) => s + (parseFloat(r.quantidade) || 0) * (parseFloat(r.precoUnitario) || 0), 0);
@@ -128,7 +135,7 @@ export function NovaEncomendaForm({
   };
 
   const camposFaltando = [
-    cliente.trim().length === 0 && (pessoal ? "título" : "cliente"),
+    !nomeCliente && "cliente",
     !dataEntrega && (pessoal ? "data prevista" : "data de entrega"),
     itens.length === 0 && "ao menos um item",
   ].filter(Boolean) as string[];
@@ -140,7 +147,7 @@ export function NovaEncomendaForm({
     if (pessoal) {
       onSave({
         tipo: "pessoal",
-        cliente: cliente.trim(),
+        cliente: nomeCliente,
         canal: "presencial",
         status: "aguardando",
         dataPedido: hoje,
@@ -171,7 +178,7 @@ export function NovaEncomendaForm({
     try {
       // Toda encomenda leva a imagem de orçamento, no mesmo modelo do módulo Orçamento.
       const orcamentoImagem = await gerarOrcamentoEncomenda({
-        cliente: cliente.trim(),
+        cliente: nomeCliente,
         prazo: formatDate(dataEntrega),
         data: hoje,
         linhas: itensSalvos.map((i) => ({
@@ -185,7 +192,7 @@ export function NovaEncomendaForm({
       });
       onSave({
         tipo: "cliente",
-        cliente: cliente.trim(),
+        cliente: nomeCliente,
         canal,
         status: "aguardando",
         dataPedido: hoje,
@@ -212,26 +219,17 @@ export function NovaEncomendaForm({
     <>
       <FotoUploadSmall value={foto} onChange={setFoto} />
 
-      <div className="alm-field" style={{ maxWidth: 200 }}>
-        <label className="alm-label">Tipo</label>
-        <Combobox
-          value={tipo}
-          onChange={(v) => setTipo(v as TipoEncomenda)}
-          options={[
-            { value: "cliente", label: "Cliente" },
-            { value: "pessoal", label: "Pessoal (fotos, conteúdo)" },
-          ]}
-        />
-      </div>
-
       <div style={{ display: "grid", gridTemplateColumns: pessoal ? "1fr" : "1fr auto", gap: 10 }}>
         <div className="alm-field">
-          <label className="alm-label">{pessoal ? "Título / finalidade" : "Cliente"}</label>
-          <input
-            className="atlas-input"
-            placeholder={pessoal ? "Ex: Coleção outono — fotos para o feed" : "Nome do cliente"}
-            value={cliente}
-            onChange={(e) => setCliente(e.target.value)}
+          <label className="alm-label">Cliente</label>
+          <Combobox
+            value={clienteSel}
+            onChange={setClienteSel}
+            options={[
+              { value: "", label: "Selecione…" },
+              { value: PESSOAL, label: "Pessoal" },
+              ...clientes.map((c) => ({ value: c.id, label: c.nome })),
+            ]}
           />
         </div>
         {!pessoal && (
