@@ -18,6 +18,9 @@ const COR_PADRAO = "#9ca3af";
 
 const OUTRA_MARCA = "__outra__";
 
+// Marcas sempre disponíveis no select, além das já usadas no inventário.
+const MARCAS_PADRAO = ["SunLu", "Eleego", "F3D"];
+
 function FilamentoModal({
   inicial,
   marcas,
@@ -36,7 +39,9 @@ function FilamentoModal({
   const [material, setMaterial] = useState<MaterialFilamento>(inicial?.material ?? "PLA");
   const [marca, setMarca] = useState(inicial?.marca ?? "");
   const [novaMarca, setNovaMarca] = useState("");
-  const opcoesMarca = Array.from(new Set([...marcas, ...(inicial?.marca ? [inicial.marca] : [])])).sort();
+  const opcoesMarca = Array.from(
+    new Set([...MARCAS_PADRAO, ...marcas, ...(inicial?.marca ? [inicial.marca] : [])]),
+  ).sort();
   const [pesoRolo, setPesoRolo] = useState(String(inicial?.pesoRolo ?? PESO_ROLO_PADRAO));
   const [gramas, setGramas] = useState(String(inicial?.gramasRestantes ?? PESO_ROLO_PADRAO));
   const [quantidade, setQuantidade] = useState(String(inicial?.quantidade ?? 1));
