@@ -1292,7 +1292,7 @@ function EditarDetalhesForm({
           />
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10 }}>
           <div className="alm-field">
             <label className="alm-label">Cliente</label>
             <Combobox value={clienteSel} onChange={setClienteSel} options={opcoesCliente} />
@@ -1311,7 +1311,7 @@ function EditarDetalhesForm({
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10 }}>
         <div className="alm-field">
           <label className="alm-label">Data do pedido</label>
           <input
