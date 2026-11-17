@@ -4,11 +4,12 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  AlertTriangle, TrendingUp, ShoppingBag, Package, Plus,
-  ClipboardList, Box, PackageCheck, X, ArrowDown, ArrowUp, Wallet,
+  TrendingUp, ShoppingBag, Plus, X, ArrowDown, ArrowUp, Wallet,
+  Receipt, CalendarClock, AlertOctagon, Percent, Trophy, BarChart3,
 } from "lucide-react";
 import { KanbanWidget } from "@/components/kanban-widget";
-import { formatBRL, categoriaLabel } from "@/lib/utils";
+import { formatBRL, formatDate, categoriaLabel, statusLabels } from "@/lib/utils";
+import { calcularPainelAdmin, type PainelAdmin, type ResumoEncomenda } from "@/lib/dashboard-admin";
 import { buscarInsumos, criarInsumo, type Insumo, type InsumoCategoria } from "@/lib/repositories/insumos";
 import { buscarProdutos, type ProdutoCalculado } from "@/lib/repositories/produtos";
 import { buscarCustosIndiretos } from "@/lib/repositories/financeiro";
@@ -170,8 +171,8 @@ function NovoInsumoForm({ onClose }: { onClose: () => void }) {
   );
 }
 
-function StatCard({ label, value, delta, deltaUp, icon: Icon, accent, highlight }: {
-  label: string; value: string; delta?: string; deltaUp?: boolean;
+function StatCard({ label, value, sub, delta, deltaUp, icon: Icon, accent, highlight }: {
+  label: string; value: string; sub?: string; delta?: string; deltaUp?: boolean;
   icon: React.ElementType; accent?: "error" | "warning"; highlight?: boolean;
 }) {
   return (
@@ -182,7 +183,103 @@ function StatCard({ label, value, delta, deltaUp, icon: Icon, accent, highlight 
           <Icon size={14} strokeWidth={1.5} style={{ color: accent === "error" ? "var(--status-error)" : accent === "warning" ? "var(--status-warning)" : "var(--text-tertiary)" }} />
         </div>
         <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--font-mono)", color: accent === "error" ? "var(--status-error)" : "var(--text-primary)" }}>{value}</div>
+        {sub && <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{sub}</div>}
         {delta && <div className={`atlas-stat-delta ${deltaUp ? "is-up" : "is-down"}`}>{delta}</div>}
+      </div>
+    </div>
+  );
+}
+
+const MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+function rotuloMes(chave: string): string {
+  const [ano, mes] = chave.split("-").map(Number);
+  return `${MESES_CURTOS[mes - 1]}/${String(ano).slice(2)}`;
+}
+
+// Tabela de encomendas (entregas e saldos a receber)
+function TabelaEncomendas({ linhas, vazio, mostrarStatus }: {
+  linhas: ResumoEncomenda[]; vazio: string; mostrarStatus?: boolean;
+}) {
+  if (linhas.length === 0) {
+    return (
+      <div className="atlas-empty" style={{ padding: 24 }}>
+        <div className="atlas-empty-desc">{vazio}</div>
+      </div>
+    );
+  }
+  return (
+    <table className="atlas-table" style={{ width: "100%", border: 0 }}>
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>Entrega</th>
+          <th className="num">Total</th>
+          <th className="num">Saldo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {linhas.map(({ encomenda: e, aReceber }) => (
+          <tr key={e.id}>
+            <td>
+              <Link href={`/encomendas/${e.id}`} className="atlas-link" style={{ fontWeight: 500 }}>{e.cliente || "Sem nome"}</Link>
+              {mostrarStatus && (
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{statusLabels[e.status]}</div>
+              )}
+            </td>
+            <td style={{ whiteSpace: "nowrap" }}>{e.dataEntrega ? formatDate(e.dataEntrega) : "—"}</td>
+            <td className="num">{formatBRL(e.totalCobrado)}</td>
+            <td className="num" style={{ fontWeight: 600, color: aReceber > 0.005 ? "var(--status-warning)" : "var(--text-tertiary)" }}>
+              {aReceber > 0.005 ? formatBRL(aReceber) : "Pago"}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+// Gráfico de barras simples (CSS), faturamento mensal
+function GraficoFaturamento({ dados }: { dados: { mes: string; valor: number }[] }) {
+  const max = Math.max(...dados.map((d) => d.valor), 1);
+  const total = dados.reduce((s, d) => s + d.valor, 0);
+  const ultimo = dados[dados.length - 1];
+  const anterior = dados[dados.length - 2];
+  const variacao = anterior && anterior.valor > 0 ? (ultimo.valor - anterior.valor) / anterior.valor : null;
+  return (
+    <div style={{ padding: "16px 18px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Total no período</div>
+          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "var(--font-mono)" }}>{formatBRL(total)}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Mês atual vs anterior</div>
+          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "var(--font-mono)" }}>
+            {variacao === null ? "—" : `${variacao >= 0 ? "+" : ""}${Math.round(variacao * 100)}%`}
+          </div>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${dados.length}, 1fr)`, gap: 10, alignItems: "end", height: 160 }}>
+        {dados.map((d) => {
+          const pct = (d.valor / max) * 100;
+          return (
+            <div key={d.mes} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, height: "100%", justifyContent: "flex-end", minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", whiteSpace: "nowrap" }}>
+                {d.valor > 0 ? formatBRL(d.valor).replace(/^R\$\s?/, "") : "0"}
+              </div>
+              <div
+                title={`${rotuloMes(d.mes)}: ${formatBRL(d.valor)}`}
+                style={{
+                  width: "100%", maxWidth: 56, height: `${Math.max(pct, d.valor > 0 ? 3 : 1)}%`,
+                  background: d.mes === dados[dados.length - 1].mes ? "var(--accent-primary)" : "var(--accent-primary-muted)",
+                  borderRadius: "6px 6px 2px 2px",
+                }}
+              />
+              <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{rotuloMes(d.mes)}</div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -200,6 +297,7 @@ export default function DashboardPage() {
   const [fluxo, setFluxo] = useState({ entradas: 0, saidas: 0, saldo: 0 });
   const [lucroTotal, setLucroTotal] = useState(0);
   const [produtosList, setProdutosList] = useState<ProdutoCalculado[]>([]);
+  const [painel, setPainel] = useState<PainelAdmin | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -215,6 +313,7 @@ export default function DashboardPage() {
       const abertas = encs.filter(e => e.status !== 'entregue' && e.status !== 'cancelado' && !isPessoal(e));
       setEncomendasAbertas(abertas);
       setProdutosList(prods);
+      setPainel(calcularPainelAdmin(encs, pagamentos, new Map(prods.map((p) => [p.id, p.nome]))));
       // Mesmos números do Financeiro (fluxo de caixa do mês atual)
       const { inicio, fim } = getPeriodRange("mes", "", "");
       const movs = [...gerarAutoMovimentacoes(custos, pagamentos, encs), ...loadManuais()];
@@ -251,13 +350,126 @@ export default function DashboardPage() {
         <StatCard label="Entradas do mês" value={formatBRL(fluxo.entradas)} icon={ArrowDown} />
         <StatCard label="Saídas do mês" value={formatBRL(fluxo.saidas)} icon={ArrowUp} />
         <StatCard label="Saldo do mês" value={formatBRL(fluxo.saldo)} icon={Wallet} />
-        <StatCard label="Lucro total" value={formatBRL(lucroTotal)} icon={TrendingUp} highlight />
-        <StatCard label="Encomendas abertas" value={String(encomendasAbertas.length)} icon={ShoppingBag} />
+        <StatCard
+          label="Lucro total"
+          value={formatBRL(lucroTotal)}
+          sub={painel && painel.margemMediaMes > 0 ? `Margem do mês: ${Math.round(painel.margemMediaMes * 100)}%` : undefined}
+          icon={TrendingUp}
+          highlight
+        />
+        <StatCard
+          label="A receber"
+          value={formatBRL(painel?.aReceberTotal ?? 0)}
+          sub={painel ? `${painel.aReceber.length} encomenda(s) com saldo` : undefined}
+          icon={Receipt}
+          accent={painel && painel.aReceberTotal > 0 ? "warning" : undefined}
+        />
+        <StatCard
+          label="Encomendas abertas"
+          value={String(encomendasAbertas.length)}
+          sub={painel ? `${painel.porStatus.aguardando} aguardando · ${painel.porStatus.em_producao} em produção · ${painel.porStatus.pronto} prontas` : undefined}
+          icon={ShoppingBag}
+        />
+        <StatCard
+          label="Atrasadas"
+          value={String(painel?.atrasadas.length ?? 0)}
+          sub={painel ? (painel.proximas.length > 0 ? `${painel.proximas.length} entrega(s) nos próximos 7 dias` : "Nenhuma entrega nos próximos 7 dias") : undefined}
+          icon={AlertOctagon}
+          accent={painel && painel.atrasadas.length > 0 ? "error" : undefined}
+        />
+        <StatCard
+          label="Ticket médio do mês"
+          value={formatBRL(painel?.ticketMedioMes ?? 0)}
+          sub={painel ? `${painel.pedidosMes} pedido(s) no mês` : undefined}
+          icon={Percent}
+        />
+        <StatCard
+          label="Produtos vendidos no mês"
+          value={String(painel?.maisVendidos.reduce((s, p) => s + p.quantidade, 0) ?? 0)}
+          sub={painel?.maisVendidos[0] ? `Mais vendido: ${painel.maisVendidos[0].nome}` : undefined}
+          icon={Trophy}
+        />
       </div>
 
       <KanbanWidget />
 
       <div className="alm-bento">
+        {/* Entregas: atrasadas e próximos 7 dias */}
+        <div className="atlas-card">
+          <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <CalendarClock size={15} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
+              <span className="atlas-panel-title">Entregas</span>
+              {painel && painel.atrasadas.length > 0 && <span className="atlas-badge atlas-badge-error">{painel.atrasadas.length} atrasada(s)</span>}
+            </span>
+            <Link href="/encomendas" className="atlas-link" style={{ fontSize: 13 }}>Ver todas</Link>
+          </div>
+          <div className="atlas-card-body" style={{ padding: 0 }}>
+            <TabelaEncomendas
+              linhas={[...(painel?.atrasadas ?? []), ...(painel?.proximas ?? [])]}
+              vazio="Nenhuma entrega atrasada ou nos próximos 7 dias."
+              mostrarStatus
+            />
+          </div>
+        </div>
+
+        {/* A receber */}
+        <div className="atlas-card">
+          <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Receipt size={15} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
+              <span className="atlas-panel-title">A receber</span>
+              {painel && painel.aReceber.length > 0 && <span className="atlas-badge atlas-badge-warning">{painel.aReceber.length}</span>}
+            </span>
+            <span style={{ fontSize: 13, fontFamily: "var(--font-mono)", fontWeight: 600 }}>{formatBRL(painel?.aReceberTotal ?? 0)}</span>
+          </div>
+          <div className="atlas-card-body" style={{ padding: 0 }}>
+            <TabelaEncomendas
+              linhas={painel?.aReceber ?? []}
+              vazio="Nenhum saldo em aberto."
+            />
+          </div>
+        </div>
+
+        {/* Faturamento */}
+        <div className="atlas-card">
+          <div className="atlas-card-header" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <BarChart3 size={15} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
+            <span className="atlas-panel-title">Faturamento · últimos 6 meses</span>
+          </div>
+          <div className="atlas-card-body" style={{ padding: 0 }}>
+            {painel ? <GraficoFaturamento dados={painel.faturamentoMensal} /> : null}
+          </div>
+        </div>
+
+        {/* Mais vendidos */}
+        <div className="atlas-card">
+          <div className="atlas-card-header" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Trophy size={15} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
+            <span className="atlas-panel-title">Mais vendidos no mês</span>
+          </div>
+          <div className="atlas-card-body" style={{ padding: 0 }}>
+            {!painel || painel.maisVendidos.length === 0 ? (
+              <div className="atlas-empty" style={{ padding: 24 }}>
+                <div className="atlas-empty-desc">Nenhum pedido no mês ainda.</div>
+              </div>
+            ) : (
+              <table className="atlas-table" style={{ width: "100%", border: 0 }}>
+                <thead><tr><th>Produto</th><th className="num">Qtd</th><th className="num">Receita</th></tr></thead>
+                <tbody>
+                  {painel.maisVendidos.map((p) => (
+                    <tr key={p.nome}>
+                      <td style={{ fontWeight: 500 }}>{p.nome}</td>
+                      <td className="num">{p.quantidade}</td>
+                      <td className="num">{formatBRL(p.receita)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
         {/* Estoque em alerta */}
           <div className="atlas-card">
             <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
