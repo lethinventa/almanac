@@ -39,6 +39,7 @@ import {
   type EncomendaStatus,
   type LinkUtil,
   type EncomendaItem,
+  type EncomendaInput,
   isPessoal,
 } from "@/lib/repositories/encomendas";
 import { buscarProdutos, type ProdutoCalculado } from "@/lib/repositories/produtos";
@@ -46,6 +47,8 @@ import { lerImagem } from "@/lib/imagem";
 import { gerarOrcamentoEncomenda } from "@/lib/orcamento-encomenda";
 import { EmbalagensPedido } from "@/components/shared/embalagens-pedido";
 import { buscarInsumos, type Insumo } from "@/lib/repositories/insumos";
+import { buscarClientes, type Cliente } from "@/lib/repositories/clientes";
+import { Combobox } from "@/components/shared/combobox";
 import { PainelPagamento } from "@/components/shared/painel-pagamento";
 
 // ── Status flow ───────────────────────────────────────────────
@@ -1194,6 +1197,155 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
+// ── Imagem do orçamento (gerada a partir dos dados da encomenda) ──
+function gerarImagemOrcamento(e: Encomenda, produtos: ProdutoCalculado[]): Promise<string> {
+  const desconto = e.desconto ?? 0;
+  const subtotal = e.itens.reduce((s, i) => s + i.quantidade * i.precoUnitario, 0);
+  const total = e.valorCobrado ?? Math.max(subtotal - desconto, 0);
+  return gerarOrcamentoEncomenda({
+    cliente: e.cliente,
+    prazo: formatDate(e.dataEntrega),
+    data: e.dataPedido,
+    linhas: e.itens.map((i) => ({
+      descricao: produtos.find((p) => p.id === i.produtoId)?.nome ?? i.descricao ?? "Item",
+      quantidade: i.quantidade,
+      precoUnitario: i.precoUnitario,
+      subtotal: i.quantidade * i.precoUnitario,
+    })),
+    desconto,
+    total,
+  });
+}
+
+// ── EditarDetalhesForm (cliente, canal, datas) ────────────────
+type DetalhesEdicao = Pick<EncomendaInput, "cliente" | "canal" | "dataPedido" | "dataEntrega">;
+
+// Valor do select quando o nome salvo não corresponde a nenhum cliente cadastrado.
+const NOME_ATUAL = "__nome_atual__";
+
+function EditarDetalhesForm({
+  enc,
+  clientes,
+  onSave,
+  onCancel,
+}: {
+  enc: Encomenda;
+  clientes: Cliente[];
+  onSave: (d: DetalhesEdicao) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const pessoal = isPessoal(enc);
+  const clienteCadastrado = clientes.find((c) => c.nome === enc.cliente);
+
+  const [clienteSel, setClienteSel] = useState(
+    clienteCadastrado?.id ?? (enc.cliente ? NOME_ATUAL : "")
+  );
+  const [tituloPessoal, setTituloPessoal] = useState(enc.cliente);
+  const [canal, setCanal] = useState<"whatsapp" | "presencial">(enc.canal);
+  const [dataPedido, setDataPedido] = useState(enc.dataPedido);
+  const [dataEntrega, setDataEntrega] = useState(enc.dataEntrega);
+  const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  const opcoesCliente = [
+    { value: "", label: "Selecione…" },
+    ...clientes.map((c) => ({ value: c.id, label: c.nome })),
+    ...(clienteCadastrado || !enc.cliente ? [] : [{ value: NOME_ATUAL, label: enc.cliente }]),
+  ];
+
+  const salvar = async () => {
+    let cliente: string;
+    if (pessoal) cliente = tituloPessoal.trim();
+    else if (clienteSel === NOME_ATUAL) cliente = enc.cliente;
+    else cliente = clientes.find((c) => c.id === clienteSel)?.nome ?? "";
+
+    if (!cliente) return setErro(pessoal ? "Informe o título da produção." : "Selecione o cliente.");
+    if (!dataPedido) return setErro("Informe a data do pedido.");
+    if (!dataEntrega) return setErro(pessoal ? "Informe a data prevista." : "Informe a data de entrega.");
+    if (dataEntrega < dataPedido)
+      return setErro("A data de entrega não pode ser anterior à data do pedido.");
+
+    setErro("");
+    setSalvando(true);
+    try {
+      await onSave({
+        cliente,
+        canal: pessoal ? enc.canal : canal,
+        dataPedido,
+        dataEntrega,
+      });
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Erro ao salvar.");
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "10px 0 4px" }}>
+      {pessoal ? (
+        <div className="alm-field">
+          <label className="alm-label">Título / finalidade</label>
+          <input
+            className="atlas-input"
+            value={tituloPessoal}
+            onChange={(e) => setTituloPessoal(e.target.value)}
+          />
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}>
+          <div className="alm-field">
+            <label className="alm-label">Cliente</label>
+            <Combobox value={clienteSel} onChange={setClienteSel} options={opcoesCliente} />
+          </div>
+          <div className="alm-field">
+            <label className="alm-label">Canal</label>
+            <Combobox
+              value={canal}
+              onChange={(v) => setCanal(v as "whatsapp" | "presencial")}
+              options={[
+                { value: "whatsapp", label: "WhatsApp" },
+                { value: "presencial", label: "Presencial" },
+              ]}
+            />
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <div className="alm-field">
+          <label className="alm-label">Data do pedido</label>
+          <input
+            className="atlas-input"
+            type="date"
+            value={dataPedido}
+            onChange={(e) => setDataPedido(e.target.value)}
+          />
+        </div>
+        <div className="alm-field">
+          <label className="alm-label">{pessoal ? "Data prevista" : "Data de entrega"}</label>
+          <input
+            className="atlas-input"
+            type="date"
+            value={dataEntrega}
+            onChange={(e) => setDataEntrega(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {erro && <p style={{ fontSize: 12, color: "var(--status-error)", margin: 0 }}>{erro}</p>}
+
+      <div style={{ display: "flex", gap: 6 }}>
+        <button className="atlas-btn atlas-btn-primary atlas-btn-sm" onClick={salvar} disabled={salvando}>
+          {salvando ? "Salvando…" : "Salvar"}
+        </button>
+        <button className="atlas-btn atlas-btn-secondary atlas-btn-sm" onClick={onCancel} disabled={salvando}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────
 export default function EncomendaDetalhePage() {
   const { id } = useParams<{ id: string }>();
@@ -1203,6 +1355,8 @@ export default function EncomendaDetalhePage() {
   const [loading, setLoading] = useState(true);
   const [produtosList, setProdutosList] = useState<ProdutoCalculado[]>([]);
   const [insumosList, setInsumosList] = useState<Insumo[]>([]);
+  const [clientesList, setClientesList] = useState<Cliente[]>([]);
+  const [editandoDetalhes, setEditandoDetalhes] = useState(false);
 
   const [status, setStatus] = useState<EncomendaStatus>("aguardando");
   const [foto, setFoto] = useState<string | null>(null);
@@ -1222,10 +1376,12 @@ export default function EncomendaDetalhePage() {
       buscarEncomenda(id),
       buscarProdutos(),
       buscarInsumos(),
-    ]).then(([e, prods, ins]) => {
+      buscarClientes(),
+    ]).then(([e, prods, ins, cls]) => {
       setEnc(e);
       setProdutosList(prods);
       setInsumosList(ins);
+      setClientesList(cls);
       setLoading(false);
       if (e) {
         setStatus(e.status);
@@ -1242,22 +1398,7 @@ export default function EncomendaDetalhePage() {
   useEffect(() => {
     if (loading || !enc || enc.orcamentoImagem || isPessoal(enc)) return;
     let cancelado = false;
-    const desconto = enc.desconto ?? 0;
-    const subtotal = enc.itens.reduce((s, i) => s + i.quantidade * i.precoUnitario, 0);
-    const total = enc.valorCobrado ?? Math.max(subtotal - desconto, 0);
-    gerarOrcamentoEncomenda({
-      cliente: enc.cliente,
-      prazo: formatDate(enc.dataEntrega),
-      data: enc.dataPedido,
-      linhas: enc.itens.map((i) => ({
-        descricao: produtosList.find((p) => p.id === i.produtoId)?.nome ?? i.descricao ?? "Item",
-        quantidade: i.quantidade,
-        precoUnitario: i.precoUnitario,
-        subtotal: i.quantidade * i.precoUnitario,
-      })),
-      desconto,
-      total,
-    })
+    gerarImagemOrcamento(enc, produtosList)
       .then(async (orcamentoImagem) => {
         if (cancelado) return;
         await editarEncomenda(enc.id, { orcamentoImagem });
@@ -1399,6 +1540,22 @@ export default function EncomendaDetalhePage() {
   const handleObservacoesInternasChange = (v: string) => {
     setObservacoesInternas(v);
     editarEncomenda(enc.id, { observacoesInternas: v });
+  };
+
+  const handleSalvarDetalhes = async (d: DetalhesEdicao) => {
+    const patch: Partial<EncomendaInput> = { ...d };
+    const cabecalhoMudou =
+      d.cliente !== enc.cliente || d.dataPedido !== enc.dataPedido || d.dataEntrega !== enc.dataEntrega;
+    if (!pessoal && cabecalhoMudou) {
+      // O orçamento gerado mostra cliente e prazo: regenera para não ficar desatualizado.
+      patch.orcamentoImagem = await gerarImagemOrcamento({ ...enc, ...d }, produtosList).catch((err) => {
+        console.error("Erro ao atualizar imagem do orçamento:", err);
+        return undefined;
+      });
+    }
+    const atualizado = await editarEncomenda(enc.id, patch);
+    setEnc(atualizado);
+    setEditandoDetalhes(false);
   };
 
   const handleAddArquivo = async (link: { label: string; url: string }) => {
@@ -1625,26 +1782,46 @@ export default function EncomendaDetalhePage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {/* Informações */}
           <div className="atlas-card">
-            <div className="atlas-card-header">
+            <div className="atlas-card-header" style={{ justifyContent: "space-between" }}>
               <span className="atlas-panel-title">Informações</span>
+              {!editandoDetalhes && (
+                <button
+                  className="atlas-btn atlas-btn-ghost atlas-btn-sm"
+                  style={{ fontSize: 11 }}
+                  onClick={() => setEditandoDetalhes(true)}
+                >
+                  Editar
+                </button>
+              )}
             </div>
             <div className="atlas-card-body" style={{ padding: "8px 12px 12px" }}>
-              <InfoRow label={pessoal ? "Tipo" : "Canal"}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  {canalIcon}
-                  {canalLabel}
-                </span>
-              </InfoRow>
-              <InfoRow label="Pedido em">{formatDate(enc.dataPedido)}</InfoRow>
-              <InfoRow label="Entrega prevista">
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: isLate ? "var(--status-error)" : undefined }}>
-                  <Calendar size={11} strokeWidth={1.5} />
-                  {formatDate(enc.dataEntrega)}
-                </span>
-              </InfoRow>
-              <InfoRow label="Código do pedido">
-                <span style={{ fontFamily: "var(--font-mono)" }}>{orderNumber}</span>
-              </InfoRow>
+              {editandoDetalhes ? (
+                <EditarDetalhesForm
+                  enc={enc}
+                  clientes={clientesList}
+                  onSave={handleSalvarDetalhes}
+                  onCancel={() => setEditandoDetalhes(false)}
+                />
+              ) : (
+                <>
+                  <InfoRow label={pessoal ? "Tipo" : "Canal"}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      {canalIcon}
+                      {canalLabel}
+                    </span>
+                  </InfoRow>
+                  <InfoRow label="Pedido em">{formatDate(enc.dataPedido)}</InfoRow>
+                  <InfoRow label="Entrega prevista">
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: isLate ? "var(--status-error)" : undefined }}>
+                      <Calendar size={11} strokeWidth={1.5} />
+                      {formatDate(enc.dataEntrega)}
+                    </span>
+                  </InfoRow>
+                  <InfoRow label="Código do pedido">
+                    <span style={{ fontFamily: "var(--font-mono)" }}>{orderNumber}</span>
+                  </InfoRow>
+                </>
+              )}
             </div>
           </div>
 
