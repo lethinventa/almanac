@@ -1,5 +1,6 @@
 import { isPessoal, type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
 import type { AllPagamentos } from "@/lib/fluxo-caixa";
+import { STATUS_POST, type PostInstagram, type StatusPost } from "@/lib/repositories/planejamento-instagram";
 
 // Métricas do painel administrativo (dashboard). Funções puras: recebem os dados
 // já carregados e a data de referência, para facilitar teste e reuso.
@@ -30,6 +31,14 @@ export interface PainelAdmin {
   faturamentoMensal: { mes: string; valor: number }[];
   // Produtos mais vendidos no mês
   maisVendidos: { nome: string; quantidade: number; receita: number }[];
+  // Instagram
+  posts: {
+    porStatus: Record<StatusPost, number>;
+    atrasados: PostInstagram[]; // data passou e ainda não publicado
+    proximos: PostInstagram[]; // hoje até os próximos 7 dias, não publicado
+    publicadosMes: number;
+    ideias: number; // banco de ideias (sem data)
+  };
 }
 
 function pad(n: number) {
@@ -50,6 +59,7 @@ export function calcularPainelAdmin(
   encomendas: Encomenda[],
   pagamentos: AllPagamentos,
   nomesProdutos: Map<string, string>,
+  posts: PostInstagram[] = [],
   hoje = new Date()
 ): PainelAdmin {
   const hojeISO = dataISO(hoje);
@@ -119,7 +129,25 @@ export function calcularPainelAdmin(
     .sort((a, b) => b.quantidade - a.quantidade || b.receita - a.receita)
     .slice(0, 5);
 
+  // Instagram
+  const porStatusPost = Object.fromEntries(STATUS_POST.map((s) => [s, 0])) as Record<StatusPost, number>;
+  for (const p of posts) porStatusPost[p.status] += 1;
+  const comData = posts.filter((p) => p.status !== "publicado" && p.data);
+  const postsAtrasados = comData
+    .filter((p) => p.data! < hojeISO)
+    .sort((a, b) => a.data!.localeCompare(b.data!));
+  const postsProximos = comData
+    .filter((p) => p.data! >= hojeISO && p.data! <= limiteProximas)
+    .sort((a, b) => a.data!.localeCompare(b.data!));
+
   return {
+    posts: {
+      porStatus: porStatusPost,
+      atrasados: postsAtrasados,
+      proximos: postsProximos,
+      publicadosMes: posts.filter((p) => p.status === "publicado" && p.data?.startsWith(mesAtual)).length,
+      ideias: posts.filter((p) => !p.data && p.status === "ideia").length,
+    },
     abertas: abertasLista.length,
     porStatus,
     atrasadas,

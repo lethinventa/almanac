@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   TrendingUp, ShoppingBag, Plus, X, ArrowDown, ArrowUp, Wallet,
-  Receipt, CalendarClock, AlertOctagon, Percent, Trophy, BarChart3,
+  Receipt, CalendarClock, AlertOctagon, Percent, Trophy, BarChart3, Instagram,
 } from "lucide-react";
 import { KanbanWidget } from "@/components/kanban-widget";
 import { formatBRL, formatDate, categoriaLabel, statusLabels } from "@/lib/utils";
@@ -14,6 +14,7 @@ import { buscarInsumos, criarInsumo, type Insumo, type InsumoCategoria } from "@
 import { buscarProdutos, type ProdutoCalculado } from "@/lib/repositories/produtos";
 import { buscarCustosIndiretos } from "@/lib/repositories/financeiro";
 import { buscarTodosPagamentos } from "@/lib/repositories/pagamentos";
+import { buscarPosts, ROTULO_STATUS, ROTULO_FORMATO, type PostInstagram } from "@/lib/repositories/planejamento-instagram";
 import {
   gerarAutoMovimentacoes,
   getPeriodRange,
@@ -239,6 +240,34 @@ function TabelaEncomendas({ linhas, vazio, mostrarStatus }: {
   );
 }
 
+// Lista de posts (atrasados ou próximos)
+function ListaPosts({ posts, vazio }: { posts: PostInstagram[]; vazio: string }) {
+  if (posts.length === 0) {
+    return (
+      <div className="atlas-empty" style={{ padding: 24 }}>
+        <div className="atlas-empty-desc">{vazio}</div>
+      </div>
+    );
+  }
+  return (
+    <table className="atlas-table" style={{ width: "100%", border: 0 }}>
+      <thead><tr><th>Post</th><th>Data</th><th>Status</th></tr></thead>
+      <tbody>
+        {posts.map((p) => (
+          <tr key={p.id}>
+            <td>
+              <div style={{ fontWeight: 500 }}>{p.titulo}</div>
+              <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{ROTULO_FORMATO[p.formato]}</div>
+            </td>
+            <td style={{ whiteSpace: "nowrap" }}>{p.data ? formatDate(p.data) : "—"}</td>
+            <td>{ROTULO_STATUS[p.status]}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 // Gráfico de barras simples (CSS), faturamento mensal
 function GraficoFaturamento({ dados }: { dados: { mes: string; valor: number }[] }) {
   const max = Math.max(...dados.map((d) => d.valor), 1);
@@ -307,13 +336,14 @@ export default function DashboardPage() {
       buscarCustosIndiretos(),
       buscarProdutosPE(),
       buscarTodosPagamentos(),
-    ]).then(([ins, prods, encs, custos, prontaEntrega, pagamentos]) => {
+      buscarPosts(),
+    ]).then(([ins, prods, encs, custos, prontaEntrega, pagamentos, posts]) => {
       setInsumosAlerta(ins.filter(i => i.estoque !== null && i.estoqueMin !== null && (i.estoque ?? 0) <= (i.estoqueMin ?? 0)));
       setProdutosAlerta(prontaEntrega.filter(p => p.estoqueAtual <= p.estoqueMin));
       const abertas = encs.filter(e => e.status !== 'entregue' && e.status !== 'cancelado' && !isPessoal(e));
       setEncomendasAbertas(abertas);
       setProdutosList(prods);
-      setPainel(calcularPainelAdmin(encs, pagamentos, new Map(prods.map((p) => [p.id, p.nome]))));
+      setPainel(calcularPainelAdmin(encs, pagamentos, new Map(prods.map((p) => [p.id, p.nome])), posts));
       // Mesmos números do Financeiro (fluxo de caixa do mês atual)
       const { inicio, fim } = getPeriodRange("mes", "", "");
       const movs = [...gerarAutoMovimentacoes(custos, pagamentos, encs), ...loadManuais()];
@@ -376,6 +406,13 @@ export default function DashboardPage() {
           sub={painel ? (painel.proximas.length > 0 ? `${painel.proximas.length} entrega(s) nos próximos 7 dias` : "Nenhuma entrega nos próximos 7 dias") : undefined}
           icon={AlertOctagon}
           accent={painel && painel.atrasadas.length > 0 ? "error" : undefined}
+        />
+        <StatCard
+          label="Posts a publicar"
+          value={String(painel ? painel.posts.porStatus.ideia + painel.posts.porStatus.roteiro + painel.posts.porStatus.produzido + painel.posts.porStatus.agendado : 0)}
+          sub={painel ? `${painel.posts.atrasados.length} atrasado(s) · ${painel.posts.ideias} ideia(s) no banco` : undefined}
+          icon={Instagram}
+          accent={painel && painel.posts.atrasados.length > 0 ? "warning" : undefined}
         />
         <StatCard
           label="Ticket médio do mês"
@@ -467,6 +504,40 @@ export default function DashboardPage() {
                 </tbody>
               </table>
             )}
+          </div>
+        </div>
+
+        {/* Instagram */}
+        <div className="atlas-card" style={{ gridColumn: "1 / -1" }}>
+          <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Instagram size={15} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
+              <span className="atlas-panel-title">Instagram</span>
+              {painel && painel.posts.atrasados.length > 0 && <span className="atlas-badge atlas-badge-warning">{painel.posts.atrasados.length} atrasado(s)</span>}
+            </span>
+            <Link href="/planejamento" className="atlas-link" style={{ fontSize: 13 }}>Abrir planejamento</Link>
+          </div>
+          <div className="atlas-card-body" style={{ padding: 0 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "14px 16px 4px" }}>
+              {(["ideia", "roteiro", "produzido", "agendado", "publicado"] as const).map((st) => (
+                <span key={st} className="atlas-badge" style={{ fontSize: 12 }}>
+                  {ROTULO_STATUS[st]} · {painel?.posts.porStatus[st] ?? 0}
+                </span>
+              ))}
+              <span className="atlas-badge" style={{ fontSize: 12 }}>
+                Publicados no mês · {painel?.posts.publicadosMes ?? 0}
+              </span>
+            </div>
+            <div className="alm-bento" style={{ gap: 0 }}>
+              <div>
+                <div style={{ padding: "10px 16px 0", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-tertiary)" }}>Atrasados</div>
+                <ListaPosts posts={painel?.posts.atrasados ?? []} vazio="Nenhum post atrasado." />
+              </div>
+              <div>
+                <div style={{ padding: "10px 16px 0", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-tertiary)" }}>Próximos 7 dias</div>
+                <ListaPosts posts={painel?.posts.proximos ?? []} vazio="Nenhum post para os próximos 7 dias." />
+              </div>
+            </div>
           </div>
         </div>
 
