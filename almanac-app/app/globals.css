@@ -373,6 +373,75 @@ body {
   min-width: 0;
 }
 
+/* ── Dashboard: seções com títulos e linhas de largura igual ── */
+.alm-dash-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.alm-dash-section-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.alm-dash-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* Duas colunas de mesma largura; cards da linha têm a mesma altura */
+.alm-dash-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+.alm-dash-row > .atlas-card,
+.alm-dash-section > .atlas-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.alm-dash-row > .atlas-card > .atlas-card-body,
+.alm-dash-section > .atlas-card > .atlas-card-body {
+  flex: 1;
+}
+
+.alm-dash-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 14px 16px 4px;
+}
+
+.alm-dash-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 6px;
+}
+
+.alm-dash-split > div + div {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.alm-dash-subtitle {
+  padding: 10px 16px 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
 .alm-row {
   display: grid;
   gap: 16px;
@@ -983,6 +1052,13 @@ body {
 /* ── Mobile ─────────────────────────────────────────────── */
 @media (max-width: 1100px) {
   .alm-bento { grid-template-columns: 1fr; }
+  .alm-dash-row { grid-template-columns: 1fr; }
+  .alm-dash-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 768px) {
+  .alm-dash-split { grid-template-columns: 1fr; }
+  .alm-dash-split > div + div { border-left: 0; border-top: 1px solid var(--border-subtle); }
 }
 
 @media (max-width: 768px) {

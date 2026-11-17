@@ -269,7 +269,9 @@ function ListaPosts({ posts, vazio }: { posts: PostInstagram[]; vazio: string })
 }
 
 // Gráfico de barras simples (CSS), faturamento mensal
-function GraficoFaturamento({ dados }: { dados: { mes: string; valor: number }[] }) {
+function GraficoFaturamento({ dados, ticketMedio, pedidosMes }: {
+  dados: { mes: string; valor: number }[]; ticketMedio: number; pedidosMes: number;
+}) {
   const max = Math.max(...dados.map((d) => d.valor), 1);
   const total = dados.reduce((s, d) => s + d.valor, 0);
   const ultimo = dados[dados.length - 1];
@@ -287,6 +289,11 @@ function GraficoFaturamento({ dados }: { dados: { mes: string; valor: number }[]
           <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "var(--font-mono)" }}>
             {variacao === null ? "—" : `${variacao >= 0 ? "+" : ""}${Math.round(variacao * 100)}%`}
           </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Ticket médio do mês</div>
+          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "var(--font-mono)" }}>{formatBRL(ticketMedio)}</div>
+          <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{pedidosMes} pedido(s)</div>
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${dados.length}, 1fr)`, gap: 10, alignItems: "end", height: 160 }}>
@@ -376,149 +383,164 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="alm-stats-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
-        <StatCard label="Entradas do mês" value={formatBRL(fluxo.entradas)} icon={ArrowDown} />
-        <StatCard label="Saídas do mês" value={formatBRL(fluxo.saidas)} icon={ArrowUp} />
-        <StatCard label="Saldo do mês" value={formatBRL(fluxo.saldo)} icon={Wallet} />
-        <StatCard
-          label="Lucro total"
-          value={formatBRL(lucroTotal)}
-          sub={painel && painel.margemMediaMes > 0 ? `Margem do mês: ${Math.round(painel.margemMediaMes * 100)}%` : undefined}
-          icon={TrendingUp}
-          highlight
-        />
-        <StatCard
-          label="A receber"
-          value={formatBRL(painel?.aReceberTotal ?? 0)}
-          sub={painel ? `${painel.aReceber.length} encomenda(s) com saldo` : undefined}
-          icon={Receipt}
-          accent={painel && painel.aReceberTotal > 0 ? "warning" : undefined}
-        />
-        <StatCard
-          label="Encomendas abertas"
-          value={String(encomendasAbertas.length)}
-          sub={painel ? `${painel.porStatus.aguardando} aguardando · ${painel.porStatus.em_producao} em produção · ${painel.porStatus.pronto} prontas` : undefined}
-          icon={ShoppingBag}
-        />
-        <StatCard
-          label="Atrasadas"
-          value={String(painel?.atrasadas.length ?? 0)}
-          sub={painel ? (painel.proximas.length > 0 ? `${painel.proximas.length} entrega(s) nos próximos 7 dias` : "Nenhuma entrega nos próximos 7 dias") : undefined}
-          icon={AlertOctagon}
-          accent={painel && painel.atrasadas.length > 0 ? "error" : undefined}
-        />
-        <StatCard
-          label="Posts a publicar"
-          value={String(painel ? painel.posts.porStatus.ideia + painel.posts.porStatus.roteiro + painel.posts.porStatus.produzido + painel.posts.porStatus.agendado : 0)}
-          sub={painel ? `${painel.posts.atrasados.length} atrasado(s) · ${painel.posts.ideias} ideia(s) no banco` : undefined}
-          icon={Instagram}
-          accent={painel && painel.posts.atrasados.length > 0 ? "warning" : undefined}
-        />
-        <StatCard
-          label="Ticket médio do mês"
-          value={formatBRL(painel?.ticketMedioMes ?? 0)}
-          sub={painel ? `${painel.pedidosMes} pedido(s) no mês` : undefined}
-          icon={Percent}
-        />
-        <StatCard
-          label="Produtos vendidos no mês"
-          value={String(painel?.maisVendidos.reduce((s, p) => s + p.quantidade, 0) ?? 0)}
-          sub={painel?.maisVendidos[0] ? `Mais vendido: ${painel.maisVendidos[0].nome}` : undefined}
-          icon={Trophy}
-        />
-      </div>
+      {/* 1 · Caixa */}
+      <section className="alm-dash-section">
+        <h2 className="alm-dash-section-title">Caixa do mês</h2>
+        <div className="alm-dash-stats">
+          <StatCard label="Entradas do mês" value={formatBRL(fluxo.entradas)} icon={ArrowDown} />
+          <StatCard label="Saídas do mês" value={formatBRL(fluxo.saidas)} icon={ArrowUp} />
+          <StatCard label="Saldo do mês" value={formatBRL(fluxo.saldo)} icon={Wallet} />
+          <StatCard
+            label="Lucro total"
+            value={formatBRL(lucroTotal)}
+            sub={painel && painel.margemMediaMes > 0 ? `Margem do mês: ${Math.round(painel.margemMediaMes * 100)}%` : undefined}
+            icon={TrendingUp}
+            highlight
+          />
+        </div>
+      </section>
 
-      <KanbanWidget />
+      {/* 2 · Vendas e operação */}
+      <section className="alm-dash-section">
+        <h2 className="alm-dash-section-title">Vendas e operação</h2>
+        <div className="alm-dash-stats">
+          <StatCard
+            label="Encomendas abertas"
+            value={String(encomendasAbertas.length)}
+            sub={painel ? `${painel.porStatus.aguardando} aguardando · ${painel.porStatus.em_producao} em produção · ${painel.porStatus.pronto} prontas` : undefined}
+            icon={ShoppingBag}
+          />
+          <StatCard
+            label="Atrasadas"
+            value={String(painel?.atrasadas.length ?? 0)}
+            sub={painel ? (painel.proximas.length > 0 ? `${painel.proximas.length} entrega(s) nos próximos 7 dias` : "Nenhuma entrega nos próximos 7 dias") : undefined}
+            icon={AlertOctagon}
+            accent={painel && painel.atrasadas.length > 0 ? "error" : undefined}
+          />
+          <StatCard
+            label="A receber"
+            value={formatBRL(painel?.aReceberTotal ?? 0)}
+            sub={painel ? `${painel.aReceber.length} encomenda(s) com saldo` : undefined}
+            icon={Receipt}
+            accent={painel && painel.aReceberTotal > 0 ? "warning" : undefined}
+          />
+          <StatCard
+            label="Posts a publicar"
+            value={String(painel ? painel.posts.porStatus.ideia + painel.posts.porStatus.roteiro + painel.posts.porStatus.produzido + painel.posts.porStatus.agendado : 0)}
+            sub={painel ? `${painel.posts.atrasados.length} atrasado(s) · ${painel.posts.ideias} ideia(s) no banco` : undefined}
+            icon={Instagram}
+            accent={painel && painel.posts.atrasados.length > 0 ? "warning" : undefined}
+          />
+        </div>
+      </section>
 
-      <div className="alm-bento">
-        {/* Entregas: atrasadas e próximos 7 dias */}
-        <div className="atlas-card">
-          <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <CalendarClock size={15} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
-              <span className="atlas-panel-title">Entregas</span>
-              {painel && painel.atrasadas.length > 0 && <span className="atlas-badge atlas-badge-error">{painel.atrasadas.length} atrasada(s)</span>}
-            </span>
-            <Link href="/encomendas" className="atlas-link" style={{ fontSize: 13 }}>Ver todas</Link>
+      {/* 3 · Pipeline */}
+      <section className="alm-dash-section">
+        <h2 className="alm-dash-section-title">Pipeline de encomendas</h2>
+        <KanbanWidget />
+      </section>
+
+      {/* 4 · Entregas e cobrança */}
+      <section className="alm-dash-section">
+        <h2 className="alm-dash-section-title">Entregas e cobrança</h2>
+        <div className="alm-dash-row">
+          <div className="atlas-card">
+            <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <CalendarClock size={15} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
+                <span className="atlas-panel-title">Entregas</span>
+                {painel && painel.atrasadas.length > 0 && <span className="atlas-badge atlas-badge-error">{painel.atrasadas.length} atrasada(s)</span>}
+              </span>
+              <Link href="/encomendas" className="atlas-link" style={{ fontSize: 13 }}>Ver todas</Link>
+            </div>
+            <div className="atlas-card-body" style={{ padding: 0 }}>
+              <TabelaEncomendas
+                linhas={[...(painel?.atrasadas ?? []), ...(painel?.proximas ?? [])]}
+                vazio="Nenhuma entrega atrasada ou nos próximos 7 dias."
+                mostrarStatus
+              />
+            </div>
           </div>
-          <div className="atlas-card-body" style={{ padding: 0 }}>
-            <TabelaEncomendas
-              linhas={[...(painel?.atrasadas ?? []), ...(painel?.proximas ?? [])]}
-              vazio="Nenhuma entrega atrasada ou nos próximos 7 dias."
-              mostrarStatus
-            />
+
+          <div className="atlas-card">
+            <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Receipt size={15} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
+                <span className="atlas-panel-title">A receber</span>
+                {painel && painel.aReceber.length > 0 && <span className="atlas-badge atlas-badge-warning">{painel.aReceber.length}</span>}
+              </span>
+              <span style={{ fontSize: 13, fontFamily: "var(--font-mono)", fontWeight: 600 }}>{formatBRL(painel?.aReceberTotal ?? 0)}</span>
+            </div>
+            <div className="atlas-card-body" style={{ padding: 0 }}>
+              <TabelaEncomendas linhas={painel?.aReceber ?? []} vazio="Nenhum saldo em aberto." />
+            </div>
           </div>
         </div>
+      </section>
 
-        {/* A receber */}
-        <div className="atlas-card">
-          <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Receipt size={15} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
-              <span className="atlas-panel-title">A receber</span>
-              {painel && painel.aReceber.length > 0 && <span className="atlas-badge atlas-badge-warning">{painel.aReceber.length}</span>}
-            </span>
-            <span style={{ fontSize: 13, fontFamily: "var(--font-mono)", fontWeight: 600 }}>{formatBRL(painel?.aReceberTotal ?? 0)}</span>
+      {/* 5 · Vendas */}
+      <section className="alm-dash-section">
+        <h2 className="alm-dash-section-title">Vendas</h2>
+        <div className="alm-dash-row">
+          <div className="atlas-card">
+            <div className="atlas-card-header" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <BarChart3 size={15} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
+              <span className="atlas-panel-title">Faturamento · últimos 6 meses</span>
+            </div>
+            <div className="atlas-card-body" style={{ padding: 0 }}>
+              {painel ? (
+                <GraficoFaturamento
+                  dados={painel.faturamentoMensal}
+                  ticketMedio={painel.ticketMedioMes}
+                  pedidosMes={painel.pedidosMes}
+                />
+              ) : null}
+            </div>
           </div>
-          <div className="atlas-card-body" style={{ padding: 0 }}>
-            <TabelaEncomendas
-              linhas={painel?.aReceber ?? []}
-              vazio="Nenhum saldo em aberto."
-            />
+
+          <div className="atlas-card">
+            <div className="atlas-card-header" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Trophy size={15} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
+              <span className="atlas-panel-title">Mais vendidos no mês</span>
+            </div>
+            <div className="atlas-card-body" style={{ padding: 0 }}>
+              {!painel || painel.maisVendidos.length === 0 ? (
+                <div className="atlas-empty" style={{ padding: 24 }}>
+                  <div className="atlas-empty-desc">Nenhum pedido no mês ainda.</div>
+                </div>
+              ) : (
+                <table className="atlas-table" style={{ width: "100%", border: 0 }}>
+                  <thead><tr><th>Produto</th><th className="num">Qtd</th><th className="num">Receita</th></tr></thead>
+                  <tbody>
+                    {painel.maisVendidos.map((p) => (
+                      <tr key={p.nome}>
+                        <td style={{ fontWeight: 500 }}>{p.nome}</td>
+                        <td className="num">{p.quantidade}</td>
+                        <td className="num">{formatBRL(p.receita)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         </div>
+      </section>
 
-        {/* Faturamento */}
+      {/* 6 · Instagram */}
+      <section className="alm-dash-section">
+        <h2 className="alm-dash-section-title">Instagram</h2>
         <div className="atlas-card">
-          <div className="atlas-card-header" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <BarChart3 size={15} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
-            <span className="atlas-panel-title">Faturamento · últimos 6 meses</span>
-          </div>
-          <div className="atlas-card-body" style={{ padding: 0 }}>
-            {painel ? <GraficoFaturamento dados={painel.faturamentoMensal} /> : null}
-          </div>
-        </div>
-
-        {/* Mais vendidos */}
-        <div className="atlas-card">
-          <div className="atlas-card-header" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Trophy size={15} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
-            <span className="atlas-panel-title">Mais vendidos no mês</span>
-          </div>
-          <div className="atlas-card-body" style={{ padding: 0 }}>
-            {!painel || painel.maisVendidos.length === 0 ? (
-              <div className="atlas-empty" style={{ padding: 24 }}>
-                <div className="atlas-empty-desc">Nenhum pedido no mês ainda.</div>
-              </div>
-            ) : (
-              <table className="atlas-table" style={{ width: "100%", border: 0 }}>
-                <thead><tr><th>Produto</th><th className="num">Qtd</th><th className="num">Receita</th></tr></thead>
-                <tbody>
-                  {painel.maisVendidos.map((p) => (
-                    <tr key={p.nome}>
-                      <td style={{ fontWeight: 500 }}>{p.nome}</td>
-                      <td className="num">{p.quantidade}</td>
-                      <td className="num">{formatBRL(p.receita)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-
-        {/* Instagram */}
-        <div className="atlas-card" style={{ gridColumn: "1 / -1" }}>
           <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Instagram size={15} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
-              <span className="atlas-panel-title">Instagram</span>
+              <span className="atlas-panel-title">Posts</span>
               {painel && painel.posts.atrasados.length > 0 && <span className="atlas-badge atlas-badge-warning">{painel.posts.atrasados.length} atrasado(s)</span>}
             </span>
             <Link href="/planejamento" className="atlas-link" style={{ fontSize: 13 }}>Abrir planejamento</Link>
           </div>
           <div className="atlas-card-body" style={{ padding: 0 }}>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "14px 16px 4px" }}>
+            <div className="alm-dash-chips">
               {(["ideia", "roteiro", "produzido", "agendado", "publicado"] as const).map((st) => (
                 <span key={st} className="atlas-badge" style={{ fontSize: 12 }}>
                   {ROTULO_STATUS[st]} · {painel?.posts.porStatus[st] ?? 0}
@@ -528,25 +550,29 @@ export default function DashboardPage() {
                 Publicados no mês · {painel?.posts.publicadosMes ?? 0}
               </span>
             </div>
-            <div className="alm-bento" style={{ gap: 0 }}>
+            <div className="alm-dash-split">
               <div>
-                <div style={{ padding: "10px 16px 0", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-tertiary)" }}>Atrasados</div>
+                <div className="alm-dash-subtitle">Atrasados</div>
                 <ListaPosts posts={painel?.posts.atrasados ?? []} vazio="Nenhum post atrasado." />
               </div>
               <div>
-                <div style={{ padding: "10px 16px 0", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-tertiary)" }}>Próximos 7 dias</div>
+                <div className="alm-dash-subtitle">Próximos 7 dias</div>
                 <ListaPosts posts={painel?.posts.proximos ?? []} vazio="Nenhum post para os próximos 7 dias." />
               </div>
             </div>
           </div>
         </div>
+      </section>
 
-        {/* Estoque em alerta */}
+      {/* 7 · Estoque */}
+      <section className="alm-dash-section">
+        <h2 className="alm-dash-section-title">Estoque</h2>
+        <div className="alm-dash-row">
           <div className="atlas-card">
             <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span className={`atlas-dot ${insumosAlerta.length > 0 ? "atlas-dot-error is-pulse" : ""}`} />
-                <span className="atlas-panel-title">Estoque em alerta</span>
+                <span className="atlas-panel-title">Insumos em alerta</span>
                 {insumosAlerta.length > 0 && <span className="atlas-badge atlas-badge-error">{insumosAlerta.length}</span>}
               </span>
               <Link href="/insumos" className="atlas-link" style={{ fontSize: 13 }}>Ver todos</Link>
@@ -577,18 +603,22 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Pronta entrega em alerta */}
-          {produtosAlerta.length > 0 && (
-            <div className="atlas-card">
-              <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span className="atlas-dot atlas-dot-warning is-pulse" />
-                  <span className="atlas-panel-title">Pronta entrega em alerta</span>
-                  <span className="atlas-badge atlas-badge-warning">{produtosAlerta.length}</span>
-                </span>
-                <Link href="/pronta-entrega" className="atlas-link" style={{ fontSize: 13 }}>Ver produtos</Link>
-              </div>
-              <div className="atlas-card-body" style={{ padding: 0 }}>
+          <div className="atlas-card">
+            <div className="atlas-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className={`atlas-dot ${produtosAlerta.length > 0 ? "atlas-dot-warning is-pulse" : ""}`} />
+                <span className="atlas-panel-title">Pronta entrega em alerta</span>
+                {produtosAlerta.length > 0 && <span className="atlas-badge atlas-badge-warning">{produtosAlerta.length}</span>}
+              </span>
+              <Link href="/pronta-entrega" className="atlas-link" style={{ fontSize: 13 }}>Ver produtos</Link>
+            </div>
+            <div className="atlas-card-body" style={{ padding: produtosAlerta.length === 0 ? undefined : 0 }}>
+              {produtosAlerta.length === 0 ? (
+                <div className="atlas-empty" style={{ padding: 24 }}>
+                  <div className="atlas-empty-title">Nenhum alerta</div>
+                  <div className="atlas-empty-desc">Todos os produtos estão acima do mínimo.</div>
+                </div>
+              ) : (
                 <table className="atlas-table" style={{ width: "100%", border: 0 }}>
                   <thead><tr><th>Produto</th><th className="num">Em estoque</th><th className="num">Mínimo</th></tr></thead>
                   <tbody>
@@ -604,10 +634,11 @@ export default function DashboardPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              )}
             </div>
-          )}
-      </div>
+          </div>
+        </div>
+      </section>
 
       {/* Modais */}
       <Modal open={modal === "encomenda"} onClose={() => setModal(null)} title="Nova encomenda" wide>
