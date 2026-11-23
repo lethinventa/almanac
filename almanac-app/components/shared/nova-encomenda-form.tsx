@@ -12,7 +12,7 @@ import { Combobox } from "@/components/shared/combobox";
 import { Modal } from "@/components/shared/modal";
 import { ClienteForm } from "@/components/shared/cliente-form";
 import type { ProdutoCalculado } from "@/lib/repositories/produtos";
-import type { EmbalagemEncomenda, EncomendaInput } from "@/lib/repositories/encomendas";
+import type { EmbalagemEncomenda, EncomendaInput, EncomendaItem } from "@/lib/repositories/encomendas";
 import { buscarClientes, criarCliente, type Cliente, type ClienteInput } from "@/lib/repositories/clientes";
 import { buscarInsumos, type Insumo } from "@/lib/repositories/insumos";
 import { EmbalagensPedido } from "@/components/shared/embalagens-pedido";
@@ -34,6 +34,25 @@ interface ItemRow {
   produtoId: string;
   quantidade: string;
   precoUnitario: string;
+  // Item avulso: feito uma vez para o cliente, sem cadastro no catálogo.
+  avulso?: boolean;
+  descricao?: string;
+  custoUnitario?: string;
+}
+
+// Converte uma linha do formulário no item salvo na encomenda.
+function paraItemEncomenda(r: ItemRow, precoUnitario: number): EncomendaItem {
+  const base = {
+    produtoId: r.avulso ? "" : r.produtoId,
+    quantidade: parseFloat(r.quantidade) || 1,
+    precoUnitario,
+  };
+  if (!r.avulso) return base;
+  return {
+    ...base,
+    descricao: r.descricao?.trim() || "Item avulso",
+    custoUnitario: parseFloat(r.custoUnitario ?? "") || 0,
+  };
 }
 
 interface LinkUtil {
@@ -184,8 +203,10 @@ export function NovaEncomendaForm({
   const temValorCobrado = valorCobrado.trim() !== "" && !isNaN(valorCobradoNum);
   const total = temValorCobrado ? valorCobradoNum : totalAutomatico;
   const custoItens = itens.reduce((s, r) => {
-    const prod = produtos.find((p) => p.id === r.produtoId);
-    return s + (prod?.custo ?? 0) * (parseFloat(r.quantidade) || 0);
+    const custoUnit = r.avulso
+      ? parseFloat(r.custoUnitario ?? "") || 0
+      : produtos.find((p) => p.id === r.produtoId)?.custo ?? 0;
+    return s + custoUnit * (parseFloat(r.quantidade) || 0);
   }, 0);
   const custoEmbalagens = embalagens.reduce((s, e) => s + e.quantidade * e.custoUnitario, 0);
   const custo = custoItens + custoEmbalagens;
@@ -196,6 +217,12 @@ export function NovaEncomendaForm({
     setItens((prev) => [
       ...prev,
       { produtoId: produtos[0]?.id ?? "", quantidade: "1", precoUnitario: String(produtos[0]?.precoVendaEfetivo ?? 0) },
+    ]);
+
+  const addItemAvulso = () =>
+    setItens((prev) => [
+      ...prev,
+      { produtoId: "", quantidade: "1", precoUnitario: "", avulso: true, descricao: "", custoUnitario: "" },
     ]);
 
   const removeItem = (idx: number) =>
@@ -244,6 +271,7 @@ export function NovaEncomendaForm({
     !nomeCliente && "cliente",
     !dataEntrega && (pessoal ? "data prevista" : "data de entrega"),
     itens.length === 0 && "ao menos um item",
+    itens.some((r) => r.avulso && !r.descricao?.trim()) && "descrição do item avulso",
   ].filter(Boolean) as string[];
   const canSave = camposFaltando.length === 0;
 
@@ -258,11 +286,7 @@ export function NovaEncomendaForm({
         status: "aguardando",
         dataPedido: hoje,
         dataEntrega,
-        itens: itens.map((r) => ({
-          produtoId: r.produtoId,
-          quantidade: parseFloat(r.quantidade) || 1,
-          precoUnitario: 0,
-        })),
+        itens: itens.map((r) => paraItemEncomenda(r, 0)),
         desconto: 0,
         valorCobrado: null,
         totalCobrado: 0,
@@ -276,11 +300,7 @@ export function NovaEncomendaForm({
     }
     setGerando(true);
     setErroOrcamento("");
-    const itensSalvos = itens.map((r) => ({
-      produtoId: r.produtoId,
-      quantidade: parseFloat(r.quantidade) || 1,
-      precoUnitario: parseFloat(r.precoUnitario) || 0,
-    }));
+    const itensSalvos = itens.map((r) => paraItemEncomenda(r, parseFloat(r.precoUnitario) || 0));
     try {
       // Toda encomenda leva a imagem de orçamento, no mesmo modelo do módulo Orçamento.
       const orcamentoImagem = await gerarOrcamentoEncomenda({
@@ -288,7 +308,7 @@ export function NovaEncomendaForm({
         prazo: formatDate(dataEntrega),
         data: hoje,
         linhas: itensSalvos.map((i) => ({
-          descricao: produtos.find((p) => p.id === i.produtoId)?.nome ?? "Item",
+          descricao: produtos.find((p) => p.id === i.produtoId)?.nome ?? i.descricao ?? "Item",
           quantidade: i.quantidade,
           precoUnitario: i.precoUnitario,
           subtotal: i.quantidade * i.precoUnitario,
@@ -366,6 +386,9 @@ export function NovaEncomendaForm({
             Itens do pedido
           </label>
           <div style={{ display: "flex", gap: 6 }}>
+            <button type="button" className="atlas-btn atlas-btn-ghost atlas-btn-sm" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11 }} onClick={addItemAvulso}>
+              <Plus size={11} strokeWidth={1.5} />Item avulso
+            </button>
             <button type="button" className="atlas-btn atlas-btn-ghost atlas-btn-sm" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11 }} onClick={irCadastrarProduto}>
               <Plus size={11} strokeWidth={1.5} />Cadastrar novo produto
             </button>
@@ -381,10 +404,14 @@ export function NovaEncomendaForm({
             const sub = q * p;
             return (
               <div key={idx} style={{ display: "grid", gridTemplateColumns: pessoal ? "minmax(0, 1fr) 64px 24px" : "minmax(0, 1fr) 64px 88px 72px 24px", gap: 6, alignItems: "center" }}>
-                <select className="alm-select" style={{ height: 32, fontSize: 12, width: "100%", minWidth: 0, textOverflow: "ellipsis" }} value={row.produtoId} onChange={(e) => updateItem(idx, "produtoId", e.target.value)}>
-                  {produtos.length === 0 && <option value="" disabled>Nenhum produto cadastrado</option>}
-                  {produtos.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                </select>
+                {row.avulso ? (
+                  <input className="atlas-input" placeholder="Descrição do item (ex: Convite casamento)" style={{ height: 32, fontSize: 12, minWidth: 0 }} value={row.descricao ?? ""} onChange={(e) => updateItem(idx, "descricao", e.target.value)} />
+                ) : (
+                  <select className="alm-select" style={{ height: 32, fontSize: 12, width: "100%", minWidth: 0, textOverflow: "ellipsis" }} value={row.produtoId} onChange={(e) => updateItem(idx, "produtoId", e.target.value)}>
+                    {produtos.length === 0 && <option value="" disabled>Nenhum produto cadastrado</option>}
+                    {produtos.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                  </select>
+                )}
                 <input className="atlas-input" type="number" min="1" placeholder="Qtd" style={{ fontSize: 12 }} value={row.quantidade} onChange={(e) => updateItem(idx, "quantidade", e.target.value)} />
                 {!pessoal && (
                   <>
@@ -397,6 +424,13 @@ export function NovaEncomendaForm({
                 <button type="button" title="Remover item" aria-label="Remover item" onClick={() => removeItem(idx)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-tertiary)", padding: 0, width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <Trash2 size={13} strokeWidth={1.5} />
                 </button>
+                {row.avulso && (
+                  <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-tertiary)" }}>
+                    <span>Custo unitário (R$)</span>
+                    <input className="atlas-input" type="number" min="0" step="0.01" placeholder="0,00" style={{ fontSize: 12, width: 110 }} value={row.custoUnitario ?? ""} onChange={(e) => updateItem(idx, "custoUnitario", e.target.value)} />
+                    <span>Usado na margem. Não tem cadastro no catálogo.</span>
+                  </div>
+                )}
               </div>
             );
           })}
