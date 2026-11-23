@@ -6,7 +6,6 @@ import { Check, X, Truck, ExternalLink, Pencil } from "lucide-react";
 import { formatBRL, formatDate } from "@/lib/utils";
 import { gerarOrcamentoEncomenda } from "@/lib/orcamento-encomenda";
 import "./orcamento.css";
-import { EditarOrcamentoModal } from "./editar-orcamento-modal";
 import {
   listarOrcamentos,
   recusarOrcamento,
@@ -30,7 +29,6 @@ export function OrcamentosEnviados({ refreshKey }: { refreshKey: number }) {
   const [aprovandoId, setAprovandoId] = useState<string | null>(null);
   const [dataEntrega, setDataEntrega] = useState("");
   const [ocupado, setOcupado] = useState(false);
-  const [editando, setEditando] = useState<Orcamento | null>(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -144,15 +142,13 @@ export function OrcamentosEnviados({ refreshKey }: { refreshKey: number }) {
 
                           {orc.status !== "aprovado" && !aprovando && (
                             <div className="orc-acoes-linha" style={{ marginTop: 12 }}>
-                              <button
-                                type="button"
+                              <Link
+                                href={`/orcamento?editar=${orc.id}`}
                                 className="atlas-btn atlas-btn-secondary atlas-btn-sm"
-                                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                                disabled={ocupado}
-                                onClick={() => setEditando(orc)}
+                                style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}
                               >
                                 <Pencil size={13} strokeWidth={1.5} /> Editar orçamento
-                              </button>
+                              </Link>
                             </div>
                           )}
 
@@ -232,8 +228,6 @@ export function OrcamentosEnviados({ refreshKey }: { refreshKey: number }) {
           </table>
         </div>
       )}
-
-      <EditarOrcamentoModal orcamento={editando} onClose={() => setEditando(null)} onSalvo={carregar} />
     </section>
   );
 }

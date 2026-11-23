@@ -4,7 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Trash2, Copy, Check, RotateCcw, Package, Download, Share2, ImageIcon, ImagePlus, Send } from "lucide-react";
 import { lerImagem } from "@/lib/imagem";
-import { registrarOrcamentoEnviado } from "@/lib/repositories/orcamentos";
+import {
+  editarOrcamento,
+  listarOrcamentos,
+  registrarOrcamentoEnviado,
+  type Orcamento,
+} from "@/lib/repositories/orcamentos";
 import { formatBRL } from "@/lib/utils";
 import { buscarInsumos, type Insumo } from "@/lib/repositories/insumos";
 import { buscarConfiguracoes, type Configuracoes } from "@/lib/repositories/configuracoes";
@@ -373,14 +378,40 @@ export default function OrcamentoPage() {
   const [salvandoEnvio, setSalvandoEnvio] = useState(false);
   const [envioRegistrado, setEnvioRegistrado] = useState(false);
   const [foto, setFoto] = useState<string | null>(null);
+  // Orçamento registrado que está sendo corrigido (?editar=<id>). Ao salvar, atualiza o mesmo registro.
+  const [editandoOrc, setEditandoOrc] = useState<Orcamento | null>(null);
 
   useEffect(() => {
+    const editarId = new URLSearchParams(window.location.search).get("editar");
     Promise.all([buscarConfiguracoes(), buscarTotalCustosIndiretos(), buscarInsumos()]).then(
       ([cfg, custos, ins]) => {
         setConfig(cfg);
         setTotalCustos(custos);
         setInsumos(ins);
         setItens([novoItem(cfg.multiplicadorPreco, novoId())]);
+        if (!editarId) return;
+        listarOrcamentos().then((lista) => {
+          const orc = lista.find((o) => o.id === editarId);
+          if (!orc || orc.status === "aprovado") return;
+          setEditandoOrc(orc);
+          setCliente(orc.cliente);
+          setPrazo(orc.prazo);
+          setDesconto(orc.desconto || null);
+          // O orçamento guarda só o resultado: cada item volta com o custo como material
+          // e o preço gravado como preço manual, para reproduzir os mesmos valores.
+          setItens(
+            orc.itens.map((i) => ({
+              id: novoId(),
+              descricao: i.descricao,
+              quantidade: i.quantidade,
+              insumos: [],
+              materialAvulso: i.custoUnitario,
+              tempoMin: 0,
+              multiplicador: cfg.multiplicadorPreco,
+              precoManual: i.precoUnitario,
+            }))
+          );
+        });
       }
     );
   }, []);
@@ -420,17 +451,26 @@ export default function OrcamentoPage() {
     if (itensSalvos.length === 0) return;
     setSalvandoEnvio(true);
     try {
-      await registrarOrcamentoEnviado({
-        cliente: cliente.trim(),
-        prazo: prazo.trim(),
-        enviadoEm: new Date().toISOString(),
-        itens: itensSalvos,
-        subtotal: resumo.subtotal,
-        desconto: resumo.desconto,
-        total: resumo.total,
-        custoTotal: custoEnviado,
-        margem: margemEnviada,
-      });
+      if (editandoOrc) {
+        await editarOrcamento(editandoOrc.id, {
+          cliente: cliente.trim(),
+          prazo: prazo.trim(),
+          desconto: resumo.desconto,
+          itens: itensSalvos,
+        });
+      } else {
+        await registrarOrcamentoEnviado({
+          cliente: cliente.trim(),
+          prazo: prazo.trim(),
+          enviadoEm: new Date().toISOString(),
+          itens: itensSalvos,
+          subtotal: resumo.subtotal,
+          desconto: resumo.desconto,
+          total: resumo.total,
+          custoTotal: custoEnviado,
+          margem: margemEnviada,
+        });
+      }
       setEnvioRegistrado(true);
       setTimeout(() => setEnvioRegistrado(false), 2500);
     } catch (err) {
@@ -471,6 +511,7 @@ export default function OrcamentoPage() {
   const removerItem = (id: string) => setItens((prev) => prev.filter((i) => i.id !== id));
 
   const novoOrcamento = () => {
+    setEditandoOrc(null);
     setCliente("");
     setPrazo("");
     setDesconto(null);
@@ -499,6 +540,13 @@ export default function OrcamentoPage() {
           Novo orçamento
         </button>
       </div>
+
+      {editandoOrc && (
+        <div className="orc-erro" style={{ marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <span>Editando o orçamento de {editandoOrc.cliente.trim() || "Sem nome"}. Ao salvar, o registro é atualizado.</span>
+          <Link href="/orcamentos" className="orc-link">Voltar para orçamentos</Link>
+        </div>
+      )}
 
       {taxaHoraria(config, totalCustos) === 0 && (
         <div className="orc-erro" style={{ marginBottom: 12 }}>
@@ -620,7 +668,9 @@ export default function OrcamentoPage() {
               disabled={itensSalvos.length === 0 || salvandoEnvio}
             >
               {envioRegistrado ? <Check size={14} strokeWidth={1.5} /> : <Send size={14} strokeWidth={1.5} />}
-              {envioRegistrado ? "Orçamento registrado!" : salvandoEnvio ? "Registrando…" : "Registrar como enviado"}
+              {envioRegistrado
+                ? editandoOrc ? "Alterações salvas!" : "Orçamento registrado!"
+                : salvandoEnvio ? "Salvando…" : editandoOrc ? "Salvar alterações" : "Registrar como enviado"}
             </button>
             <span className="orc-ajuda">Salva o orçamento para acompanhar a aprovação em <Link href="/orcamentos">Orçamentos</Link>.</span>
           </div>
