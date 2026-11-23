@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Plus, Trash2, Package, ImagePlus, Link2, FileText,
 } from "lucide-react";
@@ -8,14 +9,26 @@ import { formatBRL, formatDate } from "@/lib/utils";
 import { lerImagem } from "@/lib/imagem";
 import { gerarOrcamentoEncomenda } from "@/lib/orcamento-encomenda";
 import { Combobox } from "@/components/shared/combobox";
+import { Modal } from "@/components/shared/modal";
+import { ClienteForm } from "@/components/shared/cliente-form";
 import type { ProdutoCalculado } from "@/lib/repositories/produtos";
 import type { EmbalagemEncomenda, EncomendaInput } from "@/lib/repositories/encomendas";
-import { buscarClientes, type Cliente } from "@/lib/repositories/clientes";
+import { buscarClientes, criarCliente, type Cliente, type ClienteInput } from "@/lib/repositories/clientes";
 import { buscarInsumos, type Insumo } from "@/lib/repositories/insumos";
 import { EmbalagensPedido } from "@/components/shared/embalagens-pedido";
 
 // Valor fixo no select de cliente: encomenda para uso próprio (não é venda).
 const PESSOAL = "__pessoal__";
+// Valor fixo no select de cliente: abre o cadastro rápido de cliente.
+const NOVO_CLIENTE = "__novo_cliente__";
+
+// Rota de retorno usada pelo cadastro de produto (?retorno=...).
+export const ROTA_NOVA_ENCOMENDA = "/encomendas/nova";
+
+// ── Rascunho ─────────────────────────────────────────────────
+// O pedido em andamento é guardado na aba (sessionStorage), para não se perder
+// ao sair para cadastrar um produto ou ao recarregar a página.
+const CHAVE_RASCUNHO = "almanac:rascunho-encomenda";
 
 interface ItemRow {
   produtoId: string;
@@ -26,6 +39,49 @@ interface ItemRow {
 interface LinkUtil {
   label: string;
   url: string;
+}
+
+interface Rascunho {
+  clienteSel: string;
+  canal: "whatsapp" | "presencial";
+  dataEntrega: string;
+  itens: ItemRow[];
+  desconto: string;
+  valorCobrado: string;
+  links: LinkUtil[];
+  obs: string;
+  embalagens: EmbalagemEncomenda[];
+  foto: string | null;
+}
+
+export function lerRascunho(): Rascunho | null {
+  try {
+    const raw = sessionStorage.getItem(CHAVE_RASCUNHO);
+    return raw ? (JSON.parse(raw) as Rascunho) : null;
+  } catch {
+    return null;
+  }
+}
+
+function gravarRascunho(r: Rascunho) {
+  try {
+    sessionStorage.setItem(CHAVE_RASCUNHO, JSON.stringify(r));
+  } catch {
+    // Foto grande pode estourar a cota: guarda o resto sem a imagem.
+    try {
+      sessionStorage.setItem(CHAVE_RASCUNHO, JSON.stringify({ ...r, foto: null }));
+    } catch {
+      // Sem espaço disponível: o pedido só vive na tela.
+    }
+  }
+}
+
+export function limparRascunho() {
+  try {
+    sessionStorage.removeItem(CHAVE_RASCUNHO);
+  } catch {
+    // ignorado
+  }
 }
 
 function FotoUploadSmall({ value, onChange }: { value: string | null; onChange: (url: string) => void }) {
@@ -52,44 +108,74 @@ function FotoUploadSmall({ value, onChange }: { value: string | null; onChange: 
 
 export function NovaEncomendaForm({
   onSave,
-  onClose,
+  onCancelar,
   produtos,
+  produtoCriadoId,
 }: {
   onSave: (enc: EncomendaInput) => void;
-  onClose: () => void;
+  onCancelar: () => void;
   produtos: ProdutoCalculado[];
+  // Produto recém-cadastrado (volta do cadastro de produto): entra como novo item.
+  produtoCriadoId?: string | null;
 }) {
+  const router = useRouter();
   const hoje = new Date().toISOString().slice(0, 10);
 
-  const [foto, setFoto] = useState<string | null>(null);
+  // Rascunho lido uma única vez, na montagem (o formulário só monta no cliente).
+  const [rascunho] = useState<Rascunho | null>(() => lerRascunho());
+
+  const [foto, setFoto] = useState<string | null>(rascunho?.foto ?? null);
   // Seleção do campo Cliente: id de um cliente cadastrado, ou PESSOAL.
-  const [clienteSel, setClienteSel] = useState("");
+  const [clienteSel, setClienteSel] = useState(rascunho?.clienteSel ?? "");
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [novoClienteAberto, setNovoClienteAberto] = useState(false);
   const pessoal = clienteSel === PESSOAL;
   const nomeCliente = pessoal ? "Pessoal" : clientes.find((c) => c.id === clienteSel)?.nome ?? "";
-  const [canal, setCanal] = useState<"whatsapp" | "presencial">("whatsapp");
-  const [dataEntrega, setDataEntrega] = useState("");
+  const [canal, setCanal] = useState<"whatsapp" | "presencial">(rascunho?.canal ?? "whatsapp");
+  const [dataEntrega, setDataEntrega] = useState(rascunho?.dataEntrega ?? "");
   const [itens, setItens] = useState<ItemRow[]>(
-    produtos.length > 0
-      ? [{ produtoId: produtos[0].id, quantidade: "1", precoUnitario: String(produtos[0].precoVendaEfetivo) }]
-      : []
+    rascunho?.itens ??
+      (produtos.length > 0
+        ? [{ produtoId: produtos[0].id, quantidade: "1", precoUnitario: String(produtos[0].precoVendaEfetivo) }]
+        : [])
   );
-  const [desconto, setDesconto] = useState("0");
+  const [desconto, setDesconto] = useState(rascunho?.desconto ?? "0");
   // Valor realmente cobrado do cliente. Vazio = calculado pelos itens menos o desconto.
-  const [valorCobrado, setValorCobrado] = useState("");
-  const [links, setLinks] = useState<LinkUtil[]>([]);
+  const [valorCobrado, setValorCobrado] = useState(rascunho?.valorCobrado ?? "");
+  const [links, setLinks] = useState<LinkUtil[]>(rascunho?.links ?? []);
   const [novoLinkLabel, setNovoLinkLabel] = useState("");
   const [novoLinkUrl, setNovoLinkUrl] = useState("");
-  const [obs, setObs] = useState("");
+  const [obs, setObs] = useState(rascunho?.obs ?? "");
   const [gerando, setGerando] = useState(false);
   const [erroOrcamento, setErroOrcamento] = useState("");
-  const [embalagens, setEmbalagens] = useState<EmbalagemEncomenda[]>([]);
+  const [embalagens, setEmbalagens] = useState<EmbalagemEncomenda[]>(rascunho?.embalagens ?? []);
   const [insumos, setInsumos] = useState<Insumo[]>([]);
 
   useEffect(() => {
     buscarInsumos().then(setInsumos);
     buscarClientes().then(setClientes);
   }, []);
+
+  // Volta do cadastro de produto: adiciona o produto novo como item e limpa o parâmetro da URL.
+  const produtoAdicionado = useRef(false);
+  useEffect(() => {
+    if (!produtoCriadoId || produtoAdicionado.current) return;
+    const prod = produtos.find((p) => p.id === produtoCriadoId);
+    if (!prod) return;
+    produtoAdicionado.current = true;
+    setItens((prev) => [
+      ...prev,
+      { produtoId: prod.id, quantidade: "1", precoUnitario: String(prod.precoVendaEfetivo) },
+    ]);
+    window.history.replaceState(null, "", ROTA_NOVA_ENCOMENDA);
+  }, [produtoCriadoId, produtos]);
+
+  // Autosave do rascunho a cada mudança.
+  useEffect(() => {
+    gravarRascunho({
+      clienteSel, canal, dataEntrega, itens, desconto, valorCobrado, links, obs, embalagens, foto,
+    });
+  }, [clienteSel, canal, dataEntrega, itens, desconto, valorCobrado, links, obs, embalagens, foto]);
 
   const subtotal = itens.reduce((s, r) => s + (parseFloat(r.quantidade) || 0) * (parseFloat(r.precoUnitario) || 0), 0);
   const descontoNum = parseFloat(desconto) || 0;
@@ -126,6 +212,26 @@ export function NovaEncomendaForm({
         return { ...r, [field]: value };
       })
     );
+
+  // Sai para o cadastro de produto; o pedido fica guardado no rascunho e volta aqui.
+  const irCadastrarProduto = () => {
+    router.push(`/produtos?novo=1&retorno=${encodeURIComponent(ROTA_NOVA_ENCOMENDA)}`);
+  };
+
+  const handleSelecionarCliente = (v: string) => {
+    if (v === NOVO_CLIENTE) {
+      setNovoClienteAberto(true);
+      return;
+    }
+    setClienteSel(v);
+  };
+
+  const handleCriarCliente = async (dados: ClienteInput) => {
+    const novo = await criarCliente(dados);
+    setClientes(await buscarClientes());
+    setClienteSel(novo.id);
+    setNovoClienteAberto(false);
+  };
 
   const addLink = () => {
     if (!novoLinkUrl.trim()) return;
@@ -224,10 +330,11 @@ export function NovaEncomendaForm({
           <label className="alm-label">Cliente</label>
           <Combobox
             value={clienteSel}
-            onChange={setClienteSel}
+            onChange={handleSelecionarCliente}
             options={[
               { value: "", label: "Selecione…" },
               { value: PESSOAL, label: "Pessoal" },
+              { value: NOVO_CLIENTE, label: "+ Cadastrar novo cliente" },
               ...clientes.map((c) => ({ value: c.id, label: c.nome })),
             ]}
           />
@@ -253,14 +360,19 @@ export function NovaEncomendaForm({
       </div>
 
       <div className="alm-field">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 8 }}>
           <label className="alm-label" style={{ display: "flex", alignItems: "center", gap: 5 }}>
             <Package size={11} strokeWidth={1.5} />
             Itens do pedido
           </label>
-          <button type="button" className="atlas-btn atlas-btn-ghost atlas-btn-sm" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11 }} onClick={addItem}>
-            <Plus size={11} strokeWidth={1.5} />Adicionar
-          </button>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button type="button" className="atlas-btn atlas-btn-ghost atlas-btn-sm" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11 }} onClick={irCadastrarProduto}>
+              <Plus size={11} strokeWidth={1.5} />Cadastrar novo produto
+            </button>
+            <button type="button" className="atlas-btn atlas-btn-ghost atlas-btn-sm" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11 }} onClick={addItem}>
+              <Plus size={11} strokeWidth={1.5} />Adicionar
+            </button>
+          </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {itens.map((row, idx) => {
@@ -365,11 +477,15 @@ export function NovaEncomendaForm({
             Falta preencher: {camposFaltando.join(", ")}
           </span>
         ) : null}
-        <button type="button" className="atlas-btn atlas-btn-secondary atlas-btn-sm" onClick={onClose}>Cancelar</button>
+        <button type="button" className="atlas-btn atlas-btn-secondary atlas-btn-sm" onClick={onCancelar}>Cancelar</button>
         <button type="button" className="atlas-btn atlas-btn-primary atlas-btn-sm" disabled={!canSave || gerando} style={{ opacity: canSave && !gerando ? 1 : 0.4 }} onClick={handleSave}>
           {gerando ? "Gerando orçamento…" : "Criar encomenda"}
         </button>
       </div>
+
+      <Modal open={novoClienteAberto} onClose={() => setNovoClienteAberto(false)} title="Novo cliente">
+        <ClienteForm onSave={handleCriarCliente} onClose={() => setNovoClienteAberto(false)} />
+      </Modal>
     </>
   );
 }

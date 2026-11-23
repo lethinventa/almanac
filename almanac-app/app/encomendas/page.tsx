@@ -18,96 +18,21 @@ import {
   statusLabels,
   statusBadge,
 } from "@/lib/utils";
-import { buscarEncomendas, criarEncomenda, atualizarStatus, isPessoal, type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
-import { buscarProdutos, type ProdutoCalculado } from "@/lib/repositories/produtos";
+import { buscarEncomendas, atualizarStatus, isPessoal, type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
 import { buscarTodosPagamentos } from "@/lib/repositories/pagamentos";
 import { KanbanBoard } from "@/components/kanban-board";
-import { NovaEncomendaForm } from "@/components/shared/nova-encomenda-form";
-
-type ModalMode = "nova" | null;
-
-// ── Modal wrapper ────────────────────────────────────────────
-function Modal({
-  open,
-  onClose,
-  title,
-  wide,
-  children,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  wide?: boolean;
-  children: React.ReactNode;
-}) {
-  const [mounted, setMounted] = useState(false);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      setMounted(true);
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => setVisible(true))
-      );
-    } else {
-      setVisible(false);
-      const t = setTimeout(() => setMounted(false), 340);
-      return () => clearTimeout(t);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    if (open) document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!mounted) return null;
-
-  return (
-    <>
-      <div
-        className={`alm-backdrop${visible ? " is-open" : ""}`}
-        onClick={onClose}
-      />
-      <div
-        className={`alm-modal${wide ? " is-wide" : ""}${
-          visible ? " is-open" : ""
-        }`}
-      >
-        <div className="alm-modal-header">
-          <span className="alm-modal-title">{title}</span>
-          <button
-            className="atlas-btn atlas-btn-ghost atlas-btn-sm"
-            style={{ padding: "0 4px" }}
-            onClick={onClose}
-          >
-            <X size={14} strokeWidth={1.5} />
-          </button>
-        </div>
-        <div className="alm-modal-body">{children}</div>
-      </div>
-    </>
-  );
-}
-
 
 // ── Page ─────────────────────────────────────────────────────
 export default function EncomendasPage() {
   const router = useRouter();
   const [lista, setLista] = useState<Encomenda[]>([]);
-  const [produtosList, setProdutosList] = useState<ProdutoCalculado[]>([]);
   const [busca, setBusca] = useState("");
   const [filtroTipo, setFiltroTipo] = useState<"todas" | "clientes" | "pessoal">("todas");
   const [view, setView] = useState<"kanban" | "lista">("kanban");
-  const [mode, setMode] = useState<ModalMode>(null);
   const [recebidoPorEncomenda, setRecebidoPorEncomenda] = useState<Record<string, number>>({});
 
   useEffect(() => {
     buscarEncomendas().then(setLista);
-    buscarProdutos().then(setProdutosList);
     buscarTodosPagamentos().then((todos) => {
       const totais: Record<string, number> = {};
       for (const [encId, pags] of Object.entries(todos)) {
@@ -117,11 +42,12 @@ export default function EncomendasPage() {
     });
   }, []);
 
+  // Atalho antigo /encomendas?novo=1 agora leva para a página de nova encomenda.
   useEffect(() => {
     if (typeof window !== "undefined" && window.location.search.includes("novo=1")) {
-      setMode("nova");
+      router.replace("/encomendas/nova");
     }
-  }, []);
+  }, [router]);
 
   const filtrados = lista.filter(
     (e) =>
@@ -133,17 +59,9 @@ export default function EncomendasPage() {
 
   const goDetalhe = (e: Encomenda) => router.push(`/encomendas/${e.id}`);
 
-  const close = () => setMode(null);
-
   const handleStatusChange = (id: string, status: EncomendaStatus) => {
     atualizarStatus(id, status);
     setLista((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
-  };
-
-  const handleNova = async (enc: import("@/lib/repositories/encomendas").EncomendaInput) => {
-    const nova = await criarEncomenda(enc);
-    close();
-    router.push(`/encomendas/${nova.id}`);
   };
 
   const abertas = lista.filter((e) => e.status !== "entregue" && e.status !== "cancelado");
@@ -192,7 +110,7 @@ export default function EncomendasPage() {
           <button
             className="atlas-btn atlas-btn-primary atlas-btn-sm"
             style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-            onClick={() => setMode("nova")}
+            onClick={() => router.push("/encomendas/nova")}
           >
             <Plus size={13} strokeWidth={1.5} />
             Nova encomenda
@@ -320,10 +238,6 @@ export default function EncomendasPage() {
         </div>
       )}
 
-      {/* Modal nova encomenda */}
-      <Modal open={mode === "nova"} onClose={close} title="Nova encomenda" wide>
-        <NovaEncomendaForm onSave={handleNova} onClose={close} produtos={produtosList} />
-      </Modal>
     </div>
   );
 }

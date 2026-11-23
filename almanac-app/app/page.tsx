@@ -11,7 +11,7 @@ import { KanbanWidget } from "@/components/kanban-widget";
 import { formatBRL, formatDate, categoriaLabel, statusLabels } from "@/lib/utils";
 import { calcularPainelAdmin, type PainelAdmin, type ResumoEncomenda } from "@/lib/dashboard-admin";
 import { buscarInsumos, criarInsumo, type Insumo, type InsumoCategoria } from "@/lib/repositories/insumos";
-import { buscarProdutos, type ProdutoCalculado } from "@/lib/repositories/produtos";
+import { buscarProdutos } from "@/lib/repositories/produtos";
 import { buscarCustosIndiretos } from "@/lib/repositories/financeiro";
 import { buscarTodosPagamentos } from "@/lib/repositories/pagamentos";
 import { buscarPosts, ROTULO_STATUS, ROTULO_FORMATO, type PostInstagram } from "@/lib/repositories/planejamento-instagram";
@@ -23,8 +23,7 @@ import {
   calcularLucroTotal,
 } from "@/lib/fluxo-caixa";
 import { buscarProdutosPE, type ProdutoPE } from "@/lib/repositories/pronta-entrega";
-import { buscarEncomendas, criarEncomenda, isPessoal, type Encomenda, type EncomendaInput } from "@/lib/repositories/encomendas";
-import { NovaEncomendaForm } from "@/components/shared/nova-encomenda-form";
+import { buscarEncomendas, isPessoal, type Encomenda } from "@/lib/repositories/encomendas";
 
 // ── Modal wrapper ─────────────────────────────────────────────
 function Modal({ open, onClose, title, wide, children, footer }: {
@@ -322,7 +321,7 @@ function GraficoFaturamento({ dados, ticketMedio, pedidosMes }: {
 }
 
 // ── Page ──────────────────────────────────────────────────────
-type ModalType = "encomenda" | "insumo" | null;
+type ModalType = "insumo" | null;
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -332,7 +331,6 @@ export default function DashboardPage() {
   const [encomendasAbertas, setEncomendasAbertas] = useState<Encomenda[]>([]);
   const [fluxo, setFluxo] = useState({ entradas: 0, saidas: 0, saldo: 0 });
   const [lucroTotal, setLucroTotal] = useState(0);
-  const [produtosList, setProdutosList] = useState<ProdutoCalculado[]>([]);
   const [painel, setPainel] = useState<PainelAdmin | null>(null);
 
   useEffect(() => {
@@ -349,7 +347,6 @@ export default function DashboardPage() {
       setProdutosAlerta(prontaEntrega.filter(p => p.estoqueAtual <= p.estoqueMin));
       const abertas = encs.filter(e => e.status !== 'entregue' && e.status !== 'cancelado' && !isPessoal(e));
       setEncomendasAbertas(abertas);
-      setProdutosList(prods);
       setPainel(calcularPainelAdmin(encs, pagamentos, new Map(prods.map((p) => [p.id, p.nome])), posts));
       // Mesmos números do Financeiro (fluxo de caixa do mês atual)
       const { inicio, fim } = getPeriodRange("mes", "", "");
@@ -361,12 +358,6 @@ export default function DashboardPage() {
     });
   }, []);
 
-  const handleNovaDashboard = async (enc: EncomendaInput) => {
-    const nova = await criarEncomenda(enc);
-    setModal(null);
-    router.push(`/encomendas/${nova.id}`);
-  };
-
   return (
     <div className="alm-page">
       <div className="alm-page-header" style={{ justifyContent: "flex-end" }}>
@@ -377,7 +368,7 @@ export default function DashboardPage() {
           <button className="atlas-btn atlas-btn-secondary" onClick={() => router.push("/produtos?novo=1")}>
             <Plus size={15} strokeWidth={2} />Novo produto
           </button>
-          <button className="atlas-btn atlas-btn-primary" onClick={() => setModal("encomenda")}>
+          <button className="atlas-btn atlas-btn-primary" onClick={() => router.push("/encomendas/nova")}>
             <Plus size={15} strokeWidth={2} />Nova encomenda
           </button>
         </div>
@@ -641,9 +632,6 @@ export default function DashboardPage() {
       </section>
 
       {/* Modais */}
-      <Modal open={modal === "encomenda"} onClose={() => setModal(null)} title="Nova encomenda" wide>
-        <NovaEncomendaForm onSave={handleNovaDashboard} onClose={() => setModal(null)} produtos={produtosList} />
-      </Modal>
       <Modal open={modal === "insumo"} onClose={() => setModal(null)} title="Novo insumo">
         <NovoInsumoForm onClose={() => setModal(null)} />
       </Modal>

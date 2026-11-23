@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Box,
   X,
@@ -1125,6 +1126,9 @@ export default function ProdutosPage() {
   const [categoriasRecolhidas, setCategoriasRecolhidas] = useState<string[]>([]);
   const [selected, setSelected] = useState<ProdutoCalculado | null>(null);
   const [mode, setMode] = useState<ModalMode>(null);
+  // Quando o cadastro é aberto a partir de Nova encomenda (?retorno=...), volta para lá ao final.
+  const [retorno, setRetorno] = useState<string | null>(null);
+  const router = useRouter();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [categoriasDoc, setCategoriasDoc] = useState<Categoria[]>([]);
   // Todas as categorias, na ordem cadastrada (agrupamento da galeria)
@@ -1142,7 +1146,12 @@ export default function ProdutosPage() {
         setConfig(cfg);
         setTotalCustos(custos);
         // Atalho vindo do Dashboard: /produtos?novo=1 abre o cadastro direto
-        if (new URLSearchParams(window.location.search).get("novo") === "1") setMode("novo");
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("novo") === "1") {
+          setMode("novo");
+          const r = params.get("retorno");
+          if (r && r.startsWith("/")) setRetorno(r);
+        }
       })
       .catch((e) => setErro(String(e)))
       .finally(() => setLoading(false));
@@ -1186,6 +1195,12 @@ export default function ProdutosPage() {
     setMode(null);
     setConfirmDelete(false);
     setTimeout(() => setSelected(null), 340);
+  };
+
+  // Fecha o cadastro de produto novo; se veio de Nova encomenda, volta para lá.
+  const fecharNovo = () => {
+    close();
+    if (retorno) router.push(retorno);
   };
 
   const abrirNovo = () => {
@@ -1236,7 +1251,12 @@ export default function ProdutosPage() {
     setErro(null);
     try {
       if (mode === "novo") {
-        await criarProduto(campos);
+        const criado = await criarProduto(campos);
+        if (retorno) {
+          // Volta para Nova encomenda já com o produto recém-criado selecionado.
+          router.push(`${retorno}${retorno.includes("?") ? "&" : "?"}produtoCriado=${criado.id}`);
+          return;
+        }
       } else if (mode === "editar" && selected) {
         await editarProduto(selected.id, campos);
       }
@@ -1721,7 +1741,7 @@ export default function ProdutosPage() {
       {/* Modal novo produto */}
       <Modal
         open={mode === "novo"}
-        onClose={close}
+        onClose={fecharNovo}
         title="Novo produto"
         wide
       >
@@ -1731,7 +1751,7 @@ export default function ProdutosPage() {
           config={config}
           totalCustos={totalCustos}
           onSave={handleSave}
-          onClose={close}
+          onClose={fecharNovo}
           onAddCategoria={handleAddCategoria}
         />
       </Modal>
