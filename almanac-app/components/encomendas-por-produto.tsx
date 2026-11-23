@@ -58,12 +58,24 @@ export function agruparPorProduto(encomendas: Encomenda[], produtos: ProdutoCalc
 export function CartaoProduto({
   grupo,
   onPedidoClick,
+  arrastando = false,
+  onDragStart,
+  onDragEnd,
 }: {
   grupo: GrupoProduto;
   onPedidoClick: (enc: Encomenda) => void;
+  arrastando?: boolean;
+  onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd?: () => void;
 }) {
   return (
-    <div className="alm-kanban-card" style={{ cursor: "default", gap: 6 }}>
+    <div
+      className="alm-kanban-card"
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      style={{ cursor: "grab", gap: 6, opacity: arrastando ? 0.4 : 1, userSelect: "none" }}
+    >
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span
           style={{

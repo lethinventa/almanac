@@ -70,7 +70,7 @@ interface KanbanBoardProps {
   columns?: EncomendaStatus[];
   // Total já recebido por encomenda (id → valor). Se informado, o card mostra a tag Pago/Pendente.
   recebidoPorEncomenda?: Record<string, number>;
-  // "produtos": dentro de cada coluna, os cards são agrupados por produto (sem arrastar).
+  // "produtos": dentro de cada coluna, os cards são agrupados por produto; arrastar um card muda o status de todos os seus pedidos.
   visao?: "pedidos" | "produtos";
 }
 
@@ -83,6 +83,8 @@ export function KanbanBoard({
   visao = "pedidos",
 }: KanbanBoardProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  // Na visão por produto: o grupo arrastado (coluna + produto) e as encomendas que ele carrega.
+  const [draggedGrupo, setDraggedGrupo] = useState<{ chave: string; ids: string[] } | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<EncomendaStatus | null>(null);
   const [produtosList, setProdutosList] = useState<ProdutoCalculado[]>([]);
   const [ocultas, setOcultas] = useState<EncomendaStatus[]>([]);
@@ -171,7 +173,12 @@ export function KanbanBoard({
             }}
             onDrop={(e) => {
               e.preventDefault();
-              if (draggedId) onStatusChange(draggedId, status);
+              // Card de encomenda leva 1 pedido; card de produto leva todos os pedidos daquele produto na coluna.
+              const ids = draggedGrupo?.ids ?? (draggedId ? [draggedId] : []);
+              for (const id of ids) {
+                if (lista.find((e) => e.id === id)?.status !== status) onStatusChange(id, status);
+              }
+              setDraggedGrupo(null);
               setDraggedId(null);
               setDragOverStatus(null);
             }}
@@ -255,9 +262,26 @@ export function KanbanBoard({
               )}
 
               {visao === "produtos"
-                ? agruparPorProduto(cards, produtosList).map((grupo) => (
-                    <CartaoProduto key={grupo.chave} grupo={grupo} onPedidoClick={onCardClick} />
-                  ))
+                ? agruparPorProduto(cards, produtosList).map((grupo) => {
+                    const chaveGrupo = `${status}|${grupo.chave}`;
+                    return (
+                      <CartaoProduto
+                        key={chaveGrupo}
+                        grupo={grupo}
+                        onPedidoClick={onCardClick}
+                        arrastando={draggedGrupo?.chave === chaveGrupo}
+                        onDragStart={(e) => {
+                          e.dataTransfer.effectAllowed = "move";
+                          e.dataTransfer.setData("text/plain", chaveGrupo);
+                          setDraggedGrupo({ chave: chaveGrupo, ids: grupo.pedidos.map((p) => p.encomenda.id) });
+                        }}
+                        onDragEnd={() => {
+                          setDraggedGrupo(null);
+                          setDragOverStatus(null);
+                        }}
+                      />
+                    );
+                  })
                 : cards.map((enc) => {
                 const isDragging = draggedId === enc.id;
                 const cardFoto = getCardFoto(enc);
