@@ -19,7 +19,7 @@ import {
   statusLabels,
   statusBadge,
 } from "@/lib/utils";
-import { buscarEncomendas, atualizarStatus, isPessoal, type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
+import { buscarEncomendas, atualizarStatus, isPessoal, todosItensProntos, type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
 import { buscarTodosPagamentos } from "@/lib/repositories/pagamentos";
 import { KanbanBoard } from "@/components/kanban-board";
 
@@ -33,6 +33,7 @@ export default function EncomendasPage() {
   const [filtroTipo, setFiltroTipo] = useState<"todas" | "clientes" | "pessoal">("todas");
   const [view, setView] = useState<ViewEncomendas>("kanban");
   const [recebidoPorEncomenda, setRecebidoPorEncomenda] = useState<Record<string, number>>({});
+  const [aviso, setAviso] = useState("");
 
   useEffect(() => {
     buscarEncomendas().then(setLista);
@@ -63,6 +64,12 @@ export default function EncomendasPage() {
   const goDetalhe = (e: Encomenda) => router.push(`/encomendas/${e.id}`);
 
   const handleStatusChange = (id: string, status: EncomendaStatus) => {
+    const enc = lista.find((e) => e.id === id);
+    if (status === "pronto" && enc && !todosItensProntos(enc)) {
+      setAviso("Só dá para mover para Pronto quando todos os itens da encomenda estiverem prontos.");
+      return;
+    }
+    setAviso("");
     atualizarStatus(id, status);
     setLista((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
   };
@@ -173,6 +180,10 @@ export default function EncomendasPage() {
           ))}
         </div>
       </div>
+
+      {aviso && (
+        <div style={{ fontSize: 12, color: "var(--status-error)" }}>{aviso}</div>
+      )}
 
       {/* Kanban por status; na visão "Por produto", os cards de cada coluna são agrupados por produto */}
       {(view === "kanban" || view === "produtos") && (

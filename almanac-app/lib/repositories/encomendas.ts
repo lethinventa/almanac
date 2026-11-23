@@ -25,6 +25,13 @@ export interface EncomendaItem {
   // Só para itens de impressão 3D: quantas peças estão em cada etapa da produção.
   // A soma deve dar a quantidade; ausente = tudo em impressão.
   etapas?: Partial<Record<EtapaProducao, number>>;
+  // Item pronto (produzido e conferido). A encomenda só pode ir para "pronto" quando todos os itens estiverem prontos.
+  pronto?: boolean;
+}
+
+// Regra: a encomenda só vai para "pronto" quando todos os itens estão prontos.
+export function todosItensProntos(e: { itens: EncomendaItem[] }): boolean {
+  return e.itens.length > 0 && e.itens.every((i) => i.pronto === true);
 }
 
 export interface LinkUtil {

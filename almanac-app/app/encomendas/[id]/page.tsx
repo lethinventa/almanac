@@ -32,6 +32,7 @@ import {
   editarEncomenda,
   type EmbalagemEncomenda,
   atualizarStatus,
+  todosItensProntos,
   adicionarLink,
   removerLink,
   excluirEncomenda,
@@ -336,6 +337,7 @@ function TabelaProdutos({
   onProdutoClick,
   produtos,
   semPreco = false,
+  travarProntos = false,
 }: {
   itens: EncomendaItem[];
   onChange: (itens: EncomendaItem[]) => void;
@@ -344,6 +346,8 @@ function TabelaProdutos({
   produtos: ProdutoCalculado[];
   // Encomenda pessoal: esconde as colunas de preço (não há venda).
   semPreco?: boolean;
+  // Encomenda já está em "pronto": o check dos itens fica travado para não quebrar a regra.
+  travarProntos?: boolean;
 }) {
   const [editCell, setEditCell] = useState<{
     row: number;
@@ -377,6 +381,9 @@ function TabelaProdutos({
 
   const removeItem = (idx: number) =>
     onChange(itens.filter((_, i) => i !== idx));
+
+  const togglePronto = (idx: number) =>
+    onChange(itens.map((item, i) => (i === idx ? { ...item, pronto: !item.pronto } : item)));
 
   const confirmAdd = () => {
     const qty = parseFloat(newItem.quantidade);
@@ -425,6 +432,7 @@ function TabelaProdutos({
           <tr>
             <th style={{ width: 44 }} />
             <th>Produto</th>
+            <th style={{ width: 64 }}>Pronto</th>
             <th className="num">Qtd</th>
             <th className="num" style={semPreco ? { display: "none" } : undefined}>Valor unit.</th>
             <th className="num" style={semPreco ? { display: "none" } : undefined}>Subtotal</th>
@@ -489,6 +497,18 @@ function TabelaProdutos({
                       <Info size={11} strokeWidth={1.5} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
                     )}
                   </span>
+                </td>
+
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={`${prod?.nome ?? item.descricao ?? "Item"} pronto`}
+                    checked={item.pronto === true}
+                    disabled={travarProntos}
+                    title={travarProntos ? "Volte a encomenda para Em produção para alterar" : "Item pronto"}
+                    onChange={() => togglePronto(i)}
+                    style={{ cursor: travarProntos ? "default" : "pointer", accentColor: "var(--accent-highlight)" }}
+                  />
                 </td>
 
                 <td className="num">
@@ -604,6 +624,7 @@ function TabelaProdutos({
                   ))}
                 </select>
               </td>
+              <td />
               <td className="num">
                 <input
                   className="atlas-input"
@@ -1473,6 +1494,7 @@ export default function EncomendaDetalhePage() {
   };
 
   const handleStatusAdvance = (nextSt: EncomendaStatus) => {
+    if (nextSt === "pronto" && !todosItensProntos({ itens })) return;
     atualizarStatus(enc.id, nextSt);
     setStatus(nextSt);
   };
@@ -1643,6 +1665,12 @@ export default function EncomendaDetalhePage() {
                   <button
                     className="atlas-btn atlas-btn-primary atlas-btn-sm"
                     style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
+                    disabled={nextStatus === "pronto" && !todosItensProntos({ itens })}
+                    title={
+                      nextStatus === "pronto" && !todosItensProntos({ itens })
+                        ? "Marque todos os itens como prontos para avançar"
+                        : undefined
+                    }
                     onClick={() => handleStatusAdvance(nextStatus)}
                   >
                     {nextLabel}
@@ -1713,6 +1741,7 @@ export default function EncomendaDetalhePage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <TabelaProdutos
             semPreco={pessoal}
+            travarProntos={status === "pronto"}
             itens={itens}
             onChange={handleItensChange}
             onPreview={(src, alt) => setLightbox({ src, alt })}
