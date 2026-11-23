@@ -11,6 +11,7 @@ import {
   MessageCircle,
   Users,
   AlertTriangle,
+  Package,
 } from "lucide-react";
 import {
   formatBRL,
@@ -21,6 +22,9 @@ import {
 import { buscarEncomendas, atualizarStatus, isPessoal, type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
 import { buscarTodosPagamentos } from "@/lib/repositories/pagamentos";
 import { KanbanBoard } from "@/components/kanban-board";
+import { EncomendasPorProduto } from "@/components/encomendas-por-produto";
+
+type ViewEncomendas = "kanban" | "lista" | "produtos";
 
 // ── Page ─────────────────────────────────────────────────────
 export default function EncomendasPage() {
@@ -28,7 +32,7 @@ export default function EncomendasPage() {
   const [lista, setLista] = useState<Encomenda[]>([]);
   const [busca, setBusca] = useState("");
   const [filtroTipo, setFiltroTipo] = useState<"todas" | "clientes" | "pessoal">("todas");
-  const [view, setView] = useState<"kanban" | "lista">("kanban");
+  const [view, setView] = useState<ViewEncomendas>("kanban");
   const [recebidoPorEncomenda, setRecebidoPorEncomenda] = useState<Record<string, number>>({});
 
   useEffect(() => {
@@ -85,10 +89,12 @@ export default function EncomendasPage() {
               overflow: "hidden",
             }}
           >
-            {(["kanban", "lista"] as const).map((v) => (
+            {(["kanban", "lista", "produtos"] as const).map((v, i) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
+                title={v === "kanban" ? "Kanban" : v === "lista" ? "Lista" : "Por produto"}
+                aria-label={v === "kanban" ? "Kanban" : v === "lista" ? "Lista" : "Por produto"}
                 style={{
                   width: 32,
                   height: 32,
@@ -97,13 +103,19 @@ export default function EncomendasPage() {
                   justifyContent: "center",
                   background: view === v ? "var(--bg-tab-active)" : "transparent",
                   border: "none",
-                  borderLeft: v === "lista" ? "1px solid var(--border-default)" : "none",
+                  borderLeft: i > 0 ? "1px solid var(--border-default)" : "none",
                   cursor: "pointer",
                   color: view === v ? "var(--text-primary)" : "var(--text-tertiary)",
                   transition: "background-color 120ms ease, color 120ms ease",
                 }}
               >
-                {v === "kanban" ? <Columns size={14} strokeWidth={1.5} /> : <LayoutList size={14} strokeWidth={1.5} />}
+                {v === "kanban" ? (
+                  <Columns size={14} strokeWidth={1.5} />
+                ) : v === "lista" ? (
+                  <LayoutList size={14} strokeWidth={1.5} />
+                ) : (
+                  <Package size={14} strokeWidth={1.5} />
+                )}
               </button>
             ))}
           </div>
@@ -172,6 +184,9 @@ export default function EncomendasPage() {
           recebidoPorEncomenda={recebidoPorEncomenda}
         />
       )}
+
+      {/* Por produto: itens das encomendas abertas agrupados por produto */}
+      {view === "produtos" && <EncomendasPorProduto lista={filtrados} onRowClick={goDetalhe} />}
 
       {/* Lista */}
       {view === "lista" && (
