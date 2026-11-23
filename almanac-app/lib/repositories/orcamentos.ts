@@ -41,6 +41,37 @@ export async function registrarOrcamentoEnviado(dados: OrcamentoInput): Promise<
   return store.insert({ id: newId(), status: "enviado", ...dados });
 }
 
+// Corrige um orçamento já registrado (cliente, prazo, itens, desconto).
+// Totais, custo e margem são recalculados a partir dos itens editados.
+// Orçamento aprovado não pode ser editado: já virou encomenda.
+export async function editarOrcamento(
+  id: string,
+  dados: { cliente: string; prazo: string; desconto: number; itens: OrcamentoItem[] }
+): Promise<Orcamento> {
+  const atual = await store.list().then((l) => l.find((o) => o.id === id));
+  if (!atual) throw new Error("Orçamento não encontrado");
+  if (atual.status === "aprovado") throw new Error("Orçamento aprovado não pode ser editado: edite a encomenda.");
+
+  const subtotal = dados.itens.reduce((s, i) => s + i.subtotal, 0);
+  const custoTotal = dados.itens.reduce((s, i) => s + i.custoUnitario * i.quantidade, 0);
+  const desconto = Math.min(Math.max(dados.desconto || 0, 0), subtotal);
+  const total = Math.round((subtotal - desconto) * 100) / 100;
+  const margem = total > 0 ? ((total - custoTotal) / total) * 100 : 0;
+
+  const atualizado = await store.update(id, {
+    cliente: dados.cliente.trim(),
+    prazo: dados.prazo.trim(),
+    itens: dados.itens,
+    subtotal,
+    desconto,
+    total,
+    custoTotal,
+    margem,
+  });
+  if (!atualizado) throw new Error("Orçamento não encontrado");
+  return atualizado;
+}
+
 export async function recusarOrcamento(id: string): Promise<void> {
   const atualizado = await store.update(id, { status: "recusado" });
   if (!atualizado) throw new Error("Orçamento não encontrado");
