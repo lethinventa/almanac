@@ -186,7 +186,7 @@ export default function EncomendasPage() {
       )}
 
       {/* Por produto: itens das encomendas abertas agrupados por produto */}
-      {view === "produtos" && <EncomendasPorProduto lista={filtrados} onRowClick={goDetalhe} />}
+      {view === "produtos" && <EncomendasPorProduto lista={filtrados} onCardClick={goDetalhe} />}
 
       {/* Lista */}
       {view === "lista" && (
