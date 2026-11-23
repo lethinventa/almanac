@@ -9,6 +9,7 @@ import {
 } from "@/lib/utils";
 import { isPessoal, type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
 import { buscarProdutos, type ProdutoCalculado } from "@/lib/repositories/produtos";
+import { agruparPorProduto, CartaoProduto } from "@/components/encomendas-por-produto";
 
 const STATUS_ORDER: EncomendaStatus[] = [
   "aguardando",
@@ -69,6 +70,8 @@ interface KanbanBoardProps {
   columns?: EncomendaStatus[];
   // Total já recebido por encomenda (id → valor). Se informado, o card mostra a tag Pago/Pendente.
   recebidoPorEncomenda?: Record<string, number>;
+  // "produtos": dentro de cada coluna, os cards são agrupados por produto (sem arrastar).
+  visao?: "pedidos" | "produtos";
 }
 
 export function KanbanBoard({
@@ -77,6 +80,7 @@ export function KanbanBoard({
   onStatusChange,
   columns = STATUS_ORDER,
   recebidoPorEncomenda,
+  visao = "pedidos",
 }: KanbanBoardProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<EncomendaStatus | null>(null);
@@ -250,7 +254,11 @@ export function KanbanBoard({
                 </div>
               )}
 
-              {cards.map((enc) => {
+              {visao === "produtos"
+                ? agruparPorProduto(cards, produtosList).map((grupo) => (
+                    <CartaoProduto key={grupo.chave} grupo={grupo} onPedidoClick={onCardClick} />
+                  ))
+                : cards.map((enc) => {
                 const isDragging = draggedId === enc.id;
                 const cardFoto = getCardFoto(enc);
                 const resumo = enc.itens

@@ -22,7 +22,6 @@ import {
 import { buscarEncomendas, atualizarStatus, isPessoal, type Encomenda, type EncomendaStatus } from "@/lib/repositories/encomendas";
 import { buscarTodosPagamentos } from "@/lib/repositories/pagamentos";
 import { KanbanBoard } from "@/components/kanban-board";
-import { EncomendasPorProduto } from "@/components/encomendas-por-produto";
 
 type ViewEncomendas = "kanban" | "lista" | "produtos";
 
@@ -175,18 +174,16 @@ export default function EncomendasPage() {
         </div>
       </div>
 
-      {/* Kanban */}
-      {view === "kanban" && (
+      {/* Kanban por status; na visão "Por produto", os cards de cada coluna são agrupados por produto */}
+      {(view === "kanban" || view === "produtos") && (
         <KanbanBoard
           lista={filtrados}
           onCardClick={goDetalhe}
           onStatusChange={handleStatusChange}
           recebidoPorEncomenda={recebidoPorEncomenda}
+          visao={view === "produtos" ? "produtos" : "pedidos"}
         />
       )}
-
-      {/* Por produto: itens das encomendas abertas agrupados por produto */}
-      {view === "produtos" && <EncomendasPorProduto lista={filtrados} onCardClick={goDetalhe} />}
 
       {/* Lista */}
       {view === "lista" && (
