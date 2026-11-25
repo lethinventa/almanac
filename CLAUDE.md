@@ -42,6 +42,15 @@ Ambos os parâmetros são configuráveis em `/configuracoes`. Custos indiretos s
 cartão), estorno com motivo, status consolidado (sem pagamento / sinal / paga / paga a maior).
 Integrado ao fluxo de caixa em `/financeiro`.
 
+## Integração com o site (gingastudio.com.br)
+
+O site (repo `lethinventa/gingastudio3d`, Astro, Vercel) lê os produtos do Almanac na publicação.
+Em `/produtos`, o botão **Site** do produto edita `produto.site` (publicar, categoria do site,
+descrição, fotos, faixas de preço por pacote, especificações). A função pública
+`produtos_site()` (`supabase/site.sql`) entrega só produtos publicados e só esses campos — nunca
+colocar dado interno em `produto.site`. Ao salvar um produto publicado, `/api/site/atualizar`
+dispara o Deploy Hook da Vercel (`SITE_DEPLOY_HOOK_URL`, só no servidor).
+
 ## O que ainda não foi implementado
 
 - Log de movimentações de estoque de insumos (entrada/saída/ajuste manual)
