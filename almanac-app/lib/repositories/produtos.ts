@@ -5,7 +5,7 @@ import { buscarEncomendas } from "@/lib/repositories/encomendas";
 import * as registro from "@/lib/repositories/produtos-registro";
 import { calcPrecoSugerido, calcPreco3D } from "@/lib/produto-calculos";
 
-export type { Produto, ProdutoInput, InsumoReceita, Etapas3D } from "@/lib/repositories/produtos-registro";
+export type { Produto, ProdutoInput, InsumoReceita, Etapas3D, DadosSite, FaixaPreco, Especificacao } from "@/lib/repositories/produtos-registro";
 import type { Produto } from "@/lib/repositories/produtos-registro";
 
 // Produto com valores derivados: custo = soma dos insumos da receita aos preços atuais;

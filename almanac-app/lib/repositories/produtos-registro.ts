@@ -14,6 +14,31 @@ export interface Etapas3D {
   acabamento?: number;
 }
 
+// Faixa de preço do site: pacote com N unidades por um preço total.
+export interface FaixaPreco {
+  quantidade: number;
+  preco: number;
+}
+
+export interface Especificacao {
+  rotulo: string;
+  valor: string;
+}
+
+// O que aparece no site (gingastudio.com.br). O site só lê produtos com `publicar` = true.
+// Nunca colocar aqui nada interno (custo, receita, margem): a função pública do Supabase
+// entrega este objeto inteiro.
+export interface DadosSite {
+  publicar: boolean;
+  categoria: string;
+  descricao: string;
+  especificacoes: Especificacao[];
+  // Data URLs (fotos enviadas pelo Almanac) ou caminhos de imagens que já estão no site ("/foto.png").
+  // Vazio: o site usa a foto principal do produto.
+  fotos: string[];
+  faixas: FaixaPreco[];
+}
+
 export interface Produto {
   id: string;
   nome: string;
@@ -26,6 +51,7 @@ export interface Produto {
   multiplicador?: number;
   // Preço de venda definido pela proprietária (o que vai pro site). Se ausente, vale o sugerido.
   precoVenda?: number;
+  site?: DadosSite;
 }
 
 export interface ProdutoInput {
@@ -37,6 +63,7 @@ export interface ProdutoInput {
   etapas3D?: Etapas3D | null;
   multiplicador?: number | null;
   precoVenda?: number | null;
+  site?: DadosSite | null;
 }
 
 const store = createRemoteStore<Produto>("produtos");
@@ -56,6 +83,7 @@ export async function criarProduto(dados: ProdutoInput): Promise<Produto> {
     etapas3D: dados.etapas3D ?? undefined,
     multiplicador: dados.multiplicador ?? undefined,
     precoVenda: dados.precoVenda ?? undefined,
+    site: dados.site ?? undefined,
   });
 }
 
@@ -69,6 +97,7 @@ export async function editarProduto(id: string, dados: Partial<ProdutoInput>): P
   if ("etapas3D" in dados) patch.etapas3D = dados.etapas3D ?? undefined;
   if ("multiplicador" in dados) patch.multiplicador = dados.multiplicador ?? undefined;
   if ("precoVenda" in dados) patch.precoVenda = dados.precoVenda ?? undefined;
+  if ("site" in dados) patch.site = dados.site ?? undefined;
 
   const updated = await store.update(id, patch);
   if (!updated) throw new Error("Produto não encontrado");

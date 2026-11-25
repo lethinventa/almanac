@@ -18,7 +18,12 @@ import {
   Calculator,
   Layers,
   Printer,
+  Globe,
 } from "lucide-react";
+import { SiteForm } from "@/components/produto-site/site-form";
+import { atualizarSite } from "@/lib/site";
+import { importarProdutosDoSite } from "@/lib/importar-site";
+import type { DadosSite } from "@/lib/repositories/produtos";
 import { formatBRL } from "@/lib/utils";
 import { lerImagem } from "@/lib/imagem";
 import { buscarTotalCustosIndiretos } from "@/lib/repositories/financeiro";
@@ -49,7 +54,7 @@ import {
 } from "@/lib/repositories/produtos";
 import { buscarInsumos, type Insumo } from "@/lib/repositories/insumos";
 
-type ModalMode = "detalhe" | "editar" | "novo" | null;
+type ModalMode = "detalhe" | "editar" | "novo" | "site" | null;
 
 interface ReceitaRow {
   insumoId: string;
@@ -1119,6 +1124,8 @@ export default function ProdutosPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Aviso de atualização do site (gingastudio.com.br)
+  const [avisoSite, setAvisoSite] = useState<string | null>(null);
 
   const [busca, setBusca] = useState("");
   const [view, setView] = useState<"tabela" | "galeria">("galeria");
@@ -1218,6 +1225,60 @@ export default function ProdutosPage() {
     }
   };
 
+  // Republica o site quando muda algo que ele mostra. Não bloqueia: o produto já foi salvo.
+  const republicarSite = async () => {
+    setAvisoSite("Atualizando o site… fica pronto em cerca de 1 minuto.");
+    const r = await atualizarSite();
+    setAvisoSite(
+      r.ok
+        ? "Site atualizando. As mudanças aparecem em cerca de 1 minuto."
+        : `Produto salvo, mas o site não foi atualizado: ${r.erro}`
+    );
+  };
+
+  const categoriasSite = [
+    ...new Set(lista.map((p) => p.site?.categoria?.trim()).filter((c): c is string => Boolean(c))),
+  ].sort();
+  const temProdutosNoSite = lista.some((p) => p.site);
+
+  const handleSalvarSite = async (site: DadosSite) => {
+    if (!selected) return;
+    const afetaSite = site.publicar || Boolean(selected.site?.publicar);
+    setSaving(true);
+    setErro(null);
+    try {
+      await editarProduto(selected.id, { site });
+      close();
+      await reloadProdutos();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+      return;
+    } finally {
+      setSaving(false);
+    }
+    if (afetaSite) await republicarSite();
+  };
+
+  const handleImportarDoSite = async () => {
+    setSaving(true);
+    setErro(null);
+    try {
+      const categoriaNovos = categorias.includes("Impressão 3D") ? "Impressão 3D" : categoriasAtivas[0] ?? "Outro";
+      const r = await importarProdutosDoSite(lista, categoriaNovos);
+      await reloadProdutos();
+      const partes = [
+        r.vinculados.length ? `${r.vinculados.length} vinculado(s) a produtos existentes` : "",
+        r.criados.length ? `${r.criados.length} criado(s) sem receita (${r.criados.join(", ")}) — complete a receita depois` : "",
+      ].filter(Boolean);
+      setAvisoSite(`Importação concluída: ${partes.join("; ") || "nada novo"}.`);
+      if (partes.length) await atualizarSite();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSave = async (data: {
     nome: string;
     categoria: string;
@@ -1264,24 +1325,30 @@ export default function ProdutosPage() {
       await reloadProdutos();
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
+      return;
     } finally {
       setSaving(false);
     }
+    // Nome e foto principal aparecem no site
+    if (mode === "editar" && selected?.site?.publicar) await republicarSite();
   };
 
   const handleDelete = async () => {
     if (!selected) return;
     setSaving(true);
     setErro(null);
+    const estavaNoSite = Boolean(selected.site?.publicar);
     try {
       await deletarProduto(selected.id);
       close();
       await reloadProdutos();
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
+      return;
     } finally {
       setSaving(false);
     }
+    if (estavaNoSite) await republicarSite();
   };
 
   if (loading) {
@@ -1308,15 +1375,44 @@ export default function ProdutosPage() {
             {lista.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <button
-          className="atlas-btn atlas-btn-primary atlas-btn-sm"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-          onClick={abrirNovo}
-        >
-          <Plus size={13} strokeWidth={1.5} />
-          Novo produto
-        </button>
+        <div className="alm-header-actions" style={{ display: "flex", gap: 8 }}>
+          {!temProdutosNoSite && (
+            <button
+              className="atlas-btn atlas-btn-secondary atlas-btn-sm"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              onClick={handleImportarDoSite}
+              disabled={saving}
+              title="Traz os 9 produtos que estavam escritos no site, com descrição, fotos e faixas de preço"
+            >
+              <Globe size={13} strokeWidth={1.5} />
+              Importar do site
+            </button>
+          )}
+          <button
+            className="atlas-btn atlas-btn-primary atlas-btn-sm"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            onClick={abrirNovo}
+          >
+            <Plus size={13} strokeWidth={1.5} />
+            Novo produto
+          </button>
+        </div>
       </div>
+
+      {avisoSite && (
+        <div className="atlas-alert atlas-alert-info" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Globe size={14} strokeWidth={1.5} />
+          <div className="atlas-alert-desc" style={{ flex: 1 }}>{avisoSite}</div>
+          <button
+            className="atlas-btn atlas-btn-ghost atlas-btn-sm"
+            style={{ padding: "0 4px" }}
+            onClick={() => setAvisoSite(null)}
+            aria-label="Fechar aviso"
+          >
+            <X size={13} strokeWidth={1.5} />
+          </button>
+        </div>
+      )}
 
       {/* Error banner */}
       {erro && (
@@ -1712,6 +1808,15 @@ export default function ProdutosPage() {
                 Fechar
               </button>
               <button
+                className="atlas-btn atlas-btn-secondary atlas-btn-sm"
+                style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
+                onClick={() => setMode("site")}
+                disabled={saving}
+              >
+                <Globe size={12} strokeWidth={1.5} />
+                {selected?.site?.publicar ? "No site" : "Site"}
+              </button>
+              <button
                 className="atlas-btn atlas-btn-primary atlas-btn-sm"
                 style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
                 onClick={() => {
@@ -1773,6 +1878,25 @@ export default function ProdutosPage() {
             onSave={handleSave}
             onClose={close}
             onAddCategoria={handleAddCategoria}
+          />
+        )}
+      </Modal>
+
+      {/* Modal site */}
+      <Modal
+        open={mode === "site"}
+        onClose={close}
+        title={`Site · ${selected?.nome ?? ""}`}
+        wide
+      >
+        {selected && (
+          <SiteForm
+            key={selected.id}
+            produto={selected}
+            categoriasSite={categoriasSite}
+            salvando={saving}
+            onSave={handleSalvarSite}
+            onClose={close}
           />
         )}
       </Modal>
